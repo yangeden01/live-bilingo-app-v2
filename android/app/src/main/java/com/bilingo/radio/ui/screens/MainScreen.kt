@@ -97,25 +97,31 @@ fun MainScreen(
                 .setDomain("appassets.android.com")
                 .addPathHandler("/", object : androidx.webkit.WebViewAssetLoader.PathHandler {
                     override fun handle(path: String): WebResourceResponse? {
-                        var cleanPath = path.trimStart('/')
-                        if (cleanPath.isEmpty() || cleanPath == "index.html") {
-                            cleanPath = "index.html"
-                        }
-                        val candidatePaths = listOf(cleanPath, "www/$cleanPath", "assets/$cleanPath", "www/assets/$cleanPath")
+                        val rawPath = path.trimStart('/')
+                        val cleanPath = rawPath.substringBefore('?').substringBefore('#')
+                        val finalPath = if (cleanPath.isEmpty() || cleanPath == "index.html") "index.html" else cleanPath
+                        
+                        val candidatePaths = listOf(
+                            finalPath,
+                            "www/$finalPath",
+                            "assets/$finalPath",
+                            "www/assets/$finalPath"
+                        ).distinct()
+
                         for (assetPath in candidatePaths) {
                             try {
                                 val inputStream = context.assets.open(assetPath)
                                 val mimeType = when {
-                                    assetPath.endsWith(".html") -> "text/html"
-                                    assetPath.endsWith(".js") || assetPath.endsWith(".mjs") -> "text/javascript"
-                                    assetPath.endsWith(".css") -> "text/css"
-                                    assetPath.endsWith(".png") -> "image/png"
-                                    assetPath.endsWith(".jpg") || assetPath.endsWith(".jpeg") -> "image/jpeg"
-                                    assetPath.endsWith(".svg") -> "image/svg+xml"
-                                    assetPath.endsWith(".json") -> "application/json"
-                                    assetPath.endsWith(".woff2") -> "font/woff2"
-                                    assetPath.endsWith(".woff") -> "font/woff"
-                                    assetPath.endsWith(".ttf") -> "font/ttf"
+                                    assetPath.endsWith(".html", ignoreCase = true) -> "text/html"
+                                    assetPath.endsWith(".js", ignoreCase = true) || assetPath.endsWith(".mjs", ignoreCase = true) -> "text/javascript"
+                                    assetPath.endsWith(".css", ignoreCase = true) -> "text/css"
+                                    assetPath.endsWith(".png", ignoreCase = true) -> "image/png"
+                                    assetPath.endsWith(".jpg", ignoreCase = true) || assetPath.endsWith(".jpeg", ignoreCase = true) -> "image/jpeg"
+                                    assetPath.endsWith(".svg", ignoreCase = true) -> "image/svg+xml"
+                                    assetPath.endsWith(".json", ignoreCase = true) -> "application/json"
+                                    assetPath.endsWith(".woff2", ignoreCase = true) -> "font/woff2"
+                                    assetPath.endsWith(".woff", ignoreCase = true) -> "font/woff"
+                                    assetPath.endsWith(".ttf", ignoreCase = true) -> "font/ttf"
                                     else -> "application/octet-stream"
                                 }
                                 val encoding = if (mimeType.startsWith("text/") || mimeType == "application/json" || mimeType == "text/javascript") "UTF-8" else null

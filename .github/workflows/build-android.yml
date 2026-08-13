@@ -48,6 +48,7 @@ jobs:
           npm ci || npm install
           npm run build
           mkdir -p android/app/src/main/assets/www
+          cp -r dist/* android/app/src/main/assets/
           cp -r dist/* android/app/src/main/assets/www/
 
       - name: Build Android App Bundle (AAB)

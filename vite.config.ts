@@ -18,7 +18,7 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss(), removeCrossoriginPlugin()],
     build: {
       emptyOutDir: true,
-      target: 'es2018',
+      target: 'es2015',
       modulePreload: false,
       cssCodeSplit: false,
       rollupOptions: {

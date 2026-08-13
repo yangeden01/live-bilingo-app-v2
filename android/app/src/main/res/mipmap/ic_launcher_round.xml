@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Background Slate Dark Container -->
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M0,0h108v108h-108z"/>
+    <!-- Radio Antenna Tower Circle Node -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M54,54m-8,0a8,8 0 1,1 16,0a8,8 0 1,1 -16,0"/>
+    <!-- Outer Radio Waves Left/Right Cyan -->
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M34,40 C26,48 26,60 34,68 M74,40 C82,48 82,60 74,68"/>
+    <!-- Far Outer Radio Waves Left/Right Amber -->
+    <path
+        android:strokeColor="#F59E0B"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M24,32 C12,44 12,64 24,76 M84,32 C96,44 96,64 84,76"/>
+    <!-- Central Antenna Stand -->
+    <path
+        android:strokeColor="#E2E8F0"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M54,62 L54,84 M44,84 L64,84"/>
+</vector>
+

@@ -6,8 +6,8 @@
 
 每當程式碼更新時，GitHub Actions 會自動編譯並發布最新的 APK 檔（完全不需解壓縮）：
 
-👉 **[點此進入 GitHub Releases 直接下載 bilingo-radio.apk](https://github.com/yangeden01/live-bilingo-app-v2/releases/download/v2.0.0/bilingo-radio.apk)**
-👉 **[備用：查看所有 GitHub Releases 版本](https://github.com/yangeden01/live-bilingo-app-v2/releases)**
+👉 **[進入 GitHub Releases 頁面下載最新 bilingo-radio.apk](https://github.com/yangeden01/live-bilingo-app-v2/releases)**
+👉 **[直連下載最新 bilingo-radio.apk](https://github.com/yangeden01/live-bilingo-app-v2/releases/download/latest/bilingo-radio.apk)**
 
 ---
 

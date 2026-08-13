@@ -129,8 +129,9 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            echo "=== 1. 自動安裝最新 APK 至雲端模擬器 ==="
-            adb install release_assets/bilingo-radio.apk || adb install android/app/build/outputs/apk/release/*.apk || adb install android/app/build/outputs/apk/debug/*.apk
+            echo "=== 1. 清理舊版 App 並強制覆蓋安裝最新 APK ==="
+            adb uninstall com.bilingo.radio || true
+            adb install -r -g release_assets/bilingo-radio.apk || adb install -r -g android/app/build/outputs/apk/release/*.apk || adb install -r -g android/app/build/outputs/apk/debug/*.apk
             echo "=== 2. 自動啟動 BiLingo Radio App 主畫面 ==="
             adb shell am start -n com.bilingo.radio/com.bilingo.radio.MainActivity
             echo "=== 3. 等待 App 啟動並完成 WebView 渲染 (15 秒) ==="

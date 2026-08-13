@@ -113,3 +113,40 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Enable KVM for Android Emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm-rules.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm || true
+
+      - name: Run Android Cloud Emulator Automatic Test
+        uses: ReactiveCircus/android-emulator-runner@v2
+        if: success()
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            echo "=== 1. 自動安裝最新 APK 至雲端模擬器 ==="
+            adb install release_assets/bilingo-radio.apk || adb install android/app/build/outputs/apk/release/*.apk || adb install android/app/build/outputs/apk/debug/*.apk
+            echo "=== 2. 自動啟動 BiLingo Radio App 主畫面 ==="
+            adb shell am start -n com.bilingo.radio/com.bilingo.radio.MainActivity
+            echo "=== 3. 等待 App 啟動並完成 WebView 渲染 (15 秒) ==="
+            sleep 15
+            echo "=== 4. 抓取雲端模擬器即時螢幕截圖 ==="
+            mkdir -p emulator_test
+            adb exec-out screencap -p > emulator_test/app_startup_screenshot.png
+            echo "=== 5. 匯出 Logcat 偵錯紀錄 ==="
+            adb logcat -d > emulator_test/app_logcat.log
+            echo "=== 雲端模擬器自動執行與開機測試完成！ ==="
+
+      - name: Upload Emulator Test Screenshot & Logcat
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emulator-startup-test-results
+          path: emulator_test/
+          if-no-files-found: ignore
+

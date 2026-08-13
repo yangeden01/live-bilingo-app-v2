@@ -5,6 +5,9 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -88,3 +91,25 @@ jobs:
           name: app-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: ignore
+
+      - name: Prepare Direct Download APK
+        run: |
+          mkdir -p release_assets
+          cp android/app/build/outputs/apk/release/*.apk release_assets/bilingo-radio.apk || true
+
+      - name: Publish Direct APK to GitHub Releases (No Zip)
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: v2.0.0
+          name: "BiLingo Radio v2.0.0 (免解壓直下載)"
+          body: |
+            🚀 **BiLingo Radio 最新 APK 安裝包（免解壓縮）**
+            
+            點擊下方 Assets 中的 `bilingo-radio.apk` 即可直接下載 `.apk` 安裝檔到手機進行安裝！
+          draft: false
+          prerelease: false
+          files: release_assets/bilingo-radio.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

@@ -1,6 +1,6 @@
 {
   "name": "Live Bilingo 雙語電台",
-  "description": "即時廣播與AI雙語字幕電台應用程式 v2.2.3",
+  "description": "即時廣播與AI雙語字幕電台應用程式 v2.2.4 (鎖定直立顯示與旋轉防護)",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -56,6 +56,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         try {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        try {
             enableEdgeToEdge(
                 statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
                 navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
@@ -171,7 +177,7 @@ class MainActivity : ComponentActivity() {
                     }
                 } else {
                     if (isManualCheck) {
-                        Toast.makeText(this, "目前已是最新版本 (v2.2.2)", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "目前已是最新版本 (v2.2.4)", Toast.LENGTH_SHORT).show()
                     }
                 }
             }.addOnFailureListener { e ->

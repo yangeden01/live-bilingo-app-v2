@@ -357,9 +357,48 @@ export default function App() {
     setShowNotificationPrompt(false);
   };
 
-  const [stations, setStations] = useState<RadioStation[]>(DEFAULT_STATIONS);
+  const [stations, setStations] = useState<RadioStation[]>(() => {
+    try {
+      const saved = localStorage.getItem('live_bilingo_stations');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length === 5) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return DEFAULT_STATIONS;
+  });
 
-  const [activeStation, setActiveStation] = useState<RadioStation>(DEFAULT_STATIONS[0]);
+  const [activeStation, setActiveStation] = useState<RadioStation>(() => {
+    try {
+      const savedId = localStorage.getItem('live_bilingo_active_station_id');
+      const savedStations = localStorage.getItem('live_bilingo_stations');
+      const stationList: RadioStation[] = savedStations ? JSON.parse(savedStations) : DEFAULT_STATIONS;
+      if (savedId) {
+        const found = stationList.find((s) => s.id === savedId);
+        if (found) return found;
+      }
+    } catch (e) {}
+    return DEFAULT_STATIONS[0];
+  });
+
+  // Persist stations and activeStation ID to localStorage whenever changed
+  useEffect(() => {
+    try {
+      if (stations && stations.length > 0) {
+        localStorage.setItem('live_bilingo_stations', JSON.stringify(stations));
+      }
+    } catch (e) {}
+  }, [stations]);
+
+  useEffect(() => {
+    try {
+      if (activeStation?.id) {
+        localStorage.setItem('live_bilingo_active_station_id', activeStation.id);
+      }
+    } catch (e) {}
+  }, [activeStation]);
   const [isStationModalOpen, setIsStationModalOpen] = useState(false);
   const [isDictOpen, setIsDictOpen] = useState(false);
   const [dictWord, setDictWord] = useState('');

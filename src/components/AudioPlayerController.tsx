@@ -431,26 +431,7 @@ export const AudioPlayerController: React.FC<Props> = ({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: activeStation.streamUrl, name: activeStation.name }),
     });
-
-    // If currently playing, insert an instant station-alignment subtitle card
-    if (playbackStatusRef.current === 'PLAYING') {
-      const now = Date.now();
-      const localFormattedTime = new Date(now).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true,
-      });
-      onNewSubtitle({
-        id: `station-align-${now}`,
-        timestamp: localFormattedTime,
-        createdAt: now,
-        english: `[Live Broadcast] Tuned in to ${activeStation.name}. Real-time bilingual subtitle alignment active.`,
-        traditionalChinese: `【即時廣播連線】已切換至「${activeStation.name}」，AI 雙語字幕自動對齊中。`,
-        isFinal: true,
-      });
-    }
-  }, [activeStation.id, activeStation.streamUrl, activeStation.name, onNewSubtitle]);
+  }, [activeStation.id, activeStation.streamUrl, activeStation.name]);
 
   const lastSseMessageTimeRef = useRef<number>(0);
 

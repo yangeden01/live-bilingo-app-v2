@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { SubtitleItem, PlaybackStatus, RadioStation, ReadingMode } from '../types';
 import { BilingualSubtitleCard } from './BilingualSubtitleCard';
-import { PrecisionReadingView } from './PrecisionReadingView';
 import { BannerAd } from './BannerAd';
 import { MarqueeText } from './MarqueeText';
 import { getApiUrl } from '../utils/apiUrl';
@@ -28,7 +27,6 @@ import {
   Moon,
   BookOpen,
   ArrowDownCircle,
-  Focus,
   Lock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -50,7 +48,7 @@ interface Props {
   onReadingModeChange?: (mode: ReadingMode) => void;
 }
 
-type FrameTab = 'live' | 'focus' | 'history' | 'bookmarks';
+type FrameTab = 'live' | 'history' | 'bookmarks';
 
 export const Material3AndroidFrame: React.FC<Props> = ({
   subtitles,
@@ -184,6 +182,14 @@ export const Material3AndroidFrame: React.FC<Props> = ({
   const [copiedToast, setCopiedToast] = useState<string | null>(null);
 
   const listContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll subtitle list container to top when active station changes, and auto-switch to live tab
+  useEffect(() => {
+    setActiveTab('live');
+    if (listContainerRef.current) {
+      listContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [activeStation?.id, activeStation?.streamUrl]);
 
   // Auto-scroll subtitle list container to top when a new live subtitle arrives
   useEffect(() => {
@@ -499,18 +505,18 @@ export const Material3AndroidFrame: React.FC<Props> = ({
 
           {/* Subtitle Navigation Bar */}
           <div className="px-3 py-1.5">
-            <div className="w-full grid grid-cols-4 gap-1.5 text-xs font-semibold">
+            <div className="w-full grid grid-cols-3 gap-2 text-xs font-semibold">
               <button
                 onClick={() => setActiveTab('live')}
                 title="即時廣播 (Live)"
-                className={`flex items-center justify-center gap-1 h-8 px-1 sm:px-2 rounded-xl transition-all text-xs cursor-pointer whitespace-nowrap select-none ${
+                className={`flex items-center justify-center gap-1.5 h-8 px-2 rounded-xl transition-all text-xs cursor-pointer whitespace-nowrap select-none ${
                   activeTab === 'live'
                     ? 'bg-blue-600 text-white shadow-sm font-bold'
                     : tabUnselectedBg
                 }`}
               >
                 <Radio className="w-3.5 h-3.5 shrink-0" />
-                <span className="whitespace-nowrap">即時</span>
+                <span className="whitespace-nowrap">即時廣播</span>
                 {liveCount > 0 && (
                   <span className={`px-1 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono leading-none shrink-0 min-w-[16px] text-center ${
                     activeTab === 'live' ? 'bg-blue-300 text-slate-950' : tabBadgeUnselectedBg
@@ -521,29 +527,16 @@ export const Material3AndroidFrame: React.FC<Props> = ({
               </button>
 
               <button
-                onClick={() => setActiveTab('focus')}
-                title="雙語聚焦閱讀模式 (Focus Reading Mode) - 平滑同步呈現"
-                className={`flex items-center justify-center gap-1 h-8 px-1 sm:px-2 rounded-xl transition-all text-xs cursor-pointer whitespace-nowrap select-none ${
-                  activeTab === 'focus'
-                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm font-bold ring-2 ring-emerald-400/40'
-                    : tabUnselectedBg
-                }`}
-              >
-                <Focus className={`w-3.5 h-3.5 shrink-0 ${activeTab === 'focus' ? 'animate-spin text-emerald-200' : 'text-emerald-500'}`} />
-                <span className="whitespace-nowrap">聚焦閱讀</span>
-              </button>
-
-              <button
                 onClick={() => setActiveTab('history')}
                 title="歷史紀錄 (History)"
-                className={`flex items-center justify-center gap-1 h-8 px-1 sm:px-2 rounded-xl transition-all text-xs cursor-pointer whitespace-nowrap select-none ${
+                className={`flex items-center justify-center gap-1.5 h-8 px-2 rounded-xl transition-all text-xs cursor-pointer whitespace-nowrap select-none ${
                   activeTab === 'history'
                     ? 'bg-blue-600 text-white shadow-sm font-bold'
                     : tabUnselectedBg
                 }`}
               >
                 <History className="w-3.5 h-3.5 shrink-0" />
-                <span className="whitespace-nowrap">歷史</span>
+                <span className="whitespace-nowrap">歷史紀錄</span>
                 {historyCount > 0 && (
                   <span className={`px-1 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono leading-none shrink-0 min-w-[16px] text-center ${
                     activeTab === 'history' ? 'bg-blue-300 text-slate-950' : tabBadgeUnselectedBg
@@ -556,14 +549,14 @@ export const Material3AndroidFrame: React.FC<Props> = ({
               <button
                 onClick={() => setActiveTab('bookmarks')}
                 title="精選收藏 (Bookmarks)"
-                className={`flex items-center justify-center gap-1 h-8 px-1 sm:px-2 rounded-xl transition-all text-xs cursor-pointer whitespace-nowrap select-none ${
+                className={`flex items-center justify-center gap-1.5 h-8 px-2 rounded-xl transition-all text-xs cursor-pointer whitespace-nowrap select-none ${
                   activeTab === 'bookmarks'
                     ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                     : tabUnselectedBg
                 }`}
               >
                 <Bookmark className={`w-3.5 h-3.5 shrink-0 ${activeTab === 'bookmarks' ? 'fill-current' : ''}`} />
-                <span className="whitespace-nowrap">收藏</span>
+                <span className="whitespace-nowrap">精選收藏</span>
                 {bookmarkedCount > 0 && (
                   <span className={`px-1 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono leading-none shrink-0 min-w-[16px] text-center ${
                     activeTab === 'bookmarks' ? 'bg-amber-950 text-amber-200' : tabBadgeUnselectedBg
@@ -744,22 +737,7 @@ export const Material3AndroidFrame: React.FC<Props> = ({
           )}
         </AnimatePresence>
 
-        {/* Subtitle / History List Container or Precision Focus Reading View */}
-        {activeTab === 'focus' ? (
-          <div className="flex-1 overflow-hidden relative flex flex-col">
-            <PrecisionReadingView
-              subtitles={subtitles}
-              interimSubtitle={interimSubtitle}
-              activeStation={activeStation}
-              playbackStatus={playbackStatus}
-              onTogglePlayPause={onTogglePlayPause}
-              onBookmarkToggle={onBookmarkToggle}
-              onOpenDictionary={onOpenDictionary}
-              theme={effectiveTheme}
-              fontSize={fontSize}
-            />
-          </div>
-        ) : (
+        {/* Subtitle / History / Bookmark List Container */}
         <div ref={listContainerRef} className={`flex-1 p-3 sm:p-4 pt-4 sm:pt-5 overflow-y-auto space-y-4 relative transition-colors duration-200 ${listBg}`}>
           {filteredSubtitles.length === 0 ? (
             <div className="flex flex-col items-center justify-center min-h-[360px] text-center p-6">
@@ -894,7 +872,6 @@ export const Material3AndroidFrame: React.FC<Props> = ({
             </AnimatePresence>
           )}
         </div>
-        )}
 
         {/* Non-intrusive AdMob Banner Ad (100% Free Ad-Supported Model) */}
         <BannerAd />

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SubtitleItem, RadioStation, ReadingMode } from '../types';
-import { motion, AnimatePresence } from 'motion/react';
-import { Volume2, VolumeX, Bookmark, BookmarkCheck, Sparkles, Radio, Play, Pause, ChevronLeft, ChevronRight, Lock, Eye, Compass, Sliders, FastForward, Rewind } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Volume2, VolumeX, Bookmark, BookmarkCheck, Radio, Lock, Eye } from 'lucide-react';
 import { speakText, stopSpeech } from '../utils/tts';
 
 interface Props {
@@ -33,23 +33,6 @@ export const PrecisionReadingView: React.FC<Props> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [speakingId, setSpeakingId] = React.useState<string | null>(null);
-  const [syncOffsetMs, setSyncOffsetMs] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem('radio_subtitle_sync_offset_ms');
-      return saved ? Number(saved) || 3500 : 3500;
-    } catch (e) {
-      return 3500;
-    }
-  });
-  const [showSyncSettings, setShowSyncSettings] = useState<boolean>(false);
-
-  const handleAdjustSyncOffset = (deltaMs: number) => {
-    const updated = Math.max(0, Math.min(10000, syncOffsetMs + deltaMs));
-    setSyncOffsetMs(updated);
-    try {
-      localStorage.setItem('radio_subtitle_sync_offset_ms', String(updated));
-    } catch (e) {}
-  };
 
   // Active subtitle is either interim (if typing) or latest final subtitle
   const activeSubtitle = interimSubtitle || subtitles[0] || null;
@@ -125,29 +108,14 @@ export const PrecisionReadingView: React.FC<Props> = ({
             <span className="w-2 h-2 rounded-full bg-emerald-500 relative" />
           </div>
           <span className="font-extrabold tracking-wide">
-            精準即時聚焦閱讀
+            雙語即時閱讀流
           </span>
           <span className="hidden sm:inline-block text-[11px] opacity-75 font-normal">
-            (自動鎖定廣播目前播放段落)
+            (語音辨識與翻譯同步更新)
           </span>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Sync Calibration Offset Quick Adjuster */}
-          <button
-            type="button"
-            onClick={() => setShowSyncSettings(!showSyncSettings)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer border ${
-              showSyncSettings
-                ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold'
-                : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 opacity-80 hover:opacity-100'
-            }`}
-            title="調整字幕與廣播聲音對齊時間差 (Sync Calibration)"
-          >
-            <Sliders className="w-3 h-3" />
-            <span>校準同步</span>
-          </button>
-
           {/* Auto Follow Toggle Button */}
           <button
             type="button"
@@ -159,12 +127,12 @@ export const PrecisionReadingView: React.FC<Props> = ({
                 ? 'bg-amber-200 text-amber-900'
                 : 'bg-slate-800 text-slate-400'
             }`}
-            title={autoFollow ? '自動聚焦鎖定中：廣播播放到哪，畫面自動滑動到哪' : '手動滑動模式：點擊開啟自動聚焦'}
+            title={autoFollow ? '自動聚焦滾動中' : '手動自由滾動'}
           >
             {autoFollow ? (
               <>
                 <Lock className="w-3 h-3" />
-                <span>鎖定跟隨</span>
+                <span>自動跟隨</span>
               </>
             ) : (
               <>
@@ -175,80 +143,6 @@ export const PrecisionReadingView: React.FC<Props> = ({
           </button>
         </div>
       </div>
-
-      {/* Sync Offset Calibration Panel (Expandable) */}
-      <AnimatePresence>
-        {showSyncSettings && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className={`px-4 py-2 border-b text-xs flex flex-wrap items-center justify-between gap-2 z-10 ${
-              theme === 'paper'
-                ? 'bg-[#E5D7BC] border-[#D0BF98] text-[#3B2E1E]'
-                : theme === 'light'
-                ? 'bg-blue-50 border-blue-200 text-blue-900'
-                : 'bg-slate-900 border-slate-700 text-slate-200'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <span className="font-bold">⏱️ 字幕時間差微調：</span>
-              <span className="font-mono font-bold px-2 py-0.5 rounded bg-black/10 dark:bg-white/10">
-                {(syncOffsetMs / 1000).toFixed(1)} 秒
-              </span>
-              <span className="text-[11px] opacity-75 hidden sm:inline">
-                (字幕太快請按 +延遲；字幕太慢請按 -提早)
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => handleAdjustSyncOffset(-1000)}
-                className="px-2 py-1 rounded bg-black/10 dark:bg-white/10 hover:bg-black/20 font-bold transition-all"
-                title="提早 1 秒顯示"
-              >
-                -1.0s
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAdjustSyncOffset(-500)}
-                className="px-2 py-1 rounded bg-black/10 dark:bg-white/10 hover:bg-black/20 font-bold transition-all"
-                title="提早 0.5 秒顯示"
-              >
-                -0.5s
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAdjustSyncOffset(500)}
-                className="px-2 py-1 rounded bg-black/10 dark:bg-white/10 hover:bg-black/20 font-bold transition-all"
-                title="延遲 0.5 秒釋出"
-              >
-                +0.5s
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAdjustSyncOffset(1000)}
-                className="px-2 py-1 rounded bg-black/10 dark:bg-white/10 hover:bg-black/20 font-bold transition-all"
-                title="延遲 1 秒釋出"
-              >
-                +1.0s
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSyncOffsetMs(3500);
-                  try { localStorage.setItem('radio_subtitle_sync_offset_ms', '3500'); } catch (e) {}
-                }}
-                className="ml-1 px-2 py-1 rounded bg-emerald-600 text-white font-bold text-[11px]"
-                title="恢復預設精準對齊值 (3.5s)"
-              >
-                重設
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Subtitles Scroll View */}
       <div
@@ -262,7 +156,7 @@ export const PrecisionReadingView: React.FC<Props> = ({
             </div>
             <h3 className="font-bold text-base mb-1">正在等待廣播語音串流...</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">
-              點擊播放按鈕收聽廣播，精準閱讀模式將即時高亮目前語音段落與逐字對照。
+              點擊播放按鈕收聽廣播，系統將即時產生雙語字幕與逐字對照。
             </p>
           </div>
         ) : (
@@ -279,9 +173,9 @@ export const PrecisionReadingView: React.FC<Props> = ({
                 >
                   {/* Spotlight Banner Header */}
                   <div className="flex items-center justify-between mb-3">
-                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-black bg-emerald-500 text-slate-950 shadow-sm animate-pulse">
-                      <span className="w-2 h-2 rounded-full bg-slate-950 animate-ping" />
-                      <span>正在播放此段落 (NOW PLAYING)</span>
+                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                      <Radio className="w-3.5 h-3.5 animate-pulse" />
+                      <span className="font-mono text-[11px]">{activeSubtitle.timestamp || '即時串流'}</span>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -290,7 +184,7 @@ export const PrecisionReadingView: React.FC<Props> = ({
                           type="button"
                           onClick={() => onBookmarkToggle(activeSubtitle.id)}
                           className="p-2 rounded-xl transition-all hover:scale-105 active:scale-95 cursor-pointer bg-slate-800/10 dark:bg-white/10"
-                          title="收藏目前段落"
+                          title="收藏此段落"
                         >
                           {activeSubtitle.bookmarked ? (
                             <BookmarkCheck className="w-5 h-5 text-amber-500 fill-current" />

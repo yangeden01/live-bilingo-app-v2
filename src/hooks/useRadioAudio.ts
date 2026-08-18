@@ -155,8 +155,25 @@ export function useRadioAudio({
     safeApiFetch('/api/notify-station-playing', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: activeStationRef.current.streamUrl, name: activeStationRef.current.name }),
+      body: JSON.stringify({ url: activeStationRef.current.streamUrl, name: activeStationRef.current.name, forceRestart: true }),
     }).catch(() => {});
+
+    try {
+      if ((window as any).AndroidBridge?.onNetworkRestored) {
+        (window as any).AndroidBridge.onNetworkRestored();
+      }
+      if ((window as any).AndroidBridge?.onStationPlaybackChanged) {
+        (window as any).AndroidBridge.onStationPlaybackChanged(
+          activeStationRef.current.streamUrl,
+          activeStationRef.current.name,
+          true
+        );
+      }
+    } catch (e) {
+      console.warn('[Network Restored] AndroidBridge notice:', e);
+    }
+
+    window.dispatchEvent(new CustomEvent('radio-network-restored'));
 
     const baseUrl = getProxiedStreamUrl(activeStationRef.current.streamUrl);
     const liveFreshUrl = addQueryParam(baseUrl, '_net_restore', String(Date.now()));

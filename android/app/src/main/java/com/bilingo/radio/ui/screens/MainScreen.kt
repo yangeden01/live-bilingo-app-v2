@@ -44,7 +44,7 @@ class WebAppInterface(
 ) {
     private var tts: android.speech.tts.TextToSpeech? = null
     private var isTtsReady = false
-    private val sttManager = com.bilingo.radio.stt.RadioStreamSttManager()
+    val sttManager = com.bilingo.radio.stt.RadioStreamSttManager()
 
     init {
         try {
@@ -103,6 +103,21 @@ class WebAppInterface(
                 } catch (_: Exception) {}
             }
         }
+    }
+
+    fun onNetworkRestoredInternal() {
+        Handler(Looper.getMainLooper()).post {
+            try {
+                sttManager.onNetworkRestored()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun onNetworkRestored() {
+        onNetworkRestoredInternal()
     }
 
     @JavascriptInterface
@@ -392,13 +407,15 @@ fun MainScreen(
                             cacheMode = WebSettings.LOAD_DEFAULT
                         }
 
-                        addJavascriptInterface(WebAppInterface(ctx, {
+                        val webInterface = WebAppInterface(ctx, {
                             try {
                                 loadUrl(localAppUrl)
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }
-                        }) {}, "AndroidBridge")
+                        }) {}
+                        (ctx as? MainActivity)?.activeWebAppInterface = webInterface
+                        addJavascriptInterface(webInterface, "AndroidBridge")
 
                         webViewClient = object : WebViewClient() {
                             override fun shouldInterceptRequest(

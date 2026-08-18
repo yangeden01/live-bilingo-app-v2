@@ -479,13 +479,13 @@ app.get('/api/radio-stream-proxy', (req, res) => {
 
 // Notify server which station stream the client is playing so backend STT transcribes and translates it
 app.post('/api/notify-station-playing', (req, res) => {
-  const { url, name } = req.body || {};
+  const { url, name, forceRestart } = req.body || {};
   if (url && typeof url === 'string') {
     const targetUrl = resolveTargetStreamUrl(url);
     const stationDisplayName = name || '美西公共英語新聞廣播';
-    console.log(`[Station Notify] Client playing station stream: ${stationDisplayName} (${targetUrl}). Synchronizing backend STT...`);
+    console.log(`[Station Notify] Client playing station stream: ${stationDisplayName} (${targetUrl}) [forceRestart=${!!forceRestart}]. Synchronizing backend STT...`);
     
-    if (!isStreamingActive || currentRadioStreamUrl !== targetUrl) {
+    if (forceRestart || !isStreamingActive || currentRadioStreamUrl !== targetUrl || (Date.now() - lastAudioDataTime > 15000)) {
       startBackendDeepgramStreaming(targetUrl);
     }
 

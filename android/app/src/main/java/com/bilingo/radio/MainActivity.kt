@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
     private var appUpdateManager: AppUpdateManager? = null
     private var installStateUpdatedListener: InstallStateUpdatedListener? = null
     var activeWebView: WebView? = null
+    var activeWebAppInterface: com.bilingo.radio.ui.screens.WebAppInterface? = null
 
     private var connectivityManager: android.net.ConnectivityManager? = null
     private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
@@ -225,6 +226,7 @@ class MainActivity : ComponentActivity() {
                 override fun onAvailable(network: android.net.Network) {
                     runOnUiThread {
                         try {
+                            activeWebAppInterface?.onNetworkRestoredInternal()
                             activeWebView?.evaluateJavascript(
                                 "window.dispatchEvent(new Event('online')); window.postMessage({ type: 'NETWORK_RESTORED' }, '*');",
                                 null

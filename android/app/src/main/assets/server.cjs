@@ -429,12 +429,12 @@ app.get("/api/radio-stream-proxy", (req, res) => {
   proxyRadioAudio(targetUrl, res);
 });
 app.post("/api/notify-station-playing", (req, res) => {
-  const { url, name } = req.body || {};
+  const { url, name, forceRestart } = req.body || {};
   if (url && typeof url === "string") {
     const targetUrl = resolveTargetStreamUrl(url);
     const stationDisplayName = name || "\u7F8E\u897F\u516C\u5171\u82F1\u8A9E\u65B0\u805E\u5EE3\u64AD";
-    console.log(`[Station Notify] Client playing station stream: ${stationDisplayName} (${targetUrl}). Synchronizing backend STT...`);
-    if (!isStreamingActive || currentRadioStreamUrl !== targetUrl) {
+    console.log(`[Station Notify] Client playing station stream: ${stationDisplayName} (${targetUrl}) [forceRestart=${!!forceRestart}]. Synchronizing backend STT...`);
+    if (forceRestart || !isStreamingActive || currentRadioStreamUrl !== targetUrl || Date.now() - lastAudioDataTime > 15e3) {
       startBackendDeepgramStreaming(targetUrl);
     }
     pendingTranscriptBuffer = "";

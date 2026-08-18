@@ -45,11 +45,12 @@ class RadioStreamSttManager(
     private val timeFormat = SimpleDateFormat("hh:mm:ss a", Locale.ENGLISH)
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(0, TimeUnit.MILLISECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
     private var currentStreamJob: Job? = null
+    private var watchdogJob: Job? = null
     private var webSocket: WebSocket? = null
     private var currentRadioStreamUrl: String = ""
     private var isRunning = false
@@ -65,9 +66,9 @@ class RadioStreamSttManager(
     var onSubtitleListener: ((NativeSubtitle) -> Unit)? = null
     var onConnectionStateListener: ((Boolean) -> Unit)? = null
 
-    fun start(streamUrl: String) {
+    fun start(streamUrl: String, forceRestart: Boolean = false) {
         if (streamUrl.isBlank()) return
-        if (isRunning && currentRadioStreamUrl == streamUrl && webSocket != null) {
+        if (!forceRestart && isRunning && currentRadioStreamUrl == streamUrl && webSocket != null && (System.currentTimeMillis() - lastAudioDataTime < 15000)) {
             return
         }
 
@@ -77,13 +78,24 @@ class RadioStreamSttManager(
         lastAudioDataTime = System.currentTimeMillis()
         lastTranscriptTime = System.currentTimeMillis()
 
+        startWatchdog()
+
         currentStreamJob = scope.launch {
             startStreamingPipeline(streamUrl)
         }
     }
 
+    fun onNetworkRestored() {
+        android.util.Log.i("RadioStreamSttManager", "Network restored detected: triggering immediate STT stream restart...")
+        if (currentRadioStreamUrl.isNotBlank()) {
+            start(currentRadioStreamUrl, forceRestart = true)
+        }
+    }
+
     fun stop() {
         isRunning = false
+        watchdogJob?.cancel()
+        watchdogJob = null
         currentStreamJob?.cancel()
         currentStreamJob = null
         flushTimerJob?.cancel()
@@ -99,7 +111,35 @@ class RadioStreamSttManager(
         }
     }
 
+    private fun startWatchdog() {
+        watchdogJob?.cancel()
+        watchdogJob = scope.launch {
+            while (isRunning && isActive) {
+                delay(4000)
+                if (!isRunning) break
+                val now = System.currentTimeMillis()
+                val audioStalled = (now - lastAudioDataTime > 12000)
+                val wsDisconnected = (webSocket == null)
+                val transcriptStalled = (now - lastTranscriptTime > 25000)
+
+                if (audioStalled || wsDisconnected || transcriptStalled) {
+                    android.util.Log.w("RadioStreamSttManager", "Watchdog triggered: audioStalled=$audioStalled, wsDisconnected=$wsDisconnected, transcriptStalled=$transcriptStalled. Reconnecting...")
+                    if (currentRadioStreamUrl.isNotBlank()) {
+                        scope.launch {
+                            try {
+                                webSocket?.cancel()
+                            } catch (_: Exception) {}
+                            webSocket = null
+                            startStreamingPipeline(currentRadioStreamUrl)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private suspend fun startStreamingPipeline(streamUrl: String) {
+        if (!isRunning || !scope.isActive) return
         android.util.Log.i("RadioStreamSttManager", "Starting native radio STT stream: $streamUrl")
         
         val wsUrl = "wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&smart_format=true&punctuate=true&interim_results=true&endpointing=300"
@@ -113,6 +153,7 @@ class RadioStreamSttManager(
         val wsListener = object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
                 isWsConnected = true
+                lastTranscriptTime = System.currentTimeMillis()
                 android.util.Log.i("RadioStreamSttManager", "Deepgram WebSocket connected successfully")
                 mainHandler.post {
                     onConnectionStateListener?.invoke(true)
@@ -125,6 +166,7 @@ class RadioStreamSttManager(
 
             override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
                 isWsConnected = false
+                webSocket = null
                 android.util.Log.w("RadioStreamSttManager", "Deepgram WebSocket error: ${t.message}")
                 mainHandler.post {
                     onConnectionStateListener?.invoke(false)
@@ -133,17 +175,21 @@ class RadioStreamSttManager(
 
             override fun onClosed(ws: WebSocket, code: Int, reason: String) {
                 isWsConnected = false
+                webSocket = null
                 mainHandler.post {
                     onConnectionStateListener?.invoke(false)
                 }
             }
         }
 
+        try {
+            webSocket?.cancel()
+        } catch (_: Exception) {}
         webSocket = httpClient.newWebSocket(wsRequest, wsListener)
 
         // Launch Keep-Alive Ping Loop
         scope.launch {
-            while (isRunning && isActive) {
+            while (isRunning && isActive && webSocket != null) {
                 delay(5000)
                 try {
                     val pingJson = JSONObject().apply { put("type", "KeepAlive") }
@@ -152,7 +198,7 @@ class RadioStreamSttManager(
             }
         }
 
-        // Connect to Audio Stream and pipe bytes
+        // Connect to Audio Stream and pipe bytes with resilient retry
         try {
             val audioRequest = Request.Builder()
                 .url(streamUrl)
@@ -163,6 +209,12 @@ class RadioStreamSttManager(
             val audioResponse = httpClient.newCall(audioRequest).execute()
             if (!audioResponse.isSuccessful) {
                 android.util.Log.e("RadioStreamSttManager", "Failed to connect to audio stream: HTTP ${audioResponse.code}")
+                if (isRunning) {
+                    delay(3000)
+                    if (isRunning) {
+                        startStreamingPipeline(streamUrl)
+                    }
+                }
                 return
             }
 
@@ -185,10 +237,10 @@ class RadioStreamSttManager(
         }
 
         // Auto-reconnect if stream died while still active
-        if (isRunning) {
-            delay(2000)
-            if (isRunning) {
-                start(currentRadioStreamUrl)
+        if (isRunning && scope.isActive) {
+            delay(2500)
+            if (isRunning && scope.isActive) {
+                startStreamingPipeline(currentRadioStreamUrl)
             }
         }
     }

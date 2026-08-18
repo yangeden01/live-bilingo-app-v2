@@ -53,6 +53,18 @@ class ClientSubtitleEngine {
     this.lastPollTimestamp = Date.now();
   }
 
+  public onNetworkRestored() {
+    this.lastPollTimestamp = Math.max(0, Date.now() - 6000);
+    if (this.isStreaming && this.activeStation) {
+      safeApiFetch('/api/notify-station-playing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: this.activeStation.streamUrl, name: this.activeStation.name, forceRestart: true }),
+      }).catch(() => {});
+      this.fetchLiveSubtitles();
+    }
+  }
+
   private async fetchLiveSubtitles() {
     if (!this.isStreaming || !this.activeStation) return;
 

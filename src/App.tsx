@@ -10,7 +10,7 @@ import { DictionaryModal } from './components/DictionaryModal';
 import { getApiUrl } from './utils/apiUrl';
 import { safeApiFetch } from './utils/safeFetch';
 import { vibrateGitPushSuccess, vibrateZipExportSuccess } from './utils/haptics';
-import { Radio, Code2, Smartphone, Cpu, CheckCircle2, Sparkles, Volume2, ShieldCheck, Download, ListMusic, BookOpen, RefreshCw, Copy, Play, Pause, Sun, Moon, Bell } from 'lucide-react';
+import { Radio, Code2, Smartphone, Cpu, CheckCircle2, Sparkles, Volume2, ShieldCheck, Download, ListMusic, BookOpen, RefreshCw, Copy, Play, Pause, Sun, Moon, Bell, Power } from 'lucide-react';
 
 const DEFAULT_STATIONS: RadioStation[] = [
   {
@@ -277,6 +277,7 @@ export default function App() {
   const [notificationGranted, setNotificationGranted] = useState<boolean>(true);
   const [showNotificationPrompt, setShowNotificationPrompt] = useState<boolean>(false);
   const [notifToastMessage, setNotifToastMessage] = useState<string>('');
+  const [showExitModal, setShowExitModal] = useState<boolean>(false);
 
   // Check notification permission on startup (only show prompt if not granted & not previously dismissed)
   useEffect(() => {
@@ -731,6 +732,38 @@ export default function App() {
     }
   };
 
+  const handleConfirmExit = () => {
+    // 1. Stop audio playback immediately
+    try {
+      const audioEl = document.querySelector('audio');
+      if (audioEl) {
+        audioEl.pause();
+        audioEl.src = '';
+      }
+    } catch (_) {}
+
+    // 2. Clear server-side audio buffer & local session storage
+    fetch(getApiUrl('/api/clear-buffer'), { method: 'POST' }).catch(() => {});
+    try {
+      sessionStorage.clear();
+    } catch (_) {}
+
+    // 3. Trigger native Android app exit & memory cleanup if in Android app
+    if (typeof window !== 'undefined' && (window as any).AndroidBridge?.exitApp) {
+      (window as any).AndroidBridge.exitApp(true);
+    } else {
+      // Browser / PWA fallback
+      setShowExitModal(false);
+      setPlaybackStatus('IDLE');
+      setNotifToastMessage('已安全清理即時快取並停止廣播播放');
+      setTimeout(() => {
+        try {
+          window.close();
+        } catch (_) {}
+      }, 500);
+    }
+  };
+
   const appBgClass =
     effectiveTheme === 'paper'
       ? 'bg-[#F8F3E6] text-[#3B2E1E]'
@@ -873,20 +906,36 @@ export default function App() {
         style={{ top: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2 flex flex-nowrap items-center justify-between gap-2">
-          {/* Logo & Title */}
-          <div className="flex items-center gap-2 min-w-0 flex-1">
+          {/* Left: Exit/Power Button + Logo & Title (Far from Play button, sticky on top) */}
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+            {/* Quick Exit Button (Far left, separated from Play button, prompts before exiting) */}
+            <button
+              onClick={() => setShowExitModal(true)}
+              title="退出應用程式並清理快取"
+              className={`p-2 rounded-xl border flex items-center justify-center transition-all active:scale-95 cursor-pointer shrink-0 shadow-sm ${
+                effectiveTheme === 'paper'
+                  ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200 shadow-red-900/5'
+                  : effectiveTheme === 'light'
+                  ? 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200 shadow-red-500/5'
+                  : 'bg-red-500/15 hover:bg-red-500/25 text-red-400 border-red-500/30 shadow-red-500/10'
+              }`}
+              aria-label="退出應用程式"
+            >
+              <Power className="w-4 h-4" />
+            </button>
+
+            {/* Radio Logo Icon */}
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
               <Radio className="w-4 h-4" />
             </div>
+
+            {/* Title (Version badge removed per user request to keep header clean) */}
             <div className="min-w-0 flex-1">
               <h1 className="font-bold text-sm sm:text-base tracking-tight flex items-center gap-1.5 truncate">
                 <span className="truncate">Live Bilingo 雙語電台</span>
-                <span className={`text-[10px] font-bold border px-1.5 py-0.5 rounded-full shrink-0 transition-colors duration-200 ${versionBadgeClass}`}>
-                  v2.2.3
-                </span>
               </h1>
               <p className="text-[11px] opacity-70 truncate hidden sm:block">
-                Media3 ExoPlayer • 開源 Whisper 雙語對齊 • 即時無縫串流
+                Media3 ExoPlayer • 即時雙語字幕 • 語音對齊串流
               </p>
             </div>
           </div>
@@ -1343,6 +1392,54 @@ export default function App() {
                 className="w-full py-2.5 bg-slate-800 hover:bg-slate-700/80 text-slate-300 font-medium rounded-xl text-xs transition-colors cursor-pointer text-center"
               >
                 稍後再說（直接進入主畫面）
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Exit Confirmation Modal */}
+      {showExitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-sm w-full p-5 sm:p-6 shadow-2xl text-slate-100 space-y-4">
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
+              <div className="p-2.5 bg-red-500/15 text-red-400 rounded-xl border border-red-500/30">
+                <Power className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-white">確認退出應用程式？</h3>
+                <p className="text-[11px] text-slate-400">Live Bilingo 雙語電台</p>
+              </div>
+            </div>
+
+            <div className="space-y-2 text-xs text-slate-300 leading-relaxed">
+              <p className="text-slate-200 text-xs">
+                確定要關閉並退出 <b>Live Bilingo 雙語電台</b> 嗎？
+              </p>
+              <div className="p-3 bg-slate-800/80 border border-slate-700/80 rounded-xl space-y-1.5 text-[11px]">
+                <div className="flex items-center gap-2 text-emerald-400 font-medium">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>停止廣播即時串流與背景播放服務</span>
+                </div>
+                <div className="flex items-center gap-2 text-blue-400 font-medium">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>安全清理臨時記憶體快取，釋放系統資源</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2">
+              <button
+                onClick={handleConfirmExit}
+                className="w-full py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs sm:text-sm transition-all shadow-lg shadow-red-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+              >
+                <Power className="w-4 h-4" />
+                <span>清理快取並退出</span>
+              </button>
+              <button
+                onClick={() => setShowExitModal(false)}
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-xs transition-colors cursor-pointer text-center"
+              >
+                取消
               </button>
             </div>
           </div>

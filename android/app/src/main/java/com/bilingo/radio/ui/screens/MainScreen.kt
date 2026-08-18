@@ -256,6 +256,32 @@ class WebAppInterface(
             }
         }
     }
+
+    @JavascriptInterface
+    fun exitApp(clearCache: Boolean) {
+        Handler(Looper.getMainLooper()).post {
+            try {
+                sttManager.stop()
+                tts?.stop()
+                RadioForegroundService.stopService(context)
+
+                if (clearCache) {
+                    try {
+                        (context as? MainActivity)?.activeWebView?.clearCache(true)
+                        android.webkit.WebStorage.getInstance().deleteAllData()
+                        context.cacheDir.deleteRecursively()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+
+                (context as? android.app.Activity)?.finishAffinity()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                (context as? android.app.Activity)?.finish()
+            }
+        }
+    }
 }
 
 @SuppressLint("SetJavaScriptEnabled")

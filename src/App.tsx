@@ -650,6 +650,7 @@ export default function App() {
     const cleanItem: SubtitleItem = {
       ...item,
       english: cleanedEnglish,
+      createdAt: item.createdAt || Date.now(),
     };
 
     setSubtitles((prev) => {
@@ -663,32 +664,66 @@ export default function App() {
         // Merge item while preserving user bookmark status and custom state
         const existing = prev[existingIndex];
         const merged = {
+          ...existing,
           ...cleanItem,
+          // Preserve Chinese translation if incoming item is missing it
+          traditionalChinese: cleanItem.traditionalChinese || existing.traditionalChinese,
           bookmarked: existing.bookmarked || cleanItem.bookmarked,
         };
         updated = [...prev];
         updated[existingIndex] = merged;
       } else {
-        // Check if this new subtitle is an exact duplicate or a minor expansion of recent subtitles
-        const recentSubtitles = prev.slice(0, 8);
-        const isDuplicate = recentSubtitles.some((s) => {
-          const normPrev = (s.english || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (!normPrev || !normEnglish) return false;
-          if (normPrev === normEnglish) return true;
-          // Check substring containment if length is substantial (>15 chars)
-          if (normEnglish.length > 15 && normPrev.length > 15) {
-            if (normEnglish.includes(normPrev) || normPrev.includes(normEnglish)) {
-              return true;
-            }
+        // Check recent items (last 3 items or within last 12 seconds)
+        const now = Date.now();
+        const topItem = prev[0];
+
+        if (topItem) {
+          const normTop = (topItem.english || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const isRecentTop = (now - (topItem.createdAt || 0)) < 15000;
+
+          // 1. If incoming subtitle is an expansion / longer refined version of the top item
+          if (isRecentTop && normEnglish.length > normTop.length && (normEnglish.includes(normTop) || normEnglish.startsWith(normTop.slice(0, 20)))) {
+            // Replace top item with the updated longer sentence
+            const updatedTop = {
+              ...topItem,
+              ...cleanItem,
+              bookmarked: topItem.bookmarked || cleanItem.bookmarked,
+            };
+            updated = [updatedTop, ...prev.slice(1)];
+            return updated;
           }
-          return false;
+
+          // 2. If top item already contains this shorter text within 12s, skip adding fragment
+          if (isRecentTop && normTop.includes(normEnglish) && normTop.length > normEnglish.length) {
+            return prev;
+          }
+
+          // 3. Exact match with top item within 15s
+          if (isRecentTop && normTop === normEnglish) {
+            // Update translation if newer translation is available
+            if (cleanItem.traditionalChinese && cleanItem.traditionalChinese !== cleanItem.english && topItem.traditionalChinese !== cleanItem.traditionalChinese) {
+              const updatedTop = {
+                ...topItem,
+                traditionalChinese: cleanItem.traditionalChinese,
+              };
+              return [updatedTop, ...prev.slice(1)];
+            }
+            return prev;
+          }
+        }
+
+        // Check if identical to any of the last 3 items within 10 seconds
+        const isDuplicateRecent = prev.slice(0, 3).some((s) => {
+          const normPrev = (s.english || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const isTimeClose = (now - (s.createdAt || 0)) < 10000;
+          return isTimeClose && normPrev === normEnglish;
         });
 
-        if (isDuplicate) {
-          console.log('[Subtitle UI] Dropped duplicate / sentence overlap:', cleanItem.english);
+        if (isDuplicateRecent) {
           return prev;
         }
 
+        // Insert new clean subtitle at the beginning
         updated = [cleanItem, ...prev];
       }
 

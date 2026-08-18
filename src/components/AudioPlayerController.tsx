@@ -406,7 +406,7 @@ export const AudioPlayerController: React.FC<Props> = ({
       : 'bg-slate-700/80';
 
   return (
-    <div className={`backdrop-blur-md rounded-2xl p-4 sm:p-5 border relative z-30 flex flex-col gap-3 transition-colors duration-200 ${cardBgClass}`}>
+    <div className={`backdrop-blur-md rounded-2xl p-4 sm:p-5 border relative z-10 flex flex-col gap-3 transition-colors duration-200 ${cardBgClass}`}>
       {/* Background Ambient Glow */}
       <div className={`absolute inset-0 bg-gradient-to-r pointer-events-none rounded-2xl overflow-hidden transition-colors duration-200 ${ambientGlowClass}`} />
 

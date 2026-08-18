@@ -666,23 +666,25 @@ app.get("/api/tts", async (req, res) => {
     res.status(500).send("TTS unavailable");
   }
 });
-var APP_VERSION = "1.6.5";
+var APP_VERSION = "2.2.3";
 var SERVER_BOOT_TIME = Date.now();
 app.get("/api/version", (req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   let currentBuildTime = SERVER_BOOT_TIME;
   let commitHash = "main";
+  let dynamicVersion = APP_VERSION;
   try {
     const versionFile = import_path.default.resolve("dist/build-version.json");
     if (import_fs.default.existsSync(versionFile)) {
       const parsed = JSON.parse(import_fs.default.readFileSync(versionFile, "utf-8"));
+      if (parsed.version) dynamicVersion = parsed.version;
       if (parsed.buildTime) currentBuildTime = parsed.buildTime;
       if (parsed.commit) commitHash = parsed.commit;
     }
   } catch (e) {
   }
   res.json({
-    version: APP_VERSION,
+    version: dynamicVersion,
     commit: commitHash,
     buildTime: currentBuildTime,
     bootTime: SERVER_BOOT_TIME,

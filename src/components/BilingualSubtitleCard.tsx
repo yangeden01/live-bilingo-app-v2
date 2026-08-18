@@ -158,23 +158,23 @@ export const BilingualSubtitleCard: React.FC<Props> = ({
     large: 'text-xl sm:text-2xl',
   }[fontSize];
 
-  // Dynamic theme style definitions
+  // Dynamic theme style definitions - Consistent border thickness to prevent layout jumping
   const cardBgClass =
     theme === 'paper'
       ? `bg-[#FFFDF7] text-[#3B2E1E] ${
           isLatest
-            ? 'border-2 border-amber-600 ring-4 ring-amber-500/25 shadow-xl shadow-amber-900/10'
+            ? 'border-amber-600/80 shadow-md shadow-amber-900/10'
             : 'border-[#E8D8B8] hover:border-[#D8C49E]'
         }`
       : theme === 'light'
       ? `bg-white text-slate-900 ${
           isLatest
-            ? 'border-2 border-blue-600 ring-4 ring-blue-500/25 shadow-xl shadow-blue-500/15'
+            ? 'border-blue-600/80 shadow-md shadow-blue-500/10'
             : 'border-slate-200 hover:border-slate-300'
         }`
       : `bg-slate-800 text-slate-100 ${
           isLatest
-            ? 'border-2 border-blue-500 ring-4 ring-blue-500/35 shadow-2xl shadow-blue-500/20'
+            ? 'border-blue-500/80 shadow-lg shadow-blue-500/15'
             : 'border-slate-700/60 hover:border-slate-600'
         }`;
 
@@ -226,11 +226,8 @@ export const BilingualSubtitleCard: React.FC<Props> = ({
       : 'bg-blue-600';
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className={`rounded-2xl p-4 sm:p-5 shadow-sm border transition-all hover:shadow-md relative group ${cardBgClass}`}
+    <div
+      className={`rounded-2xl p-4 sm:p-5 shadow-sm border transition-[border-color,box-shadow,background-color] duration-300 hover:shadow-md relative group ${cardBgClass}`}
     >
       {/* Bookmark Index Tab (Pinned on Top-Left Corner Edge, Page-Flag Style) */}
       {segmentNumber !== undefined && (
@@ -317,6 +314,6 @@ export const BilingualSubtitleCard: React.FC<Props> = ({
           {renderChineseText()}
         </p>
       </div>
-    </motion.div>
+    </div>
   );
 };

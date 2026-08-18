@@ -709,9 +709,9 @@ export default function App() {
     // Only scroll/adjust screen position when STARTING playback
     if (!isCurrentlyPlaying) {
       setTimeout(() => {
-        const searchBarEl = document.getElementById('subtitle-search-bar');
-        if (searchBarEl) {
-          searchBarEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const frameEl = document.getElementById('subtitle-frame-top') || document.getElementById('subtitle-search-bar');
+        if (frameEl) {
+          frameEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       }, 60);
     }
@@ -765,7 +765,7 @@ export default function App() {
             <div className="flex items-center gap-2 mb-1">
               <h1 className="text-xl font-bold tracking-tight text-white">Live Bilingo 雙語電台</h1>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-400/30">
-                v2.1.8
+                v2.2.3
               </span>
             </div>
             <p className="text-xs text-slate-400 mb-6 font-medium">即時 AI 雙語字幕 • 語音對齊串流</p>
@@ -855,7 +855,7 @@ export default function App() {
 
       {/* Navigation Header (Sticky below top status bar) */}
       <header 
-        className={`backdrop-blur-md border-b sticky z-30 shadow-lg transition-colors duration-200 py-1.5 ${headerClass}`}
+        className={`backdrop-blur-md border-b sticky z-50 shadow-md transition-colors duration-200 py-1.5 ${headerClass}`}
         style={{ top: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2 flex flex-nowrap items-center justify-between gap-2">
@@ -868,7 +868,7 @@ export default function App() {
               <h1 className="font-bold text-sm sm:text-base tracking-tight flex items-center gap-1.5 truncate">
                 <span className="truncate">Live Bilingo 雙語電台</span>
                 <span className={`text-[10px] font-bold border px-1.5 py-0.5 rounded-full shrink-0 transition-colors duration-200 ${versionBadgeClass}`}>
-                  v2.2.2
+                  v2.2.3
                 </span>
               </h1>
               <p className="text-[11px] opacity-70 truncate hidden sm:block">

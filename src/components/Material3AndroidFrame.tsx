@@ -423,7 +423,7 @@ export const Material3AndroidFrame: React.FC<Props> = ({
       : 'bg-slate-800/90 border-slate-700/60 text-slate-100';
 
   return (
-    <div className={`rounded-3xl p-3 sm:p-6 border shadow-2xl relative max-w-4xl mx-auto transition-colors duration-200 ${outerFrameBg}`}>
+    <div id="subtitle-frame-top" className={`rounded-3xl p-3 sm:p-6 border shadow-2xl relative max-w-4xl mx-auto scroll-mt-20 sm:scroll-mt-24 transition-colors duration-200 ${outerFrameBg}`}>
       {/* Phone Screen Container */}
       <div className={`rounded-2xl overflow-hidden shadow-inner border flex flex-col min-h-[680px] transition-colors duration-200 ${screenContainerBg}`}>
         
@@ -890,7 +890,7 @@ export const Material3AndroidFrame: React.FC<Props> = ({
                 if (typeof window !== 'undefined' && (window as any).AndroidBridge?.checkForAppUpdate) {
                   (window as any).AndroidBridge.checkForAppUpdate();
                 } else {
-                  showToast('目前為最新版本 (v2.2.2)');
+                  showToast('目前為最新版本 (v2.2.3)');
                 }
               }}
               title="檢查 Google Play 商店是否有最新版本"

@@ -754,7 +754,7 @@ app.get('/api/tts', async (req, res) => {
   }
 });
 
-const APP_VERSION = '1.6.5';
+const APP_VERSION = '2.2.3';
 let SERVER_BOOT_TIME = Date.now();
 
 app.get('/api/version', (req, res) => {
@@ -762,18 +762,20 @@ app.get('/api/version', (req, res) => {
 
   let currentBuildTime = SERVER_BOOT_TIME;
   let commitHash = 'main';
+  let dynamicVersion = APP_VERSION;
 
   try {
     const versionFile = path.resolve('dist/build-version.json');
     if (fs.existsSync(versionFile)) {
       const parsed = JSON.parse(fs.readFileSync(versionFile, 'utf-8'));
+      if (parsed.version) dynamicVersion = parsed.version;
       if (parsed.buildTime) currentBuildTime = parsed.buildTime;
       if (parsed.commit) commitHash = parsed.commit;
     }
   } catch (e) {}
 
   res.json({
-    version: APP_VERSION,
+    version: dynamicVersion,
     commit: commitHash,
     buildTime: currentBuildTime,
     bootTime: SERVER_BOOT_TIME,

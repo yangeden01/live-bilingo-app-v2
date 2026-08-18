@@ -142,7 +142,7 @@ class RadioStreamSttManager(
         if (!isRunning || !scope.isActive) return
         android.util.Log.i("RadioStreamSttManager", "Starting native radio STT stream: $streamUrl")
         
-        val wsUrl = "wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&smart_format=true&punctuate=true&interim_results=true&endpointing=300"
+        val wsUrl = "wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&smart_format=true&punctuate=true&interim_results=true&endpointing=600&utterance_end_ms=1000"
         val wsRequest = Request.Builder()
             .url(wsUrl)
             .addHeader("Authorization", "Token $deepgramApiKey")
@@ -302,18 +302,6 @@ class RadioStreamSttManager(
                         }
                     }
                 }
-            } else {
-                // Interim result: only trigger if clear full sentence boundary and long enough
-                val hasSentenceEnd = "[.?!;]\\s*$".toRegex().containsMatchIn(transcript)
-                val wordCount = transcript.split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
-                if (hasSentenceEnd && wordCount >= 7) {
-                    synchronized(pendingBuffer) {
-                        if (pendingBuffer.isEmpty()) bufferStartTime = System.currentTimeMillis()
-                        else pendingBuffer.append(" ")
-                        pendingBuffer.append(transcript)
-                        flushPendingBuffer(false)
-                    }
-                }
             }
         } catch (e: Exception) {
             android.util.Log.e("RadioStreamSttManager", "Error parsing Deepgram message: ${e.message}")
@@ -342,14 +330,19 @@ class RadioStreamSttManager(
                 rawText = fullText.substring(0, cutIndex).trim()
                 textToKeep = fullText.substring(cutIndex).trim()
             } else if (forceAll) {
-                // Check if there is a comma or dash clause to split cleanly
-                val clauseRegex = Regex("[,—:](\\s+|$)")
-                val clauseMatches = clauseRegex.findAll(fullText).toList()
-                if (clauseMatches.isNotEmpty()) {
-                    val lastClause = clauseMatches.last()
-                    val cutIndex = lastClause.range.last + 1
-                    rawText = fullText.substring(0, cutIndex).trim()
-                    textToKeep = fullText.substring(cutIndex).trim()
+                val wordCount = fullText.split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
+                if (wordCount >= 15) {
+                    val clauseRegex = Regex("[,—:](\\s+|$)")
+                    val clauseMatches = clauseRegex.findAll(fullText).toList()
+                    if (clauseMatches.isNotEmpty()) {
+                        val lastClause = clauseMatches.last()
+                        val cutIndex = lastClause.range.last + 1
+                        rawText = fullText.substring(0, cutIndex).trim()
+                        textToKeep = fullText.substring(cutIndex).trim()
+                    } else {
+                        rawText = fullText
+                        textToKeep = ""
+                    }
                 } else {
                     rawText = fullText
                     textToKeep = ""

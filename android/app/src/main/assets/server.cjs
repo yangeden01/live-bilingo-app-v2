@@ -833,10 +833,15 @@ function flushTranscriptParagraph(forceAll = false) {
     const lastMatch = sentenceEndMatches[sentenceEndMatches.length - 1];
     cutIndex = (lastMatch.index || 0) + lastMatch[0].trimEnd().length;
   } else if (forceAll) {
-    const clauseMatches = [...fullText.matchAll(/[,—:](\s+|$)/g)];
-    if (clauseMatches.length > 0) {
-      const lastMatch = clauseMatches[clauseMatches.length - 1];
-      cutIndex = (lastMatch.index || 0) + lastMatch[0].trimEnd().length;
+    const wordCount = fullText.split(/\s+/).filter(Boolean).length;
+    if (wordCount >= 15) {
+      const clauseMatches = [...fullText.matchAll(/[,—:](\s+|$)/g)];
+      if (clauseMatches.length > 0) {
+        const lastMatch = clauseMatches[clauseMatches.length - 1];
+        cutIndex = (lastMatch.index || 0) + lastMatch[0].trimEnd().length;
+      } else {
+        cutIndex = fullText.length;
+      }
     } else {
       cutIndex = fullText.length;
     }
@@ -861,12 +866,12 @@ function flushTranscriptParagraph(forceAll = false) {
     return;
   }
   const normFlush = textToFlush.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const isDuplicate = recentEmittedServerSentences.some((prev) => {
+  const isDuplicate = recentEmittedServerSentences.slice(0, 4).some((prev) => {
     const normPrev = prev.toLowerCase().replace(/[^a-z0-9]/g, "");
-    return normPrev === normFlush || normFlush.includes(normPrev) && normPrev.length >= 12 || normPrev.includes(normFlush) && normFlush.length >= 12;
+    return normPrev === normFlush;
   });
   if (isDuplicate) {
-    console.log(`[Subtitle] Dropped duplicate / sentence prefix overlap: "${textToFlush.substring(0, 30)}..."`);
+    console.log(`[Subtitle] Dropped duplicate sentence: "${textToFlush.substring(0, 30)}..."`);
     return;
   }
   recentEmittedServerSentences.unshift(textToFlush);
@@ -965,7 +970,7 @@ function startBackendDeepgramStreaming(streamUrl = currentRadioStreamUrl) {
     }
   }, 4e3);
   try {
-    const wsUrl = "wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&smart_format=true&punctuate=true&interim_results=true&endpointing=300";
+    const wsUrl = "wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&smart_format=true&punctuate=true&interim_results=true&endpointing=600&utterance_end_ms=1000";
     deepgramWs = new import_ws.default(wsUrl, {
       headers: {
         Authorization: `Token ${DEEPGRAM_TOKEN}`
@@ -1141,14 +1146,6 @@ function startBackendDeepgramStreaming(streamUrl = currentRadioStreamUrl) {
               paragraphFlushTimer = setTimeout(() => {
                 flushTranscriptParagraph(false);
               }, 3500);
-            }
-          } else {
-            const hasSentenceEnd = /[\.\?!;]\s*$/.test(transcript);
-            const wordCount = transcript.split(/\s+/).filter(Boolean).length;
-            if (hasSentenceEnd && wordCount >= 7) {
-              if (!pendingTranscriptBuffer) bufferStartTime = Date.now();
-              pendingTranscriptBuffer = pendingTranscriptBuffer ? `${pendingTranscriptBuffer} ${transcript}` : transcript;
-              flushTranscriptParagraph(false);
             }
           }
         }

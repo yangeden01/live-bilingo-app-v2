@@ -348,6 +348,7 @@ fun MainScreen(
                         settings.apply {
                             javaScriptEnabled = true
                             domStorageEnabled = true
+                            databaseEnabled = true
                             allowFileAccess = true
                             allowContentAccess = true
                             allowFileAccessFromFileURLs = true
@@ -362,7 +363,7 @@ fun MainScreen(
                             if (!defaultUa.contains("AndroidApp")) {
                                 userAgentString = "$defaultUa AndroidApp/2.2.3"
                             }
-                            cacheMode = WebSettings.LOAD_NO_CACHE
+                            cacheMode = WebSettings.LOAD_DEFAULT
                         }
 
                         addJavascriptInterface(WebAppInterface(ctx, {
@@ -469,6 +470,21 @@ fun MainScreen(
                                         }
                                     }
                                 }
+                            }
+
+                            override fun onRenderProcessGone(
+                                view: WebView?,
+                                detail: android.webkit.RenderProcessGoneDetail?
+                            ): Boolean {
+                                android.util.Log.w("WebViewClient", "onRenderProcessGone detected. Recovering gracefully...")
+                                try {
+                                    view?.post {
+                                        view.loadUrl(localAppUrl)
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                                return true
                             }
                         }
 

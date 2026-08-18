@@ -230,13 +230,6 @@ class RadioForegroundService : Service() {
         } catch (_: Exception) {}
         releaseWakeLock()
         stopForegroundService()
-        
-        // Terminate process when user swipes app away from Recent Apps / Task Switcher
-        Handler(Looper.getMainLooper()).postDelayed({
-            try {
-                android.os.Process.killProcess(android.os.Process.myPid())
-            } catch (_: Exception) {}
-        }, 150)
     }
 
     override fun onDestroy() {

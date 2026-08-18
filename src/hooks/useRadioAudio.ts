@@ -237,6 +237,7 @@ export function useRadioAudio({
           playbackStatusRef.current = 'PLAYING';
           setPlaybackStatus('PLAYING');
           onStartVisualizerRef.current?.();
+          window.dispatchEvent(new CustomEvent('scroll-to-subtitles'));
         })
         .catch((err) => {
           console.error('Audio play error:', err);
@@ -247,6 +248,7 @@ export function useRadioAudio({
               playbackStatusRef.current = 'PLAYING';
               setPlaybackStatus('PLAYING');
               onStartVisualizerRef.current?.();
+              window.dispatchEvent(new CustomEvent('scroll-to-subtitles'));
             })
             .catch((e) => {
               console.error('Audio play retry error:', e);

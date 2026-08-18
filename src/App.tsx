@@ -703,17 +703,31 @@ export default function App() {
     window.dispatchEvent(new CustomEvent('radio-toggle-play'));
   };
 
+  const scrollToSubtitleReadingPosition = useCallback(() => {
+    setTimeout(() => {
+      const targetEl = document.getElementById('subtitle-search-bar') || document.getElementById('subtitle-frame-top');
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 80);
+  }, []);
+
+  useEffect(() => {
+    const handleScrollEvent = () => {
+      scrollToSubtitleReadingPosition();
+    };
+    window.addEventListener('scroll-to-subtitles', handleScrollEvent);
+    return () => {
+      window.removeEventListener('scroll-to-subtitles', handleScrollEvent);
+    };
+  }, [scrollToSubtitleReadingPosition]);
+
   const handleTopHeaderPlayToggle = () => {
     const isCurrentlyPlaying = playbackStatus === 'PLAYING';
     handleTogglePlayPause();
-    // Only scroll/adjust screen position when STARTING playback
+    // Scroll/adjust screen position to subtitles when starting playback
     if (!isCurrentlyPlaying) {
-      setTimeout(() => {
-        const frameEl = document.getElementById('subtitle-frame-top') || document.getElementById('subtitle-search-bar');
-        if (frameEl) {
-          frameEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 60);
+      scrollToSubtitleReadingPosition();
     }
   };
 
@@ -1089,7 +1103,8 @@ export default function App() {
         onSelectStation={(station) => {
           setActiveStation(station);
           setIsStationModalOpen(false);
-          // Automatically start playing immediately when switching station
+          // Automatically start playing immediately and scroll to subtitle reading position when switching station
+          scrollToSubtitleReadingPosition();
           fetch(getApiUrl('/api/clear-buffer'), { method: 'POST' }).catch(() => {});
           setPlaybackStatus('BUFFERING');
           setTimeout(() => {
@@ -1098,7 +1113,10 @@ export default function App() {
               audioEl.load();
               audioEl
                 .play()
-                .then(() => setPlaybackStatus('PLAYING'))
+                .then(() => {
+                  setPlaybackStatus('PLAYING');
+                  scrollToSubtitleReadingPosition();
+                })
                 .catch((e) => {
                   console.warn('Auto play on station switch error:', e);
                   setPlaybackStatus('ERROR');

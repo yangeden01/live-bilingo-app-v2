@@ -788,7 +788,33 @@ var lastFlushedText = "";
 var recentEmittedServerSentences = [];
 function removeDuplicateWords(str) {
   if (!str) return "";
-  return str.replace(/\b(\w+)(?:\s+\1\b)+/gi, "$1").replace(/,\s*,+/g, ",").replace(/\s+/g, " ").trim();
+  let cleaned = str.trim();
+  cleaned = cleaned.replace(/\b(\w+)(?:\s+\1\b)+/gi, "$1");
+  for (let phraseLen = 6; phraseLen >= 2; phraseLen--) {
+    const pattern = new RegExp(`(\\b(?:\\w+\\s+){${phraseLen - 1}}\\w+)(?:\\s+\\1\\b)+`, "gi");
+    cleaned = cleaned.replace(pattern, "$1");
+  }
+  return cleaned.replace(/,\s*,+/g, ",").replace(/\s+/g, " ").trim();
+}
+function isHallucinationLoop(text) {
+  if (!text || typeof text !== "string") return true;
+  const raw = text.trim();
+  if (raw.length < 4) return true;
+  const words = raw.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(Boolean);
+  if (words.length <= 3) return false;
+  const uniqueWords = new Set(words);
+  const ratio = uniqueWords.size / words.length;
+  if (words.length >= 8 && ratio < 0.4) return true;
+  if (words.length >= 15 && ratio < 0.5) return true;
+  for (let len = 2; len <= 4; len++) {
+    const counts = {};
+    for (let i = 0; i <= words.length - len; i++) {
+      const phrase = words.slice(i, i + len).join(" ");
+      counts[phrase] = (counts[phrase] || 0) + 1;
+      if (counts[phrase] >= 4) return true;
+    }
+  }
+  return false;
 }
 function flushTranscriptParagraph(forceAll = false) {
   if (paragraphFlushTimer) {
@@ -830,6 +856,10 @@ function flushTranscriptParagraph(forceAll = false) {
   bufferStartTime = textToKeep ? Date.now() : 0;
   const textToFlush = removeDuplicateWords(rawTextToFlush);
   if (textToFlush.length < 4 || textToFlush === lastFlushedText) return;
+  if (isHallucinationLoop(textToFlush)) {
+    console.log(`[Subtitle] Dropped hallucination loop speech: "${textToFlush.substring(0, 40)}..."`);
+    return;
+  }
   const normFlush = textToFlush.toLowerCase().replace(/[^a-z0-9]/g, "");
   const isDuplicate = recentEmittedServerSentences.some((prev) => {
     const normPrev = prev.toLowerCase().replace(/[^a-z0-9]/g, "");

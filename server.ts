@@ -931,11 +931,47 @@ const recentEmittedServerSentences: string[] = [];
 
 function removeDuplicateWords(str: string): string {
   if (!str) return '';
-  return str
-    .replace(/\b(\w+)(?:\s+\1\b)+/gi, '$1')
+  let cleaned = str.trim();
+  
+  // 1. Single word duplicate elimination
+  cleaned = cleaned.replace(/\b(\w+)(?:\s+\1\b)+/gi, '$1');
+
+  // 2. Multi-word phrase duplicate loop elimination (e.g. "and set up and set up" -> "and set up")
+  for (let phraseLen = 6; phraseLen >= 2; phraseLen--) {
+    const pattern = new RegExp(`(\\b(?:\\w+\\s+){${phraseLen - 1}}\\w+)(?:\\s+\\1\\b)+`, 'gi');
+    cleaned = cleaned.replace(pattern, '$1');
+  }
+
+  return cleaned
     .replace(/,\s*,+/g, ',')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function isHallucinationLoop(text: string): boolean {
+  if (!text || typeof text !== 'string') return true;
+  const raw = text.trim();
+  if (raw.length < 4) return true;
+
+  const words = raw.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(Boolean);
+  if (words.length <= 3) return false;
+
+  const uniqueWords = new Set(words);
+  const ratio = uniqueWords.size / words.length;
+
+  if (words.length >= 8 && ratio < 0.40) return true;
+  if (words.length >= 15 && ratio < 0.50) return true;
+
+  for (let len = 2; len <= 4; len++) {
+    const counts: Record<string, number> = {};
+    for (let i = 0; i <= words.length - len; i++) {
+      const phrase = words.slice(i, i + len).join(' ');
+      counts[phrase] = (counts[phrase] || 0) + 1;
+      if (counts[phrase] >= 4) return true;
+    }
+  }
+
+  return false;
 }
 
 function flushTranscriptParagraph(forceAll = false) {
@@ -986,6 +1022,11 @@ function flushTranscriptParagraph(forceAll = false) {
 
   const textToFlush = removeDuplicateWords(rawTextToFlush);
   if (textToFlush.length < 4 || textToFlush === lastFlushedText) return;
+
+  if (isHallucinationLoop(textToFlush)) {
+    console.log(`[Subtitle] Dropped hallucination loop speech: "${textToFlush.substring(0, 40)}..."`);
+    return;
+  }
 
   const normFlush = textToFlush.toLowerCase().replace(/[^a-z0-9]/g, '');
   const isDuplicate = recentEmittedServerSentences.some(prev => {

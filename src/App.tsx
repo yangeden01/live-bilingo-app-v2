@@ -10,6 +10,7 @@ import { DictionaryModal } from './components/DictionaryModal';
 import { getApiUrl } from './utils/apiUrl';
 import { safeApiFetch } from './utils/safeFetch';
 import { vibrateGitPushSuccess, vibrateZipExportSuccess } from './utils/haptics';
+import { sanitizeTranscriptText, isHallucinationLoop } from './utils/textSanitizer';
 import { Radio, Code2, Smartphone, Cpu, CheckCircle2, Sparkles, Volume2, ShieldCheck, Download, ListMusic, BookOpen, RefreshCw, Copy, Play, Pause, Sun, Moon, Bell, Power } from 'lucide-react';
 
 const DEFAULT_STATIONS: RadioStation[] = [
@@ -562,7 +563,17 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          // Clean cached items and drop any prior hallucination loops
+          const cleanedList = parsed
+            .map((item: SubtitleItem) => ({
+              ...item,
+              english: sanitizeTranscriptText(item.english),
+            }))
+            .filter((item: SubtitleItem) => !isHallucinationLoop(item.english) && item.english.length >= 4);
+
+          if (cleanedList.length > 0) {
+            return cleanedList;
+          }
         }
       }
     } catch (e) {
@@ -629,19 +640,31 @@ export default function App() {
   }, [subtitles]);
 
   const handleNewSubtitle = useCallback((item: SubtitleItem) => {
+    if (!item || !item.english) return;
+
+    const cleanedEnglish = sanitizeTranscriptText(item.english);
+    if (cleanedEnglish.length < 3 || isHallucinationLoop(cleanedEnglish)) {
+      return;
+    }
+
+    const cleanItem: SubtitleItem = {
+      ...item,
+      english: cleanedEnglish,
+    };
+
     setSubtitles((prev) => {
-      const existingIndex = prev.findIndex((s) => s.id === item.id);
+      const existingIndex = prev.findIndex((s) => s.id === cleanItem.id);
       let updated: SubtitleItem[];
 
       // Normalize english text for duplicate / sub-sentence detection
-      const normEnglish = (item.english || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normEnglish = (cleanItem.english || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
       if (existingIndex >= 0) {
         // Merge item while preserving user bookmark status and custom state
         const existing = prev[existingIndex];
         const merged = {
-          ...item,
-          bookmarked: existing.bookmarked || item.bookmarked,
+          ...cleanItem,
+          bookmarked: existing.bookmarked || cleanItem.bookmarked,
         };
         updated = [...prev];
         updated[existingIndex] = merged;
@@ -662,11 +685,11 @@ export default function App() {
         });
 
         if (isDuplicate) {
-          console.log('[Subtitle UI] Dropped duplicate / sentence overlap:', item.english);
+          console.log('[Subtitle UI] Dropped duplicate / sentence overlap:', cleanItem.english);
           return prev;
         }
 
-        updated = [item, ...prev];
+        updated = [cleanItem, ...prev];
       }
 
       // Preserve up to 500 history items + keep all bookmarked items indefinitely

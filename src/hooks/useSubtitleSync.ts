@@ -4,6 +4,7 @@ import { getApiUrl } from '../utils/apiUrl';
 import { safeApiFetch } from '../utils/safeFetch';
 import { clientSubtitleEngine } from '../utils/clientSubtitleEngine';
 import { DecoupledTimeAligner } from '../utils/DecoupledTimeAligner';
+import { sanitizeTranscriptText, isHallucinationLoop } from '../utils/textSanitizer';
 
 interface UseSubtitleSyncOptions {
   playbackStatus: PlaybackStatus;
@@ -62,10 +63,23 @@ export function useSubtitleSync({
         return;
       }
 
+      // Sanitize text loops and discard hallucination loops
+      const cleanedEnglish = sanitizeTranscriptText(item.english);
+      if (cleanedEnglish.length < 3) return;
+      if (isHallucinationLoop(cleanedEnglish)) {
+        console.log('[Subtitle] Filtered out speech hallucination loop:', cleanedEnglish.substring(0, 40));
+        return;
+      }
+
+      const sanitizedItem: SubtitleItem = {
+        ...item,
+        english: cleanedEnglish,
+      };
+
       // De-duplicate final subtitles (keep memory size capped at 100)
-      if (item.isFinal) {
-        if (lastProcessedSubtitleIdRef.current.has(item.id)) return;
-        lastProcessedSubtitleIdRef.current.add(item.id);
+      if (sanitizedItem.isFinal) {
+        if (lastProcessedSubtitleIdRef.current.has(sanitizedItem.id)) return;
+        lastProcessedSubtitleIdRef.current.add(sanitizedItem.id);
         if (lastProcessedSubtitleIdRef.current.size > 100) {
           const firstKey = lastProcessedSubtitleIdRef.current.values().next().value;
           if (firstKey) lastProcessedSubtitleIdRef.current.delete(firstKey);
@@ -74,9 +88,9 @@ export function useSubtitleSync({
 
       if (timeAlignerRef.current) {
         const currentTime = audioRef.current?.currentTime;
-        timeAlignerRef.current.enqueue(item, currentTime);
+        timeAlignerRef.current.enqueue(sanitizedItem, currentTime);
       } else {
-        onNewSubtitle(item);
+        onNewSubtitle(sanitizedItem);
       }
     },
     [audioRef, onNewSubtitle]

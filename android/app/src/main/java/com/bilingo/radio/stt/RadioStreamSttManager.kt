@@ -368,11 +368,39 @@ class RadioStreamSttManager(
             }
         }
 
-        val cleanedText = rawText.replace(Regex("\\b(\\w+)(?:\\s+\\1\\b)+", RegexOption.IGNORE_CASE), "$1")
+        var cleanedText = rawText.replace(Regex("\\b(\\w+)(?:\\s+\\1\\b)+", RegexOption.IGNORE_CASE), "$1")
+
+        // Eliminate multi-word phrase repetition loops (e.g. "and set up and set up" -> "and set up")
+        for (phraseLen in 6 downTo 2) {
+            val pattern = Regex("(\\b(?:\\w+\\s+){${phraseLen - 1}}\\w+)(?:\\s+\\1\\b)+", RegexOption.IGNORE_CASE)
+            cleanedText = cleanedText.replace(pattern, "$1")
+        }
+
+        cleanedText = cleanedText
+            .replace(Regex(",\\s*,+"), ",")
             .replace(Regex("\\s+"), " ")
             .trim()
 
         if (cleanedText.length < 4 || cleanedText == lastFlushedText) return
+
+        // Hallucination Loop Detection (Unique Words Ratio)
+        val words = cleanedText.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9\\s]"), "").split("\\s+".toRegex()).filter { it.isNotEmpty() }
+        if (words.size >= 8) {
+            val uniqueCount = words.toSet().size
+            val ratio = uniqueCount.toDouble() / words.size.toDouble()
+            if (ratio < 0.40) {
+                android.util.Log.d("RadioStreamSttManager", "Dropped low-diversity hallucination loop: $cleanedText")
+                return
+            }
+        }
+        if (words.size >= 15) {
+            val uniqueCount = words.toSet().size
+            val ratio = uniqueCount.toDouble() / words.size.toDouble()
+            if (ratio < 0.50) {
+                android.util.Log.d("RadioStreamSttManager", "Dropped low-diversity hallucination loop: $cleanedText")
+                return
+            }
+        }
 
         val normCleaned = cleanedText.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
         // Prevent duplicate cards from sentence expansion / prefix overlap

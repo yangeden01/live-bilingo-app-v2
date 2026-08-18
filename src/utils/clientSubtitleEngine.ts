@@ -2,6 +2,7 @@
 import { SubtitleItem, RadioStation } from '../types';
 import { getApiUrl } from './apiUrl';
 import { safeApiFetch } from './safeFetch';
+import { sanitizeTranscriptText, isHallucinationLoop } from './textSanitizer';
 
 class ClientSubtitleEngine {
   private activeStation: RadioStation | null = null;
@@ -86,6 +87,11 @@ class ClientSubtitleEngine {
               return;
             }
 
+            const cleanedEnglish = sanitizeTranscriptText(sub.english);
+            if (cleanedEnglish.length < 3 || isHallucinationLoop(cleanedEnglish)) {
+              return;
+            }
+
             this.seenSubtitleIds.add(sub.id);
             if (this.seenSubtitleIds.size > 200) {
               const firstKey = this.seenSubtitleIds.keys().next().value;
@@ -106,8 +112,8 @@ class ClientSubtitleEngine {
               id: sub.id,
               timestamp: localFormattedTime,
               createdAt: subCreatedAt,
-              english: sub.english,
-              traditionalChinese: sub.traditionalChinese || sub.english,
+              english: cleanedEnglish,
+              traditionalChinese: sub.traditionalChinese || cleanedEnglish,
               isFinal: true,
             };
 

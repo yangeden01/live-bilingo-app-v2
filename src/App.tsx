@@ -1074,6 +1074,7 @@ export default function App() {
             onOpenStationManager={() => setIsStationModalOpen(true)}
             readingMode={readingMode}
             onReadingModeChange={setReadingMode}
+            effectiveTheme={effectiveTheme}
           />
         )}
 

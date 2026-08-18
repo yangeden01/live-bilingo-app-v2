@@ -46,6 +46,7 @@ interface Props {
   onOpenStationManager?: () => void;
   readingMode?: ReadingMode;
   onReadingModeChange?: (mode: ReadingMode) => void;
+  effectiveTheme?: 'dark' | 'light' | 'paper';
 }
 
 type FrameTab = 'live' | 'history' | 'bookmarks';
@@ -64,6 +65,7 @@ export const Material3AndroidFrame: React.FC<Props> = ({
   onOpenStationManager,
   readingMode: propReadingMode,
   onReadingModeChange: propOnReadingModeChange,
+  effectiveTheme: propEffectiveTheme,
 }) => {
   const [activeTab, setActiveTab] = useState<FrameTab>('live');
   const [searchQuery, setSearchQuery] = useState('');
@@ -152,8 +154,20 @@ export const Material3AndroidFrame: React.FC<Props> = ({
     };
   }, [readingMode]);
 
+  const [currentHour, setCurrentHour] = useState<number>(() => new Date().getHours());
+
+  useEffect(() => {
+    const updateHour = () => setCurrentHour(new Date().getHours());
+    updateHour();
+    const interval = setInterval(updateHour, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Derived effective theme ('dark' | 'light' | 'paper')
   const effectiveTheme = useMemo<'dark' | 'light' | 'paper'>(() => {
+    if (propEffectiveTheme) {
+      return propEffectiveTheme;
+    }
     if (readingMode === 'paper') return 'paper';
     if (readingMode === 'light') return 'light';
     if (readingMode === 'dark') return 'dark';
@@ -162,8 +176,16 @@ export const Material3AndroidFrame: React.FC<Props> = ({
     if (ambientLux !== null) {
       return ambientLux < 40 ? 'dark' : 'light';
     }
-    return systemPrefersDark ? 'dark' : 'light';
-  }, [readingMode, ambientLux, systemPrefersDark]);
+    if (systemPrefersDark) {
+      return 'dark';
+    }
+    // Time-based automatic night mode: 18:00 to 07:00 is dark mode
+    const isNightTime = currentHour >= 18 || currentHour < 7;
+    if (isNightTime) {
+      return 'dark';
+    }
+    return 'light';
+  }, [propEffectiveTheme, readingMode, ambientLux, systemPrefersDark, currentHour]);
 
   useEffect(() => {
     try {

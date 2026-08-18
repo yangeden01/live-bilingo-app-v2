@@ -69,6 +69,11 @@ class ClientSubtitleEngine {
 
         data.subtitles.forEach((sub: any) => {
           if (sub && sub.id && sub.english && !this.seenSubtitleIds.has(sub.id)) {
+            // Filter out system greeting message
+            if (sub.id.startsWith('station-play-') || sub.english.includes('Connected to live radio stream')) {
+              return;
+            }
+
             this.seenSubtitleIds.add(sub.id);
             if (this.seenSubtitleIds.size > 200) {
               const firstKey = this.seenSubtitleIds.keys().next().value;

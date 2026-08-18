@@ -493,18 +493,6 @@ app.post('/api/notify-station-playing', (req, res) => {
     pendingTranscriptBuffer = '';
     bufferStartTime = 0;
     lastTranscriptTime = Date.now();
-
-    // Emit instant station alignment subtitle card to SSE clients
-    const nowStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const greetingItem: SubtitleItem = {
-      id: `station-play-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-      timestamp: nowStr,
-      createdAt: Date.now(),
-      english: `Connected to live radio stream: ${stationDisplayName}. Real-time AI speech recognition and bilingual translation active.`,
-      traditionalChinese: `【廣播連線成功】已啟動「${stationDisplayName}」即時收聽，AI 雙語語音對齊與字幕翻譯同步運作中。`,
-      isFinal: true,
-    };
-    broadcastSubtitle(greetingItem);
   }
   res.json({ status: 'ok', currentRadioStreamUrl, aligned: true });
 });

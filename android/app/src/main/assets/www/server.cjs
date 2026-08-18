@@ -440,16 +440,6 @@ app.post("/api/notify-station-playing", (req, res) => {
     pendingTranscriptBuffer = "";
     bufferStartTime = 0;
     lastTranscriptTime = Date.now();
-    const nowStr = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    const greetingItem = {
-      id: `station-play-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-      timestamp: nowStr,
-      createdAt: Date.now(),
-      english: `Connected to live radio stream: ${stationDisplayName}. Real-time AI speech recognition and bilingual translation active.`,
-      traditionalChinese: `\u3010\u5EE3\u64AD\u9023\u7DDA\u6210\u529F\u3011\u5DF2\u555F\u52D5\u300C${stationDisplayName}\u300D\u5373\u6642\u6536\u807D\uFF0CAI \u96D9\u8A9E\u8A9E\u97F3\u5C0D\u9F4A\u8207\u5B57\u5E55\u7FFB\u8B6F\u540C\u6B65\u904B\u4F5C\u4E2D\u3002`,
-      isFinal: true
-    };
-    broadcastSubtitle(greetingItem);
   }
   res.json({ status: "ok", currentRadioStreamUrl, aligned: true });
 });

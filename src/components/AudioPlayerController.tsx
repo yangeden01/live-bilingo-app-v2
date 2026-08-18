@@ -597,6 +597,11 @@ export const AudioPlayerController: React.FC<Props> = ({
           try {
             const data = JSON.parse(event.data);
             if (data.id && data.english && data.traditionalChinese) {
+              // Filter out internal system connection notifications
+              if (data.id.startsWith('station-play-') || data.english.includes('Connected to live radio stream')) {
+                return;
+              }
+
               const createdAt = data.createdAt || Date.now();
               lastPollTimestamp = Math.max(lastPollTimestamp, createdAt);
               

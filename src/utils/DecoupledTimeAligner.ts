@@ -17,8 +17,9 @@ export class DecoupledTimeAligner {
   private currentInterim: SubtitleItem | null = null;
   private isRunning = false;
 
-  // Calibrated default radio playback buffer latency offset (3500ms) to ensure subtitle aligns precisely with actual audio output
-  private targetBufferDelayMs = 3500;
+  // Calibrated default radio playback buffer latency offset (2800ms)
+  // Ensures subtitles lead the spoken audio by ~0.5s - 0.7s so user's eyes absorb the subtitle just ahead of listening
+  private targetBufferDelayMs = 2800;
 
   constructor(onRelease: (item: SubtitleItem) => void, onInterim?: (item: SubtitleItem | null) => void) {
     this.onReleaseCallback = onRelease;

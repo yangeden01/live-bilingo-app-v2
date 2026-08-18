@@ -33,8 +33,6 @@ import com.bilingo.radio.viewmodel.RadioSubtitleViewModel
 
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: RadioSubtitleViewModel by viewModels()
-
     private var appUpdateManager: AppUpdateManager? = null
     private var installStateUpdatedListener: InstallStateUpdatedListener? = null
     var activeWebView: WebView? = null
@@ -74,12 +72,21 @@ class MainActivity : ComponentActivity() {
             e.printStackTrace()
         }
 
-        setupGoogleInAppUpdate()
-        setupNetworkMonitoring()
+        try {
+            setupGoogleInAppUpdate()
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "In-app update init note: ${e.message}")
+        }
+
+        try {
+            setupNetworkMonitoring()
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Network monitoring init note: ${e.message}")
+        }
 
         setContent {
             LiveBilingoRadioTheme {
-                MainScreen(viewModel = viewModel)
+                MainScreen()
             }
         }
     }

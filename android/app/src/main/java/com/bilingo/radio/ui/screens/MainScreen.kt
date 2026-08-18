@@ -44,29 +44,14 @@ class WebAppInterface(
 ) {
     private var tts: android.speech.tts.TextToSpeech? = null
     private var isTtsReady = false
+    private var isTtsInitializing = false
     val sttManager = com.bilingo.radio.stt.RadioStreamSttManager()
 
     init {
-        try {
-            tts = android.speech.tts.TextToSpeech(context.applicationContext) { status ->
-                if (status == android.speech.tts.TextToSpeech.SUCCESS) {
-                    val result = tts?.setLanguage(java.util.Locale.US)
-                    if (result != android.speech.tts.TextToSpeech.LANG_MISSING_DATA &&
-                        result != android.speech.tts.TextToSpeech.LANG_NOT_SUPPORTED
-                    ) {
-                        isTtsReady = true
-                        tts?.setSpeechRate(0.95f)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
         sttManager.onSubtitleListener = { subtitle ->
             (context as? MainActivity)?.runOnUiThread {
                 try {
-                    val webView = (context as? MainActivity)?.activeWebView
+                    val webView = (context as? MainActivity)?.activeWebView ?: return@runOnUiThread
                     val escapedEn = org.json.JSONObject.quote(subtitle.english)
                     val escapedZh = org.json.JSONObject.quote(subtitle.traditionalChinese)
                     val jsCode = """
@@ -85,7 +70,7 @@ class WebAppInterface(
                             window.dispatchEvent(new CustomEvent('native-subtitle', { detail: sub }));
                         })();
                     """.trimIndent()
-                    webView?.evaluateJavascript(jsCode, null)
+                    webView.evaluateJavascript(jsCode, null)
                 } catch (e: Exception) {
                     android.util.Log.e("WebAppInterface", "Error sending subtitle to WebView: ${e.message}")
                 }
@@ -95,13 +80,40 @@ class WebAppInterface(
         sttManager.onConnectionStateListener = { connected ->
             (context as? MainActivity)?.runOnUiThread {
                 try {
-                    val webView = (context as? MainActivity)?.activeWebView
-                    webView?.evaluateJavascript(
+                    val webView = (context as? MainActivity)?.activeWebView ?: return@runOnUiThread
+                    webView.evaluateJavascript(
                         "window.postMessage({ type: 'STT_CONNECTION_STATE', connected: $connected }, '*');",
                         null
                     )
                 } catch (_: Exception) {}
             }
+        }
+    }
+
+    private fun ensureTtsInitialized(onReady: (() -> Unit)? = null) {
+        if (isTtsReady && tts != null) {
+            onReady?.invoke()
+            return
+        }
+        if (isTtsInitializing) return
+        isTtsInitializing = true
+        try {
+            tts = android.speech.tts.TextToSpeech(context.applicationContext) { status ->
+                isTtsInitializing = false
+                if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                    val result = tts?.setLanguage(java.util.Locale.US)
+                    if (result != android.speech.tts.TextToSpeech.LANG_MISSING_DATA &&
+                        result != android.speech.tts.TextToSpeech.LANG_NOT_SUPPORTED
+                    ) {
+                        isTtsReady = true
+                        tts?.setSpeechRate(0.95f)
+                        onReady?.invoke()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            isTtsInitializing = false
+            android.util.Log.w("WebAppInterface", "TTS init exception: ${e.message}")
         }
     }
 
@@ -139,9 +151,14 @@ class WebAppInterface(
     fun speak(text: String) {
         Handler(Looper.getMainLooper()).post {
             try {
-                if (isTtsReady && tts != null && text.isNotBlank()) {
-                    tts?.stop()
-                    tts?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "bilingo_tts_${System.currentTimeMillis()}")
+                if (text.isBlank()) return@post
+                ensureTtsInitialized {
+                    try {
+                        tts?.stop()
+                        tts?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "bilingo_tts_${System.currentTimeMillis()}")
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -302,7 +319,7 @@ class WebAppInterface(
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun MainScreen(
-    viewModel: RadioSubtitleViewModel
+    viewModel: RadioSubtitleViewModel? = null
 ) {
     val context = LocalContext.current
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }

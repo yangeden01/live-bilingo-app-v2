@@ -562,6 +562,9 @@ export default function App() {
     ];
   });
 
+  // Current real-time streaming partial subtitle (interim)
+  const [interimSubtitle, setInterimSubtitle] = useState<SubtitleItem | null>(null);
+
   // Refresh top subtitle timestamp on startup so user sees current local time & signal Android bridge page ready
   useEffect(() => {
     try {
@@ -987,6 +990,7 @@ export default function App() {
           playbackStatus={playbackStatus}
           setPlaybackStatus={setPlaybackStatus}
           onNewSubtitle={handleNewSubtitle}
+          onInterimSubtitle={setInterimSubtitle}
           sttConnected={sttConnected}
           setSttConnected={setSttConnected}
           activeStation={activeStation}
@@ -1000,6 +1004,7 @@ export default function App() {
         {activeTab === 'app' && (
           <Material3AndroidFrame
             subtitles={subtitles}
+            interimSubtitle={interimSubtitle}
             playbackStatus={playbackStatus}
             onTogglePlayPause={handleTogglePlayPause}
             sttConnected={sttConnected}

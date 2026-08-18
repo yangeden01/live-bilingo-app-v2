@@ -33,6 +33,7 @@ import { playBeanWallImpactSound } from '../utils/sound';
 
 interface Props {
   subtitles: SubtitleItem[];
+  interimSubtitle?: SubtitleItem | null;
   playbackStatus: PlaybackStatus;
   onTogglePlayPause: () => void;
   sttConnected: boolean;
@@ -50,6 +51,7 @@ type FrameTab = 'live' | 'history' | 'bookmarks';
 
 export const Material3AndroidFrame: React.FC<Props> = ({
   subtitles,
+  interimSubtitle,
   playbackStatus,
   onTogglePlayPause,
   sttConnected,
@@ -817,6 +819,27 @@ export const Material3AndroidFrame: React.FC<Props> = ({
             </div>
           ) : (
             <AnimatePresence>
+              {/* Interim Real-time Streaming Partial Transcript if currently playing and on live tab */}
+              {interimSubtitle && activeTab === 'live' && !sortAscending && playbackStatus === 'PLAYING' && (
+                <motion.div
+                  key="interim-live-streaming"
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.15 }}
+                  className="mb-2"
+                >
+                  <BilingualSubtitleCard
+                    subtitle={interimSubtitle}
+                    searchQuery={searchQuery}
+                    isLatest={true}
+                    isInterim={true}
+                    fontSize={fontSize}
+                    theme={effectiveTheme}
+                  />
+                </motion.div>
+              )}
+
               {filteredSubtitles.map((subtitle, index) => (
                 <motion.div
                   key={subtitle.id}
@@ -830,7 +853,7 @@ export const Material3AndroidFrame: React.FC<Props> = ({
                     onBookmarkToggle={onBookmarkToggle}
                     onOpenDictionary={onOpenDictionary}
                     searchQuery={searchQuery}
-                    isLatest={index === 0 && activeTab === 'live' && !sortAscending && playbackStatus === 'PLAYING'}
+                    isLatest={index === 0 && activeTab === 'live' && !sortAscending && playbackStatus === 'PLAYING' && !interimSubtitle}
                     fontSize={fontSize}
                     segmentNumber={activeTab === 'history' ? (sortAscending ? index + 1 : filteredSubtitles.length - index) : undefined}
                     theme={effectiveTheme}

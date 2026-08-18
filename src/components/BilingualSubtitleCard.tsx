@@ -13,6 +13,7 @@ interface Props {
   fontSize?: 'small' | 'medium' | 'large';
   segmentNumber?: number;
   theme?: 'dark' | 'light' | 'paper';
+  isInterim?: boolean;
 }
 
 const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -26,6 +27,7 @@ export const BilingualSubtitleCard: React.FC<Props> = ({
   fontSize = 'small',
   segmentNumber,
   theme = 'dark',
+  isInterim = false,
 }) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
 
@@ -245,10 +247,17 @@ export const BilingualSubtitleCard: React.FC<Props> = ({
       {/* Top Bar: Timestamp & Action Buttons */}
       <div className="flex items-center justify-between mb-3 text-xs opacity-90">
         <div className="flex items-center gap-2 flex-wrap">
-          {isLatest && (
+          {isLatest && !isInterim && (
             <span className="inline-flex items-center gap-1.5 font-bold px-2.5 py-0.5 rounded-full text-[11px] bg-red-500/10 text-red-600 border border-red-500/30 animate-pulse">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-ping shrink-0" />
               即時廣播
+            </span>
+          )}
+
+          {isInterim && (
+            <span className="inline-flex items-center gap-1.5 font-bold px-2.5 py-0.5 rounded-full text-[11px] bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/40 animate-pulse">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0" />
+              串流辨識中 (Streaming...)
             </span>
           )}
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { playBeanWallImpactSound } from '../utils/sound';
 import { PlaybackStatus, RadioStation, SubtitleItem, ReadingMode } from '../types';
@@ -8,10 +8,13 @@ import { getApiUrl } from '../utils/apiUrl';
 import { safeApiFetch } from '../utils/safeFetch';
 import { clientSubtitleEngine } from '../utils/clientSubtitleEngine';
 
+import { DecoupledTimeAligner } from '../utils/DecoupledTimeAligner';
+
 interface Props {
   playbackStatus: PlaybackStatus;
   setPlaybackStatus: (status: PlaybackStatus) => void;
   onNewSubtitle: (item: SubtitleItem) => void;
+  onInterimSubtitle?: (item: SubtitleItem | null) => void;
   sttConnected: boolean;
   setSttConnected: (connected: boolean) => void;
   activeStation: RadioStation;
@@ -25,6 +28,7 @@ export const AudioPlayerController: React.FC<Props> = ({
   playbackStatus,
   setPlaybackStatus,
   onNewSubtitle,
+  onInterimSubtitle,
   sttConnected,
   setSttConnected,
   activeStation,
@@ -34,6 +38,38 @@ export const AudioPlayerController: React.FC<Props> = ({
   effectiveTheme,
 }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const timeAlignerRef = useRef<DecoupledTimeAligner | null>(null);
+
+  // Initialize decoupled time alignment engine
+  useEffect(() => {
+    const aligner = new DecoupledTimeAligner(
+      (item) => {
+        onNewSubtitle(item);
+      },
+      (interimItem) => {
+        if (onInterimSubtitle) {
+          onInterimSubtitle(interimItem);
+        }
+      }
+    );
+    aligner.start();
+    timeAlignerRef.current = aligner;
+
+    return () => {
+      aligner.stop();
+      timeAlignerRef.current = null;
+    };
+  }, [onNewSubtitle, onInterimSubtitle]);
+
+  // Safe wrapper to dispatch subtitles through decoupled time aligner
+  const dispatchSubtitleWithTimeAlignment = useCallback((item: SubtitleItem) => {
+    if (timeAlignerRef.current) {
+      const currentTime = audioRef.current?.currentTime;
+      timeAlignerRef.current.enqueue(item, currentTime);
+    } else {
+      onNewSubtitle(item);
+    }
+  }, [onNewSubtitle]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -424,7 +460,7 @@ export const AudioPlayerController: React.FC<Props> = ({
     (window as any).handleNativeSubtitle = (sub: any) => {
       if (sub && sub.id && sub.english && sub.traditionalChinese) {
         setSttConnected(true);
-        onNewSubtitle(sub);
+        dispatchSubtitleWithTimeAlignment(sub);
       }
     };
 
@@ -432,7 +468,7 @@ export const AudioPlayerController: React.FC<Props> = ({
     const handleNativeEvent = (e: any) => {
       if (e.detail && e.detail.id && e.detail.english && e.detail.traditionalChinese) {
         setSttConnected(true);
-        onNewSubtitle(e.detail);
+        dispatchSubtitleWithTimeAlignment(e.detail);
       }
     };
 
@@ -442,7 +478,7 @@ export const AudioPlayerController: React.FC<Props> = ({
         setSttConnected(!!e.data.connected);
       } else if (e.data?.type === 'NEW_SUBTITLE' && e.data?.data) {
         setSttConnected(true);
-        onNewSubtitle(e.data.data);
+        dispatchSubtitleWithTimeAlignment(e.data.data);
       }
     };
 
@@ -454,7 +490,7 @@ export const AudioPlayerController: React.FC<Props> = ({
       window.removeEventListener('native-subtitle', handleNativeEvent);
       window.removeEventListener('message', handleMessage);
     };
-  }, [onNewSubtitle, setSttConnected]);
+  }, [dispatchSubtitleWithTimeAlignment, setSttConnected]);
 
   // Sync Android Native STT Pipeline & Backend STT Engine on Station / Playback Change
   useEffect(() => {
@@ -522,7 +558,7 @@ export const AudioPlayerController: React.FC<Props> = ({
                 };
                 clientSubtitleEngine.recordExternalSubtitle();
                 if (playbackStatusRef.current === 'PLAYING' || playbackStatusRef.current === 'BUFFERING') {
-                  onNewSubtitle(newItem);
+                  dispatchSubtitleWithTimeAlignment(newItem);
                 }
               }
             });
@@ -583,7 +619,7 @@ export const AudioPlayerController: React.FC<Props> = ({
                 };
 
                 clientSubtitleEngine.recordExternalSubtitle();
-                onNewSubtitle(newItem);
+                dispatchSubtitleWithTimeAlignment(newItem);
               }
             }
           } catch (err) {
@@ -645,7 +681,7 @@ export const AudioPlayerController: React.FC<Props> = ({
       clientSubtitleEngine.start(
         activeStation,
         (item) => {
-          onNewSubtitle(item);
+          dispatchSubtitleWithTimeAlignment(item);
         },
         (connected) => {
           setSttConnected(connected);
@@ -658,7 +694,7 @@ export const AudioPlayerController: React.FC<Props> = ({
     return () => {
       clientSubtitleEngine.stop();
     };
-  }, [playbackStatus, activeStation, onNewSubtitle, setSttConnected]);
+  }, [playbackStatus, activeStation, dispatchSubtitleWithTimeAlignment, setSttConnected]);
 
   // Client local buffer ref for live sync alignment
   const pendingEnglishBufferRef = useRef<string>('');

@@ -7,6 +7,8 @@ export interface SubtitleItem {
   isFinal: boolean;
   confidence?: number;
   bookmarked?: boolean;
+  audioTime?: number; // HTML5 audio element currentTime when released
+  isInterim?: boolean; // Real-time streaming typing state
 }
 
 export interface RadioStation {

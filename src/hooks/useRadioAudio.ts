@@ -21,10 +21,17 @@ export function useRadioAudio({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playbackStatusRef = useRef(playbackStatus);
   const activeStationRef = useRef(activeStation);
+  const prevStationIdRef = useRef(activeStation.id);
   const retryCountRef = useRef<number>(0);
   const isReconnectingRef = useRef<boolean>(false);
   const lastCurrentTimeRef = useRef<{ time: number; timestamp: number }>({ time: 0, timestamp: Date.now() });
-  const isInitialMountRef = useRef(true);
+
+  const onStartVisualizerRef = useRef(onStartVisualizer);
+  const onClearSubtitleQueueRef = useRef(onClearSubtitleQueue);
+  useEffect(() => {
+    onStartVisualizerRef.current = onStartVisualizer;
+    onClearSubtitleQueueRef.current = onClearSubtitleQueue;
+  });
 
   useEffect(() => {
     playbackStatusRef.current = playbackStatus;
@@ -73,6 +80,7 @@ export function useRadioAudio({
 
     if (retryCountRef.current >= 3) {
       console.warn('[Auto-Reconnect] Exceeded maximum retry attempts (3). Updating UI to ERROR.');
+      playbackStatusRef.current = 'ERROR';
       setPlaybackStatus('ERROR');
       isReconnectingRef.current = false;
       return;
@@ -84,6 +92,7 @@ export function useRadioAudio({
     const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
 
     console.log(`[Auto-Reconnect] Attempt ${attempt}/3 in ${delayMs}ms...`);
+    playbackStatusRef.current = 'BUFFERING';
     setPlaybackStatus('BUFFERING');
 
     setTimeout(() => {
@@ -102,8 +111,10 @@ export function useRadioAudio({
         .play()
         .then(() => {
           console.log(`[Auto-Reconnect] Attempt ${attempt}/3 succeeded!`);
+          playbackStatusRef.current = 'PLAYING';
           setPlaybackStatus('PLAYING');
           isReconnectingRef.current = false;
+          onStartVisualizerRef.current?.();
         })
         .catch((err) => {
           console.warn(`[Auto-Reconnect] Attempt ${attempt}/3 failed:`, err);
@@ -111,6 +122,7 @@ export function useRadioAudio({
           if (retryCountRef.current < 3) {
             handleAutoReconnect();
           } else {
+            playbackStatusRef.current = 'ERROR';
             setPlaybackStatus('ERROR');
           }
         });
@@ -149,27 +161,32 @@ export function useRadioAudio({
     return () => clearInterval(interval);
   }, [playbackStatus, handleAutoReconnect]);
 
-  // Handle active station changes
+  // Handle active station changes ONLY when activeStation.id actually changes
   useEffect(() => {
     if (!audioRef.current) return;
 
-    if (isInitialMountRef.current) {
-      isInitialMountRef.current = false;
-      audioRef.current.load();
+    if (prevStationIdRef.current === activeStation.id) {
       return;
     }
+    prevStationIdRef.current = activeStation.id;
 
     if (playbackStatusRef.current === 'PLAYING' || playbackStatusRef.current === 'BUFFERING') {
+      playbackStatusRef.current = 'BUFFERING';
       setPlaybackStatus('BUFFERING');
+      const baseUrl = getProxiedStreamUrl(activeStation.streamUrl);
+      const liveFreshUrl = addQueryParam(baseUrl, '_t', String(Date.now()));
+      audioRef.current.src = liveFreshUrl;
       audioRef.current.load();
       audioRef.current
         .play()
         .then(() => {
+          playbackStatusRef.current = 'PLAYING';
           setPlaybackStatus('PLAYING');
-          onStartVisualizer?.();
+          onStartVisualizerRef.current?.();
         })
         .catch((e) => {
           console.warn('Auto-play on station switch error:', e);
+          playbackStatusRef.current = 'ERROR';
           setPlaybackStatus('ERROR');
         });
     } else {
@@ -181,34 +198,35 @@ export function useRadioAudio({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: activeStation.streamUrl, name: activeStation.name }),
     });
-  }, [activeStation.id, activeStation.streamUrl, activeStation.name, onStartVisualizer, setPlaybackStatus]);
+  }, [activeStation.id, activeStation.streamUrl, activeStation.name, getProxiedStreamUrl, setPlaybackStatus]);
 
   // Main toggle play / pause logic
   const togglePlayPause = useCallback(() => {
     if (!audioRef.current) return;
 
-    if (playbackStatus === 'PLAYING') {
+    if (playbackStatusRef.current === 'PLAYING') {
       playbackStatusRef.current = 'PAUSED';
       setPlaybackStatus('PAUSED');
       if (audioRef.current) {
         audioRef.current.pause();
       }
-      onClearSubtitleQueue?.();
+      onClearSubtitleQueueRef.current?.();
     } else {
-      onClearSubtitleQueue?.();
+      onClearSubtitleQueueRef.current?.();
 
       fetch(getApiUrl('/api/clear-buffer'), { method: 'POST' }).catch(() => {});
       safeApiFetch('/api/notify-station-playing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: activeStation.streamUrl, name: activeStation.name }),
+        body: JSON.stringify({ url: activeStationRef.current.streamUrl, name: activeStationRef.current.name }),
       }).catch(() => {});
 
+      playbackStatusRef.current = 'BUFFERING';
       setPlaybackStatus('BUFFERING');
       const audio = audioRef.current;
       audio.playbackRate = 1.0;
 
-      const baseUrl = getProxiedStreamUrl(activeStation.streamUrl);
+      const baseUrl = getProxiedStreamUrl(activeStationRef.current.streamUrl);
       const liveFreshUrl = addQueryParam(baseUrl, '_t', String(Date.now()));
       audio.src = liveFreshUrl;
       audio.load();
@@ -216,8 +234,9 @@ export function useRadioAudio({
       audio
         .play()
         .then(() => {
+          playbackStatusRef.current = 'PLAYING';
           setPlaybackStatus('PLAYING');
-          onStartVisualizer?.();
+          onStartVisualizerRef.current?.();
         })
         .catch((err) => {
           console.error('Audio play error:', err);
@@ -225,16 +244,29 @@ export function useRadioAudio({
           audio
             .play()
             .then(() => {
+              playbackStatusRef.current = 'PLAYING';
               setPlaybackStatus('PLAYING');
-              onStartVisualizer?.();
+              onStartVisualizerRef.current?.();
             })
             .catch((e) => {
               console.error('Audio play retry error:', e);
+              playbackStatusRef.current = 'ERROR';
               setPlaybackStatus('ERROR');
             });
         });
     }
-  }, [activeStation.name, activeStation.streamUrl, getProxiedStreamUrl, onClearSubtitleQueue, onStartVisualizer, playbackStatus, setPlaybackStatus]);
+  }, [getProxiedStreamUrl, setPlaybackStatus]);
+
+  // Listen for global window custom events
+  useEffect(() => {
+    const handleGlobalToggle = () => {
+      togglePlayPause();
+    };
+    window.addEventListener('radio-toggle-play', handleGlobalToggle);
+    return () => {
+      window.removeEventListener('radio-toggle-play', handleGlobalToggle);
+    };
+  }, [togglePlayPause]);
 
   // Fast live-edge alignment
   const handleSyncLiveEdge = useCallback(() => {
@@ -390,6 +422,7 @@ export function useRadioAudio({
     audioRef,
     togglePlayPause,
     handleSyncLiveEdge,
+    handleAutoReconnect,
     getProxiedStreamUrl,
   };
 }

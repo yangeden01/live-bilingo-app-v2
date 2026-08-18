@@ -110,6 +110,7 @@ export const AudioPlayerController: React.FC<Props> = ({
   const {
     audioRef,
     togglePlayPause,
+    handleAutoReconnect,
     getProxiedStreamUrl,
   } = useRadioAudio({
     activeStation,
@@ -414,9 +415,23 @@ export const AudioPlayerController: React.FC<Props> = ({
         src={getProxiedStreamUrl(activeStation.streamUrl)}
         preload="auto"
         onWaiting={() => setPlaybackStatus('BUFFERING')}
-        onPlaying={() => setPlaybackStatus('PLAYING')}
+        onPlaying={() => {
+          setPlaybackStatus('PLAYING');
+          setupAudioVisualizer();
+        }}
+        onEnded={() => {
+          console.warn('[Audio Tag] Live stream ended unexpectedly.');
+          if (playbackStatus === 'PLAYING') {
+            handleAutoReconnect();
+          }
+        }}
         onPause={() => {}}
-        onError={() => setPlaybackStatus('ERROR')}
+        onStalled={() => {
+          console.log('[Audio Tag] Network delay (stalled). Waiting for buffer...');
+        }}
+        onError={() => {
+          handleAutoReconnect();
+        }}
       />
 
       {playbackStatus === 'ERROR' && (

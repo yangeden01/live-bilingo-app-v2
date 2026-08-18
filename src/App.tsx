@@ -699,38 +699,8 @@ export default function App() {
   };
 
   const handleTogglePlayPause = () => {
-    // Triggered from Sticky Header, Material 3 FAB, or main controller
-    const audioEl = document.querySelector('audio');
-    if (!audioEl) return;
-
-    if (playbackStatus === 'PLAYING') {
-      setPlaybackStatus('PAUSED');
-      audioEl.pause();
-    } else {
-      setPlaybackStatus('BUFFERING');
-      safeApiFetch('/api/clear-buffer', { method: 'POST' });
-      safeApiFetch('/api/notify-station-playing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: activeStation.streamUrl, name: activeStation.name }),
-      });
-      audioEl.playbackRate = 1.0;
-      audioEl
-        .play()
-        .then(() => {
-          setPlaybackStatus('PLAYING');
-        })
-        .catch((err) => {
-          console.warn('Audio play attempt notice:', err);
-          audioEl.load();
-          audioEl
-            .play()
-            .then(() => {
-              setPlaybackStatus('PLAYING');
-            })
-            .catch(() => setPlaybackStatus('ERROR'));
-        });
-    }
+    // Dispatches to useRadioAudio's centralized streaming pipeline
+    window.dispatchEvent(new CustomEvent('radio-toggle-play'));
   };
 
   const handleTopHeaderPlayToggle = () => {

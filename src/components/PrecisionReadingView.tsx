@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { SubtitleItem, RadioStation, ReadingMode } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Volume2, VolumeX, Bookmark, BookmarkCheck, Sparkles, Radio, Play, Pause, ChevronLeft, ChevronRight, Lock, Eye, Compass } from 'lucide-react';
+import { Volume2, VolumeX, Bookmark, BookmarkCheck, Sparkles, Radio, Play, Pause, ChevronLeft, ChevronRight, Lock, Eye, Compass, Sliders, FastForward, Rewind } from 'lucide-react';
 import { speakText, stopSpeech } from '../utils/tts';
 
 interface Props {
@@ -33,6 +33,23 @@ export const PrecisionReadingView: React.FC<Props> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [speakingId, setSpeakingId] = React.useState<string | null>(null);
+  const [syncOffsetMs, setSyncOffsetMs] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('radio_subtitle_sync_offset_ms');
+      return saved ? Number(saved) || 3500 : 3500;
+    } catch (e) {
+      return 3500;
+    }
+  });
+  const [showSyncSettings, setShowSyncSettings] = useState<boolean>(false);
+
+  const handleAdjustSyncOffset = (deltaMs: number) => {
+    const updated = Math.max(0, Math.min(10000, syncOffsetMs + deltaMs));
+    setSyncOffsetMs(updated);
+    try {
+      localStorage.setItem('radio_subtitle_sync_offset_ms', String(updated));
+    } catch (e) {}
+  };
 
   // Active subtitle is either interim (if typing) or latest final subtitle
   const activeSubtitle = interimSubtitle || subtitles[0] || null;
@@ -115,32 +132,123 @@ export const PrecisionReadingView: React.FC<Props> = ({
           </span>
         </div>
 
-        {/* Auto Follow Toggle Button */}
-        <button
-          type="button"
-          onClick={onToggleAutoFollow}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
-            autoFollow
-              ? 'bg-blue-600 text-white'
-              : theme === 'paper'
-              ? 'bg-amber-200 text-amber-900'
-              : 'bg-slate-800 text-slate-400'
-          }`}
-          title={autoFollow ? '自動聚焦鎖定中：廣播播放到哪，畫面自動滑動到哪' : '手動滑動模式：點擊開啟自動聚焦'}
-        >
-          {autoFollow ? (
-            <>
-              <Lock className="w-3 h-3" />
-              <span>鎖定跟隨中</span>
-            </>
-          ) : (
-            <>
-              <Eye className="w-3 h-3" />
-              <span>自由滾動</span>
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Sync Calibration Offset Quick Adjuster */}
+          <button
+            type="button"
+            onClick={() => setShowSyncSettings(!showSyncSettings)}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer border ${
+              showSyncSettings
+                ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold'
+                : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 opacity-80 hover:opacity-100'
+            }`}
+            title="調整字幕與廣播聲音對齊時間差 (Sync Calibration)"
+          >
+            <Sliders className="w-3 h-3" />
+            <span>校準同步</span>
+          </button>
+
+          {/* Auto Follow Toggle Button */}
+          <button
+            type="button"
+            onClick={onToggleAutoFollow}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
+              autoFollow
+                ? 'bg-blue-600 text-white'
+                : theme === 'paper'
+                ? 'bg-amber-200 text-amber-900'
+                : 'bg-slate-800 text-slate-400'
+            }`}
+            title={autoFollow ? '自動聚焦鎖定中：廣播播放到哪，畫面自動滑動到哪' : '手動滑動模式：點擊開啟自動聚焦'}
+          >
+            {autoFollow ? (
+              <>
+                <Lock className="w-3 h-3" />
+                <span>鎖定跟隨</span>
+              </>
+            ) : (
+              <>
+                <Eye className="w-3 h-3" />
+                <span>自由滾動</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* Sync Offset Calibration Panel (Expandable) */}
+      <AnimatePresence>
+        {showSyncSettings && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className={`px-4 py-2 border-b text-xs flex flex-wrap items-center justify-between gap-2 z-10 ${
+              theme === 'paper'
+                ? 'bg-[#E5D7BC] border-[#D0BF98] text-[#3B2E1E]'
+                : theme === 'light'
+                ? 'bg-blue-50 border-blue-200 text-blue-900'
+                : 'bg-slate-900 border-slate-700 text-slate-200'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-bold">⏱️ 字幕時間差微調：</span>
+              <span className="font-mono font-bold px-2 py-0.5 rounded bg-black/10 dark:bg-white/10">
+                {(syncOffsetMs / 1000).toFixed(1)} 秒
+              </span>
+              <span className="text-[11px] opacity-75 hidden sm:inline">
+                (字幕太快請按 +延遲；字幕太慢請按 -提早)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => handleAdjustSyncOffset(-1000)}
+                className="px-2 py-1 rounded bg-black/10 dark:bg-white/10 hover:bg-black/20 font-bold transition-all"
+                title="提早 1 秒顯示"
+              >
+                -1.0s
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAdjustSyncOffset(-500)}
+                className="px-2 py-1 rounded bg-black/10 dark:bg-white/10 hover:bg-black/20 font-bold transition-all"
+                title="提早 0.5 秒顯示"
+              >
+                -0.5s
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAdjustSyncOffset(500)}
+                className="px-2 py-1 rounded bg-black/10 dark:bg-white/10 hover:bg-black/20 font-bold transition-all"
+                title="延遲 0.5 秒釋出"
+              >
+                +0.5s
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAdjustSyncOffset(1000)}
+                className="px-2 py-1 rounded bg-black/10 dark:bg-white/10 hover:bg-black/20 font-bold transition-all"
+                title="延遲 1 秒釋出"
+              >
+                +1.0s
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSyncOffsetMs(3500);
+                  try { localStorage.setItem('radio_subtitle_sync_offset_ms', '3500'); } catch (e) {}
+                }}
+                className="ml-1 px-2 py-1 rounded bg-emerald-600 text-white font-bold text-[11px]"
+                title="恢復預設精準對齊值 (3.5s)"
+              >
+                重設
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Subtitles Scroll View */}
       <div

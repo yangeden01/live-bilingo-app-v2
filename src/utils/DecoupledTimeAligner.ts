@@ -17,12 +17,33 @@ export class DecoupledTimeAligner {
   private currentInterim: SubtitleItem | null = null;
   private isRunning = false;
 
-  // Adaptive offset: typical radio buffer latency is ~1.5s - 2.8s
-  private targetBufferDelayMs = 1800;
+  // Calibrated default radio playback buffer latency offset (3500ms) to ensure subtitle aligns precisely with actual audio output
+  private targetBufferDelayMs = 3500;
 
   constructor(onRelease: (item: SubtitleItem) => void, onInterim?: (item: SubtitleItem | null) => void) {
     this.onReleaseCallback = onRelease;
     this.onInterimCallback = onInterim || null;
+
+    try {
+      const savedOffset = localStorage.getItem('radio_subtitle_sync_offset_ms');
+      if (savedOffset) {
+        const parsed = Number(savedOffset);
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 12000) {
+          this.targetBufferDelayMs = parsed;
+        }
+      }
+    } catch (e) {}
+  }
+
+  public setSyncOffsetMs(offsetMs: number) {
+    this.targetBufferDelayMs = Math.max(0, Math.min(12000, offsetMs));
+    try {
+      localStorage.setItem('radio_subtitle_sync_offset_ms', String(this.targetBufferDelayMs));
+    } catch (e) {}
+  }
+
+  public getSyncOffsetMs(): number {
+    return this.targetBufferDelayMs;
   }
 
   public start() {

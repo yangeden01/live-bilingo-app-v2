@@ -668,7 +668,7 @@ export const AudioPlayerController: React.FC<Props> = ({
               <div className="relative z-10 flex items-center w-full sm:w-auto">
                 {(
                   [
-                    { mode: 'system', label: '自動', icon: Sparkles, color: 'text-blue-400', title: '跟隨環境光線感應與系統設定自動切換 (避亮防眩)' },
+                    { mode: 'system', label: '自動', icon: Sparkles, color: 'text-blue-400', title: '自動模式：夜間(18:00起)自動護眼暗黑，並跟隨環境光線與系統' },
                     { mode: 'paper', label: '紙張', icon: BookOpen, color: 'text-amber-500', title: '護眼紙張模式：溫潤羊皮紙色系，長時間閱讀不疲勞' },
                     { mode: 'light', label: '明亮', icon: Sun, color: 'text-amber-400', title: '固定日間高對比明亮模式' },
                     { mode: 'dark', label: '暗黑', icon: Moon, color: 'text-indigo-300', title: '固定夜間低光護眼暗黑模式' },

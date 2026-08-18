@@ -24,6 +24,7 @@ export function useRadioAudio({
   const prevStationIdRef = useRef(activeStation.id);
   const retryCountRef = useRef<number>(0);
   const isReconnectingRef = useRef<boolean>(false);
+  const userPlaybackIntentRef = useRef<boolean>(false);
   const lastCurrentTimeRef = useRef<{ time: number; timestamp: number }>({ time: 0, timestamp: Date.now() });
 
   const onStartVisualizerRef = useRef(onStartVisualizer);
@@ -35,6 +36,11 @@ export function useRadioAudio({
 
   useEffect(() => {
     playbackStatusRef.current = playbackStatus;
+    if (playbackStatus === 'PLAYING' || playbackStatus === 'BUFFERING') {
+      userPlaybackIntentRef.current = true;
+    } else if (playbackStatus === 'PAUSED' || playbackStatus === 'IDLE') {
+      userPlaybackIntentRef.current = false;
+    }
   }, [playbackStatus]);
 
   useEffect(() => {
@@ -76,27 +82,27 @@ export function useRadioAudio({
   // Exponential backoff auto-reconnect
   const handleAutoReconnect = useCallback(() => {
     if (!audioRef.current || isReconnectingRef.current) return;
-    if (playbackStatusRef.current !== 'PLAYING' && playbackStatusRef.current !== 'BUFFERING') return;
+    if (!userPlaybackIntentRef.current && playbackStatusRef.current !== 'PLAYING' && playbackStatusRef.current !== 'BUFFERING') {
+      return;
+    }
 
-    if (retryCountRef.current >= 3) {
-      console.warn('[Auto-Reconnect] Exceeded maximum retry attempts (3). Updating UI to ERROR.');
-      playbackStatusRef.current = 'ERROR';
-      setPlaybackStatus('ERROR');
-      isReconnectingRef.current = false;
+    // If offline (e.g. inside elevator), set buffering and wait for online event instead of exhausting retries
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      playbackStatusRef.current = 'BUFFERING';
+      setPlaybackStatus('BUFFERING');
       return;
     }
 
     isReconnectingRef.current = true;
     retryCountRef.current += 1;
     const attempt = retryCountRef.current;
-    const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
+    const delayMs = Math.min(1000 * Math.pow(1.5, attempt - 1), 6000);
 
-    console.log(`[Auto-Reconnect] Attempt ${attempt}/3 in ${delayMs}ms...`);
     playbackStatusRef.current = 'BUFFERING';
     setPlaybackStatus('BUFFERING');
 
     setTimeout(() => {
-      if (!audioRef.current || playbackStatusRef.current === 'PAUSED') {
+      if (!audioRef.current || !userPlaybackIntentRef.current) {
         isReconnectingRef.current = false;
         return;
       }
@@ -110,56 +116,157 @@ export function useRadioAudio({
       audio
         .play()
         .then(() => {
-          console.log(`[Auto-Reconnect] Attempt ${attempt}/3 succeeded!`);
           playbackStatusRef.current = 'PLAYING';
           setPlaybackStatus('PLAYING');
           isReconnectingRef.current = false;
+          retryCountRef.current = 0;
           onStartVisualizerRef.current?.();
+          safeApiFetch('/api/notify-station-playing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: activeStationRef.current.streamUrl, name: activeStationRef.current.name }),
+          }).catch(() => {});
         })
         .catch((err) => {
-          console.warn(`[Auto-Reconnect] Attempt ${attempt}/3 failed:`, err);
+          console.warn(`[Auto-Reconnect] Attempt ${attempt} failed:`, err);
           isReconnectingRef.current = false;
-          if (retryCountRef.current < 3) {
+          if (attempt < 5) {
             handleAutoReconnect();
           } else {
-            playbackStatusRef.current = 'ERROR';
-            setPlaybackStatus('ERROR');
+            // Keep in buffering if still intent to play, allow watchdog to recover
+            playbackStatusRef.current = 'BUFFERING';
+            setPlaybackStatus('BUFFERING');
           }
         });
     }, delayMs);
   }, [getProxiedStreamUrl, setPlaybackStatus]);
 
-  // Stall detector
-  useEffect(() => {
-    if (playbackStatus !== 'PLAYING') return;
+  // Force re-acquisition of stream when exiting elevator / regaining network
+  const triggerFreshStreamReconnect = useCallback(() => {
+    if (!audioRef.current || !userPlaybackIntentRef.current) return;
+    const audio = audioRef.current;
+    isReconnectingRef.current = false;
+    retryCountRef.current = 0;
 
+    playbackStatusRef.current = 'BUFFERING';
+    setPlaybackStatus('BUFFERING');
+
+    fetch(getApiUrl('/api/clear-buffer'), { method: 'POST' }).catch(() => {});
+    safeApiFetch('/api/notify-station-playing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: activeStationRef.current.streamUrl, name: activeStationRef.current.name }),
+    }).catch(() => {});
+
+    const baseUrl = getProxiedStreamUrl(activeStationRef.current.streamUrl);
+    const liveFreshUrl = addQueryParam(baseUrl, '_net_restore', String(Date.now()));
+    audio.src = liveFreshUrl;
+    audio.load();
+
+    audio
+      .play()
+      .then(() => {
+        playbackStatusRef.current = 'PLAYING';
+        setPlaybackStatus('PLAYING');
+        onStartVisualizerRef.current?.();
+        window.dispatchEvent(new CustomEvent('scroll-to-subtitles'));
+      })
+      .catch((e) => {
+        console.warn('[Network Restored] Initial play retry error:', e);
+        handleAutoReconnect();
+      });
+  }, [getProxiedStreamUrl, handleAutoReconnect, setPlaybackStatus]);
+
+  // Robust Network Recovery Listeners (Online / Offline / Android Network Broadcast / Focus)
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('[Network Monitor] Network connection restored (online). Resuming radio & subtitles...');
+      if (userPlaybackIntentRef.current) {
+        triggerFreshStreamReconnect();
+      }
+    };
+
+    const handleOffline = () => {
+      console.log('[Network Monitor] Network lost (offline/elevator). Pausing stream buffer...');
+      if (playbackStatusRef.current === 'PLAYING') {
+        playbackStatusRef.current = 'BUFFERING';
+        setPlaybackStatus('BUFFERING');
+      }
+    };
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'NETWORK_RESTORED' && userPlaybackIntentRef.current) {
+        console.log('[Android Bridge] Network restored signal received. Reconnecting radio stream...');
+        triggerFreshStreamReconnect();
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && userPlaybackIntentRef.current) {
+        const audio = audioRef.current;
+        if (audio && (audio.paused || audio.readyState < 2)) {
+          console.log('[App Visibility] Resumed from background/sleep. Ensuring live stream active...');
+          triggerFreshStreamReconnect();
+        }
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('message', handleMessage);
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('message', handleMessage);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+    };
+  }, [setPlaybackStatus, triggerFreshStreamReconnect]);
+
+  // Stall & Health watchdog
+  useEffect(() => {
     const interval = setInterval(() => {
       const audio = audioRef.current;
-      if (!audio) return;
+      if (!audio || !userPlaybackIntentRef.current) return;
+
+      // If device is offline, stay in buffering until online event fires
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        if (playbackStatusRef.current !== 'BUFFERING') {
+          playbackStatusRef.current = 'BUFFERING';
+          setPlaybackStatus('BUFFERING');
+        }
+        return;
+      }
 
       const now = Date.now();
       const currentAudioTime = audio.currentTime;
 
-      const isTrulyStalled =
+      const isAudioFrozen =
         !audio.paused &&
         audio.readyState < 2 &&
         currentAudioTime === lastCurrentTimeRef.current.time &&
-        now - lastCurrentTimeRef.current.timestamp > 20000;
+        now - lastCurrentTimeRef.current.timestamp > 8000;
 
-      if (isTrulyStalled) {
-        console.warn('[Stall Monitor] Audio stalled. Starting auto-reconnect...');
+      const isStuckInBuffering =
+        playbackStatusRef.current === 'BUFFERING' &&
+        now - lastCurrentTimeRef.current.timestamp > 10000;
+
+      if (isAudioFrozen || isStuckInBuffering) {
+        console.warn('[Stall Watchdog] Audio stalled or buffering timed out. Auto-healing stream...');
         lastCurrentTimeRef.current = { time: currentAudioTime, timestamp: now };
-        handleAutoReconnect();
+        triggerFreshStreamReconnect();
       } else {
         if (currentAudioTime !== lastCurrentTimeRef.current.time) {
           lastCurrentTimeRef.current = { time: currentAudioTime, timestamp: now };
         }
-        retryCountRef.current = 0;
       }
-    }, 5000);
+    }, 4000);
 
     return () => clearInterval(interval);
-  }, [playbackStatus, handleAutoReconnect]);
+  }, [setPlaybackStatus, triggerFreshStreamReconnect]);
 
   // Handle active station changes ONLY when activeStation.id actually changes
   useEffect(() => {

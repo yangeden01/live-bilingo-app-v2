@@ -259,37 +259,75 @@ export function useSubtitleSync({
               es.close();
             } catch (e) {}
           }
-          if (!reconnectTimer && navigator.onLine) {
+          if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+          }
+          if (typeof navigator === 'undefined' || navigator.onLine) {
             reconnectTimer = setTimeout(() => {
+              reconnectTimer = null;
               connectSSE();
-            }, 4000);
+            }, 3000);
           }
         };
       } catch (e) {
         setSttConnected(false);
+        if (!reconnectTimer) {
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null;
+            connectSSE();
+          }, 3000);
+        }
       }
     };
 
     connectSSE();
     pollSubtitles();
-    pollInterval = setInterval(pollSubtitles, 3500);
+    pollInterval = setInterval(pollSubtitles, 3000);
 
     const handleOnline = () => {
+      console.log('[Subtitle Sync] Online event detected. Re-establishing SSE and subtitle polling...');
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
       connectSSE();
       pollSubtitles();
     };
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'NETWORK_RESTORED') {
+        console.log('[Subtitle Sync] Android NETWORK_RESTORED message received. Re-establishing live subtitles...');
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+        connectSSE();
+        pollSubtitles();
+      }
+    };
+
     const handleOffline = () => {
       setSttConnected(false);
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      if (es) es.close();
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      if (es) {
+        try {
+          es.close();
+        } catch (e) {}
+      }
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('message', handleMessage);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('message', handleMessage);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (pollInterval) clearInterval(pollInterval);
       if (es) es.close();

@@ -39,6 +39,9 @@ class MainActivity : ComponentActivity() {
     private var installStateUpdatedListener: InstallStateUpdatedListener? = null
     var activeWebView: WebView? = null
 
+    private var connectivityManager: android.net.ConnectivityManager? = null
+    private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
+
     val requestNotificationPermissionLauncher: ActivityResultLauncher<String> =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             android.util.Log.d("MainActivity", "Notification permission granted: $isGranted")
@@ -71,6 +74,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setupGoogleInAppUpdate()
+        setupNetworkMonitoring()
 
         setContent {
             LiveBilingoRadioTheme {
@@ -210,6 +214,46 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun setupNetworkMonitoring() {
+        try {
+            connectivityManager = getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            val request = android.net.NetworkRequest.Builder()
+                .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+
+            networkCallback = object : android.net.ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: android.net.Network) {
+                    runOnUiThread {
+                        try {
+                            activeWebView?.evaluateJavascript(
+                                "window.dispatchEvent(new Event('online')); window.postMessage({ type: 'NETWORK_RESTORED' }, '*');",
+                                null
+                            )
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+
+                override fun onLost(network: android.net.Network) {
+                    runOnUiThread {
+                        try {
+                            activeWebView?.evaluateJavascript(
+                                "window.dispatchEvent(new Event('offline')); window.postMessage({ type: 'NETWORK_LOST' }, '*');",
+                                null
+                            )
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
+            networkCallback?.let { connectivityManager?.registerNetworkCallback(request, it) }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to setup network monitoring", e)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         appUpdateManager?.appUpdateInfo?.addOnSuccessListener { appUpdateInfo ->
@@ -222,6 +266,11 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         installStateUpdatedListener?.let { appUpdateManager?.unregisterListener(it) }
+        try {
+            networkCallback?.let { connectivityManager?.unregisterNetworkCallback(it) }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         try {
             activeWebView?.apply {
                 loadUrl("about:blank")

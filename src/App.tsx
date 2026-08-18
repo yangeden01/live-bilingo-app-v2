@@ -467,16 +467,41 @@ export default function App() {
     };
   }, [readingMode]);
 
+  const [currentHour, setCurrentHour] = useState<number>(() => {
+    return new Date().getHours();
+  });
+
+  // Periodically check local time so auto theme switches smoothly at nightfall (e.g. 18:00 or 21:30)
+  useEffect(() => {
+    const updateHour = () => {
+      setCurrentHour(new Date().getHours());
+    };
+    updateHour();
+    const interval = setInterval(updateHour, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const effectiveTheme = useMemo<'dark' | 'light' | 'paper'>(() => {
     if (readingMode === 'paper') return 'paper';
     if (readingMode === 'light') return 'light';
     if (readingMode === 'dark') return 'dark';
 
+    // readingMode === 'system' (自動閱讀模式)
+    // 1. Check ambient light sensor if available
     if (ambientLux !== null) {
       return ambientLux < 40 ? 'dark' : 'light';
     }
-    return systemPrefersDark ? 'dark' : 'light';
-  }, [readingMode, ambientLux, systemPrefersDark]);
+    // 2. Check system-level dark mode preference
+    if (systemPrefersDark) {
+      return 'dark';
+    }
+    // 3. Time-of-day automatic eye-protection: Evening / Night (18:00 to 07:00) defaults to DARK mode
+    const isNightTime = currentHour >= 18 || currentHour < 7;
+    if (isNightTime) {
+      return 'dark';
+    }
+    return 'light';
+  }, [readingMode, ambientLux, systemPrefersDark, currentHour]);
 
   const handleOpenDictionary = (word?: string) => {
     setDictWord(word || '');

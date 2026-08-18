@@ -29,7 +29,20 @@ echo "=== 2. Building Production Assets ==="
 npm run build
 
 echo "=== 3. Running Live Subtitles Verification Simulator ==="
+# Ensure backend server is accessible during verification
+SERVER_PID=""
+if ! curl -s http://localhost:3000/api/version > /dev/null 2>&1; then
+  echo "Starting background server on port 3000 for verification gate..."
+  NODE_ENV=production node dist/server.cjs &
+  SERVER_PID=$!
+  sleep 2
+fi
+
 node scripts/verify-subtitles-stream.js
+
+if [ -n "$SERVER_PID" ]; then
+  kill "$SERVER_PID" 2>/dev/null || true
+fi
 
 echo "=== 4. Staging and Committing Changes ==="
 git add -A

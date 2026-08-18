@@ -2,13 +2,13 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { playBeanWallImpactSound } from '../utils/sound';
 import { PlaybackStatus, RadioStation, SubtitleItem, ReadingMode } from '../types';
-import { Play, Pause, Radio, Signal, Sparkles, Activity, Zap, Info, ListMusic, Plus, Timer, Clock, RefreshCw, X, Check, ChevronDown, Sun, Moon, BookOpen } from 'lucide-react';
+import { Radio, Signal, Sparkles, ListMusic, Timer, RefreshCw, Check, ChevronDown, Sun, Moon, BookOpen } from 'lucide-react';
 import { MarqueeText } from './MarqueeText';
 import { getApiUrl } from '../utils/apiUrl';
 import { safeApiFetch } from '../utils/safeFetch';
-import { clientSubtitleEngine } from '../utils/clientSubtitleEngine';
-
-import { DecoupledTimeAligner } from '../utils/DecoupledTimeAligner';
+import { useSubtitleSync } from '../hooks/useSubtitleSync';
+import { useRadioAudio } from '../hooks/useRadioAudio';
+import { useSleepTimer } from '../hooks/useSleepTimer';
 
 interface Props {
   playbackStatus: PlaybackStatus;
@@ -37,84 +37,101 @@ export const AudioPlayerController: React.FC<Props> = ({
   onReadingModeChange,
   effectiveTheme,
 }) => {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const timeAlignerRef = useRef<DecoupledTimeAligner | null>(null);
-
-  // Initialize decoupled time alignment engine
-  useEffect(() => {
-    const aligner = new DecoupledTimeAligner(
-      (item) => {
-        onNewSubtitle(item);
-      },
-      (interimItem) => {
-        if (onInterimSubtitle) {
-          onInterimSubtitle(interimItem);
-        }
-      }
-    );
-    aligner.start();
-    timeAlignerRef.current = aligner;
-
-    return () => {
-      aligner.stop();
-      timeAlignerRef.current = null;
-    };
-  }, [onNewSubtitle, onInterimSubtitle]);
-
-  // Safe wrapper to dispatch subtitles through decoupled time aligner
-  const dispatchSubtitleWithTimeAlignment = useCallback((item: SubtitleItem) => {
-    if (timeAlignerRef.current) {
-      const currentTime = audioRef.current?.currentTime;
-      timeAlignerRef.current.enqueue(item, currentTime);
-    } else {
-      onNewSubtitle(item);
-    }
-  }, [onNewSubtitle]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
-
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(1);
-  const [isAdjustingVolume, setIsAdjustingVolume] = useState(false);
-  const volumeTouchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [sleepMinutes, setSleepMinutes] = useState<number>(0);
-  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
-  const timerEndTimeRef = useRef<number | null>(null);
-  const [isTimerDropdownOpen, setIsTimerDropdownOpen] = useState(false);
-  const timerDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close timer dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (timerDropdownRef.current && !timerDropdownRef.current.contains(event.target as Node)) {
-        setIsTimerDropdownOpen(false);
-      }
-    };
-    if (isTimerDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isTimerDropdownOpen]);
 
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
   const [isSpinning, setIsSpinning] = useState(false);
-  const eventSourceRef = useRef<EventSource | null>(null);
-
-  // Auto-reconnect & Stall Detection Refs
-  const retryCountRef = useRef<number>(0);
-  const isReconnectingRef = useRef<boolean>(false);
-  const lastCurrentTimeRef = useRef<{ time: number; timestamp: number }>({ time: 0, timestamp: Date.now() });
-
   const [hasNewUpdate, setHasNewUpdate] = useState<boolean>(false);
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const [updateProgress, setUpdateProgress] = useState<number>(0);
   const CLIENT_VERSION = '1.6.0';
 
-  // Check version API and ServiceWorker updates on mount and periodically (NO auto-reloads)
+  // Canvas visualizer waveform
+  const setupAudioVisualizer = useCallback(() => {
+    if (!canvasRef.current) return;
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const barCount = 32;
+    let step = 0;
+
+    const render = () => {
+      if (document.hidden) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const barWidth = (canvas.width / barCount) * 0.8;
+      let x = 0;
+      step += 0.15;
+
+      for (let i = 0; i < barCount; i++) {
+        const heightMultiplier = Math.abs(Math.sin(step + i * 0.35) * Math.cos(step * 0.8 + i * 0.2));
+        const barHeight = Math.max(3, heightMultiplier * canvas.height * 0.85);
+
+        ctx.fillStyle = playbackStatus === 'PLAYING' ? '#3B82F6' : '#94A3B8';
+        ctx.fillRect(x, canvas.height - barHeight, barWidth - 1, barHeight);
+        x += barWidth + 2;
+      }
+
+      if (playbackStatus === 'PLAYING') {
+        animFrameRef.current = requestAnimationFrame(render);
+      }
+    };
+
+    render();
+  }, [playbackStatus]);
+
+  // Hook 1: Sleep Timer
+  const {
+    sleepMinutes,
+    remainingSeconds,
+    isTimerDropdownOpen,
+    setIsTimerDropdownOpen,
+    timerDropdownRef,
+    selectSleepTimer,
+  } = useSleepTimer({
+    playbackStatus,
+    onTimerEnd: () => {
+      setPlaybackStatus('PAUSED');
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    },
+  });
+
+  // Hook 2: Audio streaming & playback lifecycle
+  const {
+    audioRef,
+    togglePlayPause,
+    getProxiedStreamUrl,
+  } = useRadioAudio({
+    activeStation,
+    playbackStatus,
+    setPlaybackStatus,
+    onClearSubtitleQueue: () => {
+      clearQueue();
+    },
+    onStartVisualizer: setupAudioVisualizer,
+  });
+
+  // Hook 3: Subtitle synchronization (SSE + Polling + Bridge + DecoupledTimeAligner)
+  const { clearQueue } = useSubtitleSync({
+    playbackStatus,
+    activeStation,
+    onNewSubtitle,
+    onInterimSubtitle,
+    setSttConnected,
+    audioRef,
+  });
+
+  // Check version & ServiceWorker updates
   useEffect(() => {
     const checkVersion = async () => {
       if (typeof navigator !== 'undefined' && !navigator.onLine) return;
@@ -144,12 +161,10 @@ export const AudioPlayerController: React.FC<Props> = ({
       if ('serviceWorker' in navigator) {
         try {
           const reg = await navigator.serviceWorker.getRegistration();
-          if (reg) {
-            if (reg.waiting || reg.installing) {
-              const storedVersion = localStorage.getItem('installed_version');
-              if (storedVersion !== CLIENT_VERSION) {
-                setHasNewUpdate(true);
-              }
+          if (reg && (reg.waiting || reg.installing)) {
+            const storedVersion = localStorage.getItem('installed_version');
+            if (storedVersion !== CLIENT_VERSION) {
+              setHasNewUpdate(true);
             }
           }
         } catch (e) {}
@@ -216,14 +231,8 @@ export const AudioPlayerController: React.FC<Props> = ({
     }
   };
 
-  // Click Blue Radio Icon: Forces immediate cache purge & refresh to ensure latest frontend bundle
   const handleHiddenRefresh = async () => {
     setIsSpinning(true);
-    retryCountRef.current = 0; // Reset retry counter
-
-    if (audioRef.current) {
-      lastCurrentTimeRef.current = { time: audioRef.current.currentTime, timestamp: Date.now() };
-    }
 
     if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume().catch(() => {});
@@ -256,802 +265,24 @@ export const AudioPlayerController: React.FC<Props> = ({
     }, 400);
   };
 
-  // Keep a ref to latest playbackStatus so async listeners can check live pause state
-  const playbackStatusRef = useRef(playbackStatus);
-  useEffect(() => {
-    playbackStatusRef.current = playbackStatus;
-  }, [playbackStatus]);
-
-  const mediaElementSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-
-  // Keep a ref to activeStation for reconnecting
-  const activeStationRef = useRef(activeStation);
-  useEffect(() => {
-    activeStationRef.current = activeStation;
-  }, [activeStation]);
-
-  // Helper to ensure direct radio stream URL is extracted and played seamlessly across Web & Android
-  const getProxiedStreamUrl = (rawUrl: string): string => {
-    if (!rawUrl) return 'https://npr-ice.streamguys1.com/live.mp3';
-
-    // If rawUrl is encoded like /api/radio-stream-proxy?url=https...
-    if (rawUrl.includes('/api/radio-stream-proxy') && rawUrl.includes('url=')) {
-      try {
-        const parts = rawUrl.split('url=');
-        if (parts.length > 1) {
-          const decoded = decodeURIComponent(parts[1]);
-          if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
-            return decoded;
-          }
-        }
-      } catch (e) {}
-    }
-
-    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
-      return rawUrl;
-    }
-
-    if (rawUrl.startsWith('/api/radio-stream-proxy')) {
-      return getApiUrl(rawUrl);
-    }
-
-    return rawUrl;
-  };
-
-  // Helper to append query parameter cleanly (? vs &)
-  const addQueryParam = (baseUrl: string, key: string, value: string): string => {
-    const separator = baseUrl.includes('?') ? '&' : '?';
-    return `${baseUrl}${separator}${key}=${encodeURIComponent(value)}`;
-  };
-
-  // Exponential Backoff Auto-Reconnect Procedure (Max 3 retries)
-  const handleAutoReconnect = () => {
-    if (!audioRef.current || isReconnectingRef.current) return;
-    if (playbackStatusRef.current !== 'PLAYING' && playbackStatusRef.current !== 'BUFFERING') return;
-
-    if (retryCountRef.current >= 3) {
-      console.warn('[Auto-Reconnect] Exceeded maximum retry attempts (3). Updating UI to ERROR.');
-      setPlaybackStatus('ERROR');
-      isReconnectingRef.current = false;
-      return;
-    }
-
-    isReconnectingRef.current = true;
-    retryCountRef.current += 1;
-    const attempt = retryCountRef.current;
-    // Exponential backoff delay: 1000ms, 2000ms, 4000ms
-    const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
-
-    console.log(`[Auto-Reconnect] Attempt ${attempt}/3 initiating in ${delayMs}ms...`);
-    setPlaybackStatus('BUFFERING');
-
-    setTimeout(() => {
-      if (!audioRef.current || playbackStatusRef.current === 'PAUSED') {
-        isReconnectingRef.current = false;
-        return;
-      }
-
-      const audio = audioRef.current;
-      const baseUrl = getProxiedStreamUrl(activeStationRef.current.streamUrl);
-      const freshUrl = addQueryParam(baseUrl, '_retry', String(Date.now()));
-      audio.src = freshUrl;
-      audio.load();
-
-      audio
-        .play()
-        .then(() => {
-          console.log(`[Auto-Reconnect] Attempt ${attempt}/3 succeeded! Broadcast resumed.`);
-          setPlaybackStatus('PLAYING');
-          isReconnectingRef.current = false;
-        })
-        .catch((err) => {
-          console.warn(`[Auto-Reconnect] Attempt ${attempt}/3 failed:`, err);
-          isReconnectingRef.current = false;
-          if (retryCountRef.current < 3) {
-            handleAutoReconnect();
-          } else {
-            setPlaybackStatus('ERROR');
-          }
-        });
-    }, delayMs);
-  };
-
-  // Periodic Heartbeat Monitor: Detect stalled stream (currentTime freezing > 15s or unexpected pause)
-  useEffect(() => {
-    if (playbackStatus !== 'PLAYING') return;
-
-    const interval = setInterval(() => {
-      const audio = audioRef.current;
-      if (!audio) return;
-
-      const now = Date.now();
-      const currentAudioTime = audio.currentTime;
-
-      // For live radio streams in Android WebViews, currentTime may advance irregularly or stay constant for intervals.
-      // Only treat as stalled if audio is actually paused, ended, has no data (readyState < 2),
-      // AND currentTime hasn't moved for over 20 seconds.
-      const isTrulyStalled =
-        !audio.paused &&
-        audio.readyState < 2 &&
-        currentAudioTime === lastCurrentTimeRef.current.time &&
-        now - lastCurrentTimeRef.current.timestamp > 20000;
-
-      // If playback status is PLAYING but audio time hasn't advanced for >20s with no data arriving
-      if (isTrulyStalled) {
-        console.warn('[Stall Monitor] Broadcast audio genuinely stalled while in PLAYING state. Starting auto-reconnect...');
-        lastCurrentTimeRef.current = { time: currentAudioTime, timestamp: now };
-        handleAutoReconnect();
-      } else {
-        // Stream is playing normally or buffer is healthy: update time record
-        if (currentAudioTime !== lastCurrentTimeRef.current.time) {
-          lastCurrentTimeRef.current = { time: currentAudioTime, timestamp: now };
-        }
-        retryCountRef.current = 0;
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [playbackStatus, activeStation.streamUrl]);
-
-  const isInitialMountRef = useRef(true);
-
-  // When activeStation changes, update audio source. NEVER auto-play on initial load or preview reload.
-  useEffect(() => {
-    if (!audioRef.current) return;
-
-    if (isInitialMountRef.current) {
-      isInitialMountRef.current = false;
-      // Initial mount: ensure playback is paused/idle and load source without playing
-      audioRef.current.load();
-      return;
-    }
-
-    // On active station change by user:
-    // Only auto-play if user is ALREADY actively listening
-    if (playbackStatusRef.current === 'PLAYING' || playbackStatusRef.current === 'BUFFERING') {
-      setPlaybackStatus('BUFFERING');
-      audioRef.current.load();
-      audioRef.current
-        .play()
-        .then(() => {
-          setPlaybackStatus('PLAYING');
-          setupAudioVisualizer();
-        })
-        .catch((e) => {
-          console.warn('Auto-play on station switch error:', e);
-          setPlaybackStatus('ERROR');
-        });
-    } else {
-      audioRef.current.load();
-    }
-
-    // Always notify backend to synchronize STT transcription for the active station
-    safeApiFetch('/api/notify-station-playing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: activeStation.streamUrl, name: activeStation.name }),
-    });
-  }, [activeStation.id, activeStation.streamUrl, activeStation.name]);
-
-  const lastSseMessageTimeRef = useRef<number>(0);
-
-  // Native Android Subtitle & Bridge Synchronization Listener
-  useEffect(() => {
-    // 1. Direct JS function binding for Android evaluateJavascript
-    (window as any).handleNativeSubtitle = (sub: any) => {
-      if (sub && sub.id && sub.english && sub.traditionalChinese) {
-        setSttConnected(true);
-        dispatchSubtitleWithTimeAlignment(sub);
-      }
-    };
-
-    // 2. CustomEvent listener
-    const handleNativeEvent = (e: any) => {
-      if (e.detail && e.detail.id && e.detail.english && e.detail.traditionalChinese) {
-        setSttConnected(true);
-        dispatchSubtitleWithTimeAlignment(e.detail);
-      }
-    };
-
-    // 3. Window message listener for connection state and subtitles
-    const handleMessage = (e: MessageEvent) => {
-      if (e.data?.type === 'STT_CONNECTION_STATE') {
-        setSttConnected(!!e.data.connected);
-      } else if (e.data?.type === 'NEW_SUBTITLE' && e.data?.data) {
-        setSttConnected(true);
-        dispatchSubtitleWithTimeAlignment(e.data.data);
-      }
-    };
-
-    window.addEventListener('native-subtitle', handleNativeEvent);
-    window.addEventListener('message', handleMessage);
-
-    return () => {
-      delete (window as any).handleNativeSubtitle;
-      window.removeEventListener('native-subtitle', handleNativeEvent);
-      window.removeEventListener('message', handleMessage);
-    };
-  }, [dispatchSubtitleWithTimeAlignment, setSttConnected]);
-
-  // Sync Android Native STT Pipeline & Backend STT Engine on Station / Playback Change
-  useEffect(() => {
-    const isPlaying = playbackStatus === 'PLAYING' || playbackStatus === 'BUFFERING';
-
-    // 1. Notify Android Bridge if available
-    try {
-      if ((window as any).AndroidBridge?.onStationPlaybackChanged) {
-        (window as any).AndroidBridge.onStationPlaybackChanged(
-          activeStation.streamUrl,
-          activeStation.name,
-          isPlaying
-        );
-      }
-    } catch (e) {
-      console.warn('AndroidBridge STT sync notice:', e);
-    }
-
-    // 2. Notify Backend server to start/pause Deepgram streaming accordingly
-    safeApiFetch('/api/radio-playback-state', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isPlaying, streamUrl: activeStation.streamUrl }),
-    }).catch(() => {});
-  }, [activeStation.streamUrl, activeStation.name, playbackStatus]);
-
-  // Connect SSE with seamless REST polling fallback for background server events and real-time subtitles
-  useEffect(() => {
-    let reconnectTimer: NodeJS.Timeout | null = null;
-    let pollInterval: NodeJS.Timeout | null = null;
-    let es: EventSource | null = null;
-    let lastPollTimestamp = 0;
-
-    const pollSubtitles = async () => {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-      // Only poll when user is actively playing or buffering radio
-      if (playbackStatusRef.current !== 'PLAYING' && playbackStatusRef.current !== 'BUFFERING') return;
-
-      try {
-        const url = getApiUrl(`/api/live-subtitles?since=${lastPollTimestamp}`);
-        const res = await fetch(url, { cache: 'no-store' });
-        if (res.ok) {
-          const json = await res.json();
-          if (json && Array.isArray(json.subtitles) && json.subtitles.length > 0) {
-            setSttConnected(true);
-            json.subtitles.forEach((sub: any) => {
-              if (sub && sub.id && sub.english && sub.traditionalChinese) {
-                const subCreatedAt = sub.createdAt || Date.now();
-                if (subCreatedAt > lastPollTimestamp) {
-                  lastPollTimestamp = Math.max(lastPollTimestamp, subCreatedAt);
-                }
-                const localFormattedTime = new Date(subCreatedAt).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: true,
-                });
-                const newItem: SubtitleItem = {
-                  id: sub.id,
-                  timestamp: localFormattedTime,
-                  createdAt: subCreatedAt,
-                  english: sub.english,
-                  traditionalChinese: sub.traditionalChinese,
-                  isFinal: true,
-                };
-                clientSubtitleEngine.recordExternalSubtitle();
-                if (playbackStatusRef.current === 'PLAYING' || playbackStatusRef.current === 'BUFFERING') {
-                  dispatchSubtitleWithTimeAlignment(newItem);
-                }
-              }
-            });
-          }
-        }
-      } catch (err) {
-        // quiet fallback error
-      }
-    };
-
-    const connectSSE = () => {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        setSttConnected(false);
-        return;
-      }
-
-      if (es) {
-        es.close();
-      }
-
-      try {
-        es = new EventSource(getApiUrl('/api/live-subtitles-stream'));
-        eventSourceRef.current = es;
-
-        es.onopen = () => {
-          setSttConnected(true);
-          if (reconnectTimer) {
-            clearTimeout(reconnectTimer);
-            reconnectTimer = null;
-          }
-        };
-
-        es.onmessage = (event) => {
-          lastSseMessageTimeRef.current = Date.now();
-
-          try {
-            const data = JSON.parse(event.data);
-            if (data.id && data.english && data.traditionalChinese) {
-              // Filter out internal system connection notifications
-              if (data.id.startsWith('station-play-') || data.english.includes('Connected to live radio stream')) {
-                return;
-              }
-
-              const createdAt = data.createdAt || Date.now();
-              lastPollTimestamp = Math.max(lastPollTimestamp, createdAt);
-              
-              // Only push new live subtitles if playback is currently active
-              if (playbackStatusRef.current === 'PLAYING' || playbackStatusRef.current === 'BUFFERING') {
-                const localFormattedTime = new Date(createdAt).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: true,
-                });
-
-                const newItem: SubtitleItem = {
-                  id: data.id,
-                  timestamp: localFormattedTime,
-                  createdAt: createdAt,
-                  english: data.english,
-                  traditionalChinese: data.traditionalChinese,
-                  isFinal: true,
-                };
-
-                clientSubtitleEngine.recordExternalSubtitle();
-                dispatchSubtitleWithTimeAlignment(newItem);
-              }
-            }
-          } catch (err) {
-            console.error('SSE JSON parse error:', err);
-          }
-        };
-
-        es.onerror = () => {
-          setSttConnected(false);
-          if (es) {
-            try {
-              es.close();
-            } catch (e) {}
-          }
-          if (!reconnectTimer && navigator.onLine) {
-            reconnectTimer = setTimeout(() => {
-              connectSSE();
-            }, 4000);
-          }
-        };
-      } catch (e) {
-        setSttConnected(false);
-      }
-    };
-
-    connectSSE();
-
-    // Initial poll right away to populate any recent subtitles from server
-    pollSubtitles();
-
-    // Secondary fallback polling check every 3.5s to ensure zero subtitle missed
-    pollInterval = setInterval(pollSubtitles, 3500);
-
-    const handleOnline = () => {
-      connectSSE();
-      pollSubtitles();
-    };
-    const handleOffline = () => {
-      setSttConnected(false);
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      if (es) es.close();
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      if (pollInterval) clearInterval(pollInterval);
-      if (es) es.close();
-    };
-  }, [onNewSubtitle, setSttConnected]);
-
-  // Client-side Direct Live Radio Recognition Engine (Optimized SSE-first architecture with autonomous failover)
-  useEffect(() => {
-    if (playbackStatus === 'PLAYING') {
-      clientSubtitleEngine.start(
-        activeStation,
-        (item) => {
-          dispatchSubtitleWithTimeAlignment(item);
-        },
-        (connected) => {
-          setSttConnected(connected);
-        }
-      );
-    } else {
-      clientSubtitleEngine.stop();
-    }
-
-    return () => {
-      clientSubtitleEngine.stop();
-    };
-  }, [playbackStatus, activeStation, dispatchSubtitleWithTimeAlignment, setSttConnected]);
-
-  // Client local buffer ref for live sync alignment
-  const pendingEnglishBufferRef = useRef<string>('');
-  const lastFlushTimeRef = useRef<number>(Date.now());
-
-  // Method B-3: Synchronize audio player to live broadcast stream smoothly with cache flush and fast alignment
-  const handleSyncLiveEdge = () => {
-    if (!audioRef.current) return;
-    try {
-      // Clear client local transcript buffer
-      pendingEnglishBufferRef.current = '';
-      lastFlushTimeRef.current = Date.now();
-
-      // Clear backend speech recognition buffer & re-sync station
-      fetch(getApiUrl('/api/clear-buffer'), { method: 'POST' }).catch(() => {});
-      safeApiFetch('/api/notify-station-playing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: activeStation.streamUrl, name: activeStation.name }),
-      }).catch(() => {});
-
-      const audio = audioRef.current;
-      audio.playbackRate = 1.0;
-
-      setPlaybackStatus('BUFFERING');
-
-      // Fast alignment to live edge
-      if (audio.buffered && audio.buffered.length > 0) {
-        const liveBufferEnd = audio.buffered.end(audio.buffered.length - 1);
-        if (liveBufferEnd > 0) {
-          audio.currentTime = Math.max(0, liveBufferEnd - 0.1);
-        }
-      }
-
-      audio
-        .play()
-        .then(() => {
-          setPlaybackStatus('PLAYING');
-          setupAudioVisualizer();
-        })
-        .catch((err) => {
-          console.error('Audio sync play error:', err);
-          audio.load();
-          audio
-            .play()
-            .then(() => {
-              setPlaybackStatus('PLAYING');
-              setupAudioVisualizer();
-            })
-            .catch(() => setPlaybackStatus('ERROR'));
-        });
-    } catch (err) {
-      console.warn('Live sync notice:', err);
-    }
-  };
-
-  // Sleep Timer Countdown Logic (自動關閉廣播) - Wait for PLAYING status before counting down
-  useEffect(() => {
-    if (sleepMinutes === 0 || remainingSeconds === null) {
-      return;
-    }
-
-    // Do NOT count down if audio is not currently playing
-    if (playbackStatus !== 'PLAYING') {
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setRemainingSeconds((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(interval);
-          playbackStatusRef.current = 'PAUSED';
-          setPlaybackStatus('PAUSED');
-          if (audioRef.current) {
-            audioRef.current.pause();
-          }
-          setSleepMinutes(0);
-          return null;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [sleepMinutes, playbackStatus, remainingSeconds]);
-
-  const handleSelectSleepTimer = (minutes: number) => {
-    setSleepMinutes(minutes);
-    setIsTimerDropdownOpen(false);
-    if (minutes === 0) {
-      setRemainingSeconds(null);
-    } else {
-      setRemainingSeconds(minutes * 60);
-    }
-  };
-
-  // Configure HTML5 Media Session API for standard media keys
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'mediaSession' in navigator) {
-      try {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: activeStation.name,
-          artist: 'Live Bilingo 雙語即時電台',
-          album: '即時英語廣播 & AI雙語字幕',
-          artwork: [
-            { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-            { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-          ]
-        });
-
-        navigator.mediaSession.playbackState =
-          playbackStatus === 'PLAYING' ? 'playing' : playbackStatus === 'PAUSED' ? 'paused' : 'none';
-
-        navigator.mediaSession.setActionHandler('play', () => {
-          if (playbackStatusRef.current !== 'PLAYING') {
-            togglePlayPause();
-          }
-        });
-
-        navigator.mediaSession.setActionHandler('pause', () => {
-          playbackStatusRef.current = 'PAUSED';
-          setPlaybackStatus('PAUSED');
-          if (audioRef.current) {
-            audioRef.current.pause();
-          }
-        });
-
-        navigator.mediaSession.setActionHandler('stop', () => {
-          playbackStatusRef.current = 'STOPPED';
-          setPlaybackStatus('STOPPED');
-          if (audioRef.current) {
-            audioRef.current.pause();
-          }
-          if ((window as any).AndroidBridge?.stopNotificationService) {
-            (window as any).AndroidBridge.stopNotificationService();
-          }
-        });
-      } catch (e) {
-        console.warn('MediaSession configuration note:', e);
-      }
-    }
-  }, [activeStation.name, playbackStatus]);
-
-  // Sync Android Foreground Service notification state (Only triggers on station change or playbackStatus change, never spamming)
-  useEffect(() => {
-    try {
-      if (typeof window !== 'undefined' && (window as any).AndroidBridge?.updatePlayerNotification) {
-        if (playbackStatus === 'PLAYING' || playbackStatus === 'BUFFERING') {
-          (window as any).AndroidBridge.updatePlayerNotification(activeStation.name, true);
-        } else if (playbackStatus === 'PAUSED') {
-          (window as any).AndroidBridge.updatePlayerNotification(activeStation.name, false);
-        } else if (playbackStatus === 'STOPPED') {
-          (window as any).AndroidBridge.stopNotificationService?.();
-        }
-      }
-    } catch (e) {
-      console.warn('Android notification sync notice:', e);
-    }
-  }, [activeStation.name, playbackStatus]);
-
-  // Listen for media control actions triggered from the Android pull-down notification menu
-  useEffect(() => {
-    let lastHandledTime = 0;
-
-    const handleAndroidMediaMessage = (event: MessageEvent) => {
-      if (event.data && event.data.type === 'ANDROID_MEDIA_CONTROL') {
-        const now = Date.now();
-        // Debounce rapid duplicate events (within 300ms)
-        if (now - lastHandledTime < 300) {
-          return;
-        }
-        lastHandledTime = now;
-
-        const action = event.data.action;
-        console.log('[MediaControl] Received action from Android system notification:', action);
-
-        if (action === 'com.bilingo.radio.ACTION_TOGGLE_PLAY') {
-          const isCurrentlyPlaying = playbackStatusRef.current === 'PLAYING' || (audioRef.current && !audioRef.current.paused);
-          if (isCurrentlyPlaying) {
-            playbackStatusRef.current = 'PAUSED';
-            setPlaybackStatus('PAUSED');
-            if (audioRef.current) {
-              audioRef.current.pause();
-            }
-          } else {
-            togglePlayPause();
-          }
-        } else if (action === 'com.bilingo.radio.ACTION_STOP') {
-          playbackStatusRef.current = 'PAUSED';
-          setPlaybackStatus('PAUSED');
-          if (audioRef.current) {
-            audioRef.current.pause();
-          }
-          if ((window as any).AndroidBridge?.stopNotificationService) {
-            (window as any).AndroidBridge.stopNotificationService();
-          }
-        } else if (action === 'com.bilingo.radio.ACTION_PAUSE') {
-          playbackStatusRef.current = 'PAUSED';
-          setPlaybackStatus('PAUSED');
-          if (audioRef.current) {
-            audioRef.current.pause();
-          }
-        } else if (action === 'com.bilingo.radio.ACTION_PLAY') {
-          const isCurrentlyPlaying = playbackStatusRef.current === 'PLAYING' || (audioRef.current && !audioRef.current.paused);
-          if (!isCurrentlyPlaying) {
-            togglePlayPause();
-          }
-        }
-      }
-    };
-
-    window.addEventListener('message', handleAndroidMediaMessage);
-    return () => window.removeEventListener('message', handleAndroidMediaMessage);
-  }, []);
-
-  // Handle Play/Pause: Automatically reconnect to live stream and align subtitle engine immediately
-  const togglePlayPause = () => {
-    if (!audioRef.current) return;
-
-    if (playbackStatus === 'PLAYING') {
-      playbackStatusRef.current = 'PAUSED';
-      setPlaybackStatus('PAUSED');
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-      if (timeAlignerRef.current) {
-        timeAlignerRef.current.clear();
-      }
-    } else {
-      // 1. Clear client local speech recognition buffer and time aligner queue
-      pendingEnglishBufferRef.current = '';
-      lastFlushTimeRef.current = Date.now();
-      if (timeAlignerRef.current) {
-        timeAlignerRef.current.clear();
-      }
-
-      // 2. Clear backend STT stream buffer asynchronously and sync active station
-      fetch(getApiUrl('/api/clear-buffer'), { method: 'POST' }).catch(() => {});
-      safeApiFetch('/api/notify-station-playing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: activeStation.streamUrl, name: activeStation.name }),
-      }).catch(() => {});
-
-      setPlaybackStatus('BUFFERING');
-      const audio = audioRef.current;
-      audio.playbackRate = 1.0;
-
-      // 3. For live radio streams: re-assign fresh live stream URL with cache buster to skip stale internal audio socket buffer
-      const baseUrl = getProxiedStreamUrl(activeStation.streamUrl);
-      const liveFreshUrl = addQueryParam(baseUrl, '_t', String(Date.now()));
-      audio.src = liveFreshUrl;
-      audio.load();
-
-      // 4. Play fresh live audio stream cleanly
-      audio
-        .play()
-        .then(() => {
-          setPlaybackStatus('PLAYING');
-          setupAudioVisualizer();
-        })
-        .catch((err) => {
-          console.error('Audio play error:', err);
-          audio.load();
-          audio
-            .play()
-            .then(() => {
-              setPlaybackStatus('PLAYING');
-              setupAudioVisualizer();
-            })
-            .catch((e) => {
-              console.error('Audio play retry error:', e);
-              setPlaybackStatus('ERROR');
-            });
-        });
-    }
-  };
-
-  const triggerVolumeFeedback = () => {
-    setIsAdjustingVolume(true);
-    if (volumeTouchTimeoutRef.current) clearTimeout(volumeTouchTimeoutRef.current);
-    volumeTouchTimeoutRef.current = setTimeout(() => {
-      setIsAdjustingVolume(false);
-    }, 1500); // Keep popup visible for 1.5s after touch so user sees final value clearly
-  };
-
-  const toggleMute = () => {
-    if (!audioRef.current) return;
-    audioRef.current.muted = !isMuted;
-    setIsMuted(!isMuted);
-    triggerVolumeFeedback();
-  };
-
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
-    setVolume(val);
-    if (audioRef.current) {
-      audioRef.current.volume = val;
-      if (val === 0) setIsMuted(true);
-      else setIsMuted(false);
-    }
-    triggerVolumeFeedback();
-  };
-
-  // Canvas visualizer waveform setup (non-invasive, smooth animation without hijacking HTML5 audio output)
-  const setupAudioVisualizer = () => {
-    drawWaveform();
-  };
-
-  const drawWaveform = () => {
-    if (!canvasRef.current) return;
-    if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
-      animFrameRef.current = null;
-    }
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const barCount = 32;
-    let step = 0;
-
-    const render = () => {
-      if (document.hidden) return; // Do not render animation frames in background
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const barWidth = (canvas.width / barCount) * 0.8;
-      let x = 0;
-      step += 0.15;
-
-      for (let i = 0; i < barCount; i++) {
-        const heightMultiplier = Math.abs(Math.sin(step + i * 0.35) * Math.cos(step * 0.8 + i * 0.2));
-        const barHeight = Math.max(3, heightMultiplier * canvas.height * 0.85);
-
-        ctx.fillStyle = playbackStatusRef.current === 'PLAYING' ? '#3B82F6' : '#94A3B8';
-        ctx.fillRect(x, canvas.height - barHeight, barWidth - 1, barHeight);
-        x += barWidth + 2;
-      }
-
-      if (playbackStatusRef.current === 'PLAYING') {
-        animFrameRef.current = requestAnimationFrame(render);
-      }
-    };
-
-    render();
-  };
-
-  // App Visibility & Background/Foreground Lifecycle Manager (prevents app switching crash)
+  // App Visibility & Lifecycle
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // App backgrounded: Stop visualizer rendering to save GPU/CPU memory
         if (animFrameRef.current) {
           cancelAnimationFrame(animFrameRef.current);
           animFrameRef.current = null;
         }
       } else {
-        // App returned to foreground
-        if (playbackStatusRef.current === 'PLAYING') {
-          // Resume AudioContext if suspended
+        if (playbackStatus === 'PLAYING') {
           if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
             audioCtxRef.current.resume().catch(() => {});
           }
-          // Restart canvas visualizer loop
           setupAudioVisualizer();
 
-          // Check if audio element was paused during background transition
           if (audioRef.current && audioRef.current.paused) {
             audioRef.current.play().catch((err) => {
-              console.warn('[Foreground] Auto-resume blocked by browser:', err);
+              console.warn('[Foreground] Auto-resume blocked:', err);
               setPlaybackStatus('PAUSED');
             });
           }
@@ -1065,7 +296,7 @@ export const AudioPlayerController: React.FC<Props> = ({
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       if (audioCtxRef.current) audioCtxRef.current.close().catch(() => {});
     };
-  }, []);
+  }, [playbackStatus, setPlaybackStatus, setupAudioVisualizer, audioRef]);
 
   const currentTheme = effectiveTheme || (readingMode === 'paper' ? 'paper' : readingMode === 'light' ? 'light' : 'dark');
 
@@ -1175,7 +406,7 @@ export const AudioPlayerController: React.FC<Props> = ({
 
   return (
     <div className={`backdrop-blur-md rounded-2xl p-4 sm:p-5 border relative z-30 flex flex-col gap-3 transition-colors duration-200 ${cardBgClass}`}>
-      {/* Background Subtle Ambient Lighting */}
+      {/* Background Ambient Glow */}
       <div className={`absolute inset-0 bg-gradient-to-r pointer-events-none rounded-2xl overflow-hidden transition-colors duration-200 ${ambientGlowClass}`} />
 
       <audio
@@ -1183,52 +414,16 @@ export const AudioPlayerController: React.FC<Props> = ({
         src={getProxiedStreamUrl(activeStation.streamUrl)}
         preload="auto"
         onWaiting={() => setPlaybackStatus('BUFFERING')}
-        onPlaying={() => {
-          setPlaybackStatus('PLAYING');
-          retryCountRef.current = 0;
-          if (audioRef.current) {
-            lastCurrentTimeRef.current = { time: audioRef.current.currentTime, timestamp: Date.now() };
-          }
-        }}
-        onEnded={() => {
-          console.warn('[Audio Tag] Live stream ended unexpectedly.');
-          if (playbackStatusRef.current === 'PLAYING') {
-            handleAutoReconnect();
-          }
-        }}
-        onPause={() => {
-          // Normal pause handler - no auto resume
-        }}
-        onStalled={() => {
-          console.log('[Audio Tag] Network packet delay (stalled). Waiting for audio buffer...');
-        }}
-        onError={(e) => {
-          const errCode = (e.currentTarget as HTMLAudioElement)?.error?.code;
-          console.warn('[Audio Tag] Error code:', errCode || 'unknown');
-          if (!isReconnectingRef.current) {
-            handleAutoReconnect();
-          }
-        }}
+        onPlaying={() => setPlaybackStatus('PLAYING')}
+        onPause={() => {}}
+        onError={() => setPlaybackStatus('ERROR')}
       />
 
       {playbackStatus === 'ERROR' && (
         <div className="relative z-10 flex items-center justify-between p-3 bg-rose-950/80 border border-rose-800/80 rounded-xl text-xs text-rose-200 animate-fadeIn">
           <span>串流連線失敗，請重試或切換電台。</span>
           <button
-            onClick={() => {
-              if (audioRef.current) {
-                retryCountRef.current = 0;
-                setPlaybackStatus('BUFFERING');
-                const baseUrl = getProxiedStreamUrl(activeStation.streamUrl);
-                const freshUrl = addQueryParam(baseUrl, '_retry', String(Date.now()));
-                audioRef.current.src = freshUrl;
-                audioRef.current.load();
-                audioRef.current
-                  .play()
-                  .then(() => setPlaybackStatus('PLAYING'))
-                  .catch(() => setPlaybackStatus('ERROR'));
-              }
-            }}
+            onClick={togglePlayPause}
             className="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-semibold shrink-0 transition-colors"
           >
             重試連線
@@ -1404,7 +599,7 @@ export const AudioPlayerController: React.FC<Props> = ({
                       <button
                         key={opt.minutes}
                         type="button"
-                        onClick={() => handleSelectSleepTimer(opt.minutes)}
+                        onClick={() => selectSleepTimer(opt.minutes)}
                         className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer select-none ${
                           isSelected
                             ? 'bg-blue-600 text-white font-bold shadow-sm'
@@ -1428,7 +623,6 @@ export const AudioPlayerController: React.FC<Props> = ({
 
         {/* Bottom Utility Bar: Reading Mode Selector Bar */}
         <div className="flex items-center justify-start w-full text-xs pt-1">
-          {/* Mechanical Sliding Reading Mode Selector */}
           <div className={`flex items-center gap-1 p-1 rounded-xl shadow-inner w-full sm:w-auto border transition-colors duration-200 ${readingModeContainerClass}`}>
             <div className="flex items-center justify-center text-amber-500 font-bold px-1.5" title="閱讀模式選擇 (護眼與深淺色)">
               <BookOpen className="w-3.5 h-3.5 text-amber-500 shrink-0" />

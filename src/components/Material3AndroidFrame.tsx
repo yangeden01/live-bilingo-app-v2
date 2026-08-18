@@ -522,7 +522,7 @@ export const Material3AndroidFrame: React.FC<Props> = ({
 
               <button
                 onClick={() => setActiveTab('focus')}
-                title="精準聚焦閱讀模式 (Focus Reading Mode) - 自動鎖定目前廣播段落"
+                title="雙語聚焦閱讀模式 (Focus Reading Mode) - 平滑同步呈現"
                 className={`flex items-center justify-center gap-1 h-8 px-1 sm:px-2 rounded-xl transition-all text-xs cursor-pointer whitespace-nowrap select-none ${
                   activeTab === 'focus'
                     ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm font-bold ring-2 ring-emerald-400/40'

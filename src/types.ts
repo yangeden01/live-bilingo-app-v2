@@ -9,6 +9,8 @@ export interface SubtitleItem {
   bookmarked?: boolean;
   audioTime?: number; // HTML5 audio element currentTime when released
   isInterim?: boolean; // Real-time streaming typing state
+  durationMs?: number; // Estimated spoken duration in ms
+  startTimeOffsetMs?: number; // Relative start offset
 }
 
 export interface RadioStation {

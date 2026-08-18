@@ -910,7 +910,7 @@ export const AudioPlayerController: React.FC<Props> = ({
     return () => window.removeEventListener('message', handleAndroidMediaMessage);
   }, []);
 
-  // Handle Play/Pause: Automatically flush cache and execute fast alignment when pressing Play
+  // Handle Play/Pause: Automatically reconnect to live stream and align subtitle engine immediately
   const togglePlayPause = () => {
     if (!audioRef.current) return;
 
@@ -920,10 +920,16 @@ export const AudioPlayerController: React.FC<Props> = ({
       if (audioRef.current) {
         audioRef.current.pause();
       }
+      if (timeAlignerRef.current) {
+        timeAlignerRef.current.clear();
+      }
     } else {
-      // 1. Clear client local speech recognition buffer
+      // 1. Clear client local speech recognition buffer and time aligner queue
       pendingEnglishBufferRef.current = '';
       lastFlushTimeRef.current = Date.now();
+      if (timeAlignerRef.current) {
+        timeAlignerRef.current.clear();
+      }
 
       // 2. Clear backend STT stream buffer asynchronously and sync active station
       fetch(getApiUrl('/api/clear-buffer'), { method: 'POST' }).catch(() => {});
@@ -937,20 +943,18 @@ export const AudioPlayerController: React.FC<Props> = ({
       const audio = audioRef.current;
       audio.playbackRate = 1.0;
 
-      // 3. Play audio stream cleanly and perform alignment
+      // 3. For live radio streams: re-assign fresh live stream URL with cache buster to skip stale internal audio socket buffer
+      const baseUrl = getProxiedStreamUrl(activeStation.streamUrl);
+      const liveFreshUrl = addQueryParam(baseUrl, '_t', String(Date.now()));
+      audio.src = liveFreshUrl;
+      audio.load();
+
+      // 4. Play fresh live audio stream cleanly
       audio
         .play()
         .then(() => {
           setPlaybackStatus('PLAYING');
           setupAudioVisualizer();
-
-          // Execute ultra-fast alignment to live stream edge
-          if (audio.buffered && audio.buffered.length > 0) {
-            const liveBufferEnd = audio.buffered.end(audio.buffered.length - 1);
-            if (liveBufferEnd > 0) {
-              audio.currentTime = Math.max(0, liveBufferEnd - 0.1);
-            }
-          }
         })
         .catch((err) => {
           console.error('Audio play error:', err);

@@ -460,21 +460,19 @@ class RadioStreamSttManager(
             }
         }
 
-        // Avoid emitting near-duplicate sentences
+        // Avoid emitting exact duplicate sentences within the last 5 items
         val normCleaned = cleanedText.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
         synchronized(recentEmittedSentences) {
-            val isDuplicate = recentEmittedSentences.any { prev ->
+            val isDuplicate = recentEmittedSentences.take(5).any { prev ->
                 val normPrev = prev.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
-                normPrev == normCleaned ||
-                (normCleaned.contains(normPrev) && normPrev.length >= 14) ||
-                (normPrev.contains(normCleaned) && normCleaned.length >= 14)
+                normPrev == normCleaned && normCleaned.isNotEmpty()
             }
             if (isDuplicate) {
-                android.util.Log.d("RadioStreamSttManager", "Dropped duplicate sentence: $cleanedText")
+                android.util.Log.d("RadioStreamSttManager", "Dropped exact duplicate sentence: $cleanedText")
                 return
             }
             recentEmittedSentences.add(0, cleanedText)
-            if (recentEmittedSentences.size > 10) {
+            if (recentEmittedSentences.size > 15) {
                 recentEmittedSentences.removeAt(recentEmittedSentences.size - 1)
             }
         }

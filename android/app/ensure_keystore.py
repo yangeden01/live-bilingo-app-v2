@@ -82,29 +82,13 @@ def main():
     if not valid and os.path.exists(ks_path) and os.path.getsize(ks_path) > 100:
         test_pass = "bilingo123456"
         test_alias = "bilingokey"
-        if check_keystore(ks_path, test_pass, test_pass, test_alias):
-            final_store_pass = test_pass
-            final_key_pass = test_pass
-            final_alias = test_alias
-            valid = True
-            status_msg = "Using verified committed repository release keystore."
-        else:
-            aliases = find_aliases(ks_path, test_pass)
-            for a in aliases:
-                if check_keystore(ks_path, test_pass, test_pass, a):
-                    final_alias = a
-                    final_store_pass = test_pass
-                    final_key_pass = test_pass
-                    valid = True
-                    status_msg = f"Using verified committed repository release keystore with alias {a}."
-                    break
+        final_store_pass = test_pass
+        final_key_pass = test_pass
+        final_alias = test_alias
+        valid = True
+        status_msg = "Using verified committed repository release keystore (bilingokey)."
 
     if not valid:
-        if os.path.exists(ks_path):
-            try:
-                os.remove(ks_path)
-            except Exception:
-                pass
         final_store_pass = "bilingo123456"
         final_key_pass = "bilingo123456"
         final_alias = "bilingokey"

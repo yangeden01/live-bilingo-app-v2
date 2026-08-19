@@ -895,7 +895,7 @@ export default function App() {
             <div className="flex items-center gap-2 mb-1">
               <h1 className="text-xl font-bold tracking-tight text-white">Live Bilingo 雙語電台</h1>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-400/30">
-                v2.2.3
+                v2.2.5
               </span>
             </div>
             <p className="text-xs text-slate-400 mb-6 font-medium">即時 AI 雙語字幕 • 語音對齊串流</p>

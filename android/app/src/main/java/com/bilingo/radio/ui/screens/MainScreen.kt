@@ -37,8 +37,22 @@ import com.bilingo.radio.MainActivity
 import com.bilingo.radio.service.RadioForegroundService
 import com.bilingo.radio.viewmodel.RadioSubtitleViewModel
 
+fun Context.findMainActivity(): MainActivity? {
+    var ctx: Context? = this
+    while (ctx != null) {
+        if (ctx is MainActivity) return ctx
+        if (ctx is android.content.ContextWrapper) {
+            ctx = ctx.baseContext
+        } else {
+            break
+        }
+    }
+    return null
+}
+
 class WebAppInterface(
     private val context: Context,
+    private val getWebView: () -> WebView?,
     private val onRetry: () -> Unit,
     private val onAppLoaded: () -> Unit
 ) {
@@ -49,9 +63,9 @@ class WebAppInterface(
 
     init {
         sttManager.onSubtitleListener = { subtitle ->
-            (context as? MainActivity)?.runOnUiThread {
+            Handler(Looper.getMainLooper()).post {
                 try {
-                    val webView = (context as? MainActivity)?.activeWebView ?: return@runOnUiThread
+                    val webView = getWebView() ?: context.findMainActivity()?.activeWebView ?: return@post
                     val escapedEn = org.json.JSONObject.quote(subtitle.english)
                     val escapedZh = org.json.JSONObject.quote(subtitle.traditionalChinese)
                     val jsCode = """
@@ -78,9 +92,9 @@ class WebAppInterface(
         }
 
         sttManager.onConnectionStateListener = { connected ->
-            (context as? MainActivity)?.runOnUiThread {
+            Handler(Looper.getMainLooper()).post {
                 try {
-                    val webView = (context as? MainActivity)?.activeWebView ?: return@runOnUiThread
+                    val webView = getWebView() ?: context.findMainActivity()?.activeWebView ?: return@post
                     webView.evaluateJavascript(
                         "window.postMessage({ type: 'STT_CONNECTION_STATE', connected: $connected }, '*');",
                         null
@@ -217,14 +231,14 @@ class WebAppInterface(
 
     @JavascriptInterface
     fun isNotificationPermissionGranted(): Boolean {
-        return (context as? MainActivity)?.isNotificationPermissionGranted() ?: true
+        return context.findMainActivity()?.isNotificationPermissionGranted() ?: true
     }
 
     @JavascriptInterface
     fun requestNotificationPermission() {
         Handler(Looper.getMainLooper()).post {
             try {
-                (context as? MainActivity)?.requestNotificationPermission()
+                context.findMainActivity()?.requestNotificationPermission()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -235,7 +249,7 @@ class WebAppInterface(
     fun openNotificationSettings() {
         Handler(Looper.getMainLooper()).post {
             try {
-                (context as? MainActivity)?.openNotificationSettings()
+                context.findMainActivity()?.openNotificationSettings()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -282,7 +296,7 @@ class WebAppInterface(
     fun checkForAppUpdate() {
         Handler(Looper.getMainLooper()).post {
             try {
-                (context as? MainActivity)?.checkForAppUpdate(isManualCheck = true)
+                context.findMainActivity()?.checkForAppUpdate(isManualCheck = true)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -299,7 +313,8 @@ class WebAppInterface(
 
                 if (clearCache) {
                     try {
-                        (context as? MainActivity)?.activeWebView?.clearCache(true)
+                        getWebView()?.clearCache(true)
+                        context.findMainActivity()?.activeWebView?.clearCache(true)
                         android.webkit.WebStorage.getInstance().deleteAllData()
                         context.cacheDir.deleteRecursively()
                     } catch (e: Exception) {
@@ -307,10 +322,10 @@ class WebAppInterface(
                     }
                 }
 
-                (context as? android.app.Activity)?.finishAffinity()
+                (context.findMainActivity() ?: context as? android.app.Activity)?.finishAffinity()
             } catch (e: Exception) {
                 e.printStackTrace()
-                (context as? android.app.Activity)?.finish()
+                (context.findMainActivity() ?: context as? android.app.Activity)?.finish()
             }
         }
     }
@@ -419,19 +434,25 @@ fun MainScreen(
                             textZoom = 100
                             val defaultUa = try { userAgentString } catch (_: Exception) { "" } ?: ""
                             if (!defaultUa.contains("AndroidApp")) {
-                                userAgentString = "$defaultUa AndroidApp/2.2.3"
+                                userAgentString = "$defaultUa AndroidApp/2.2.5"
                             }
                             cacheMode = WebSettings.LOAD_DEFAULT
                         }
 
-                        val webInterface = WebAppInterface(ctx, {
-                            try {
-                                loadUrl(localAppUrl)
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        }) {}
-                        (ctx as? MainActivity)?.activeWebAppInterface = webInterface
+                        val webInterface = WebAppInterface(
+                            context = ctx,
+                            getWebView = { this },
+                            onRetry = {
+                                try {
+                                    loadUrl(localAppUrl)
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            },
+                            onAppLoaded = {}
+                        )
+                        ctx.findMainActivity()?.activeWebAppInterface = webInterface
+                        ctx.findMainActivity()?.activeWebView = this
                         addJavascriptInterface(webInterface, "AndroidBridge")
 
                         webViewClient = object : WebViewClient() {

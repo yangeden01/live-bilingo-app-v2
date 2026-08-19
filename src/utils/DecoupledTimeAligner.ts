@@ -96,7 +96,7 @@ export class DecoupledTimeAligner {
     // Check if subtitle arrived from native Android bridge or late from history poll
     const age = now - (item.createdAt || now);
     const isNative = Boolean((item as any).isNative || (typeof window !== 'undefined' && (window as any).AndroidBridge));
-    const effectiveDelay = isNative ? 500 : this.targetBufferDelayMs;
+    const effectiveDelay = isNative ? 0 : this.targetBufferDelayMs;
     const delay = age > 6000 ? 0 : effectiveDelay;
 
     this.queue.push({

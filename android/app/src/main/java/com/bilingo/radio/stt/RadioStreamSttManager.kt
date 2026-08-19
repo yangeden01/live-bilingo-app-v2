@@ -318,6 +318,39 @@ class RadioStreamSttManager(
         }
     }
 
+    private fun mergeTranscriptChunk(pending: String, chunk: String): String {
+        if (pending.isBlank()) return chunk.trim()
+        if (chunk.isBlank()) return pending.trim()
+
+        val pendingWords = pending.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }
+        val chunkWords = chunk.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }
+
+        if (pendingWords.isEmpty()) return chunk.trim()
+        if (chunkWords.isEmpty()) return pending.trim()
+
+        // Normalize words for comparison
+        val normPending = pendingWords.map { it.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "") }
+        val normChunk = chunkWords.map { it.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "") }
+
+        // Find longest suffix-prefix overlap (from max possible down to 1)
+        val maxOverlap = minOf(pendingWords.size, chunkWords.size)
+        for (k in maxOverlap downTo 1) {
+            val pendingSuffix = normPending.takeLast(k)
+            val chunkPrefix = normChunk.take(k)
+            if (pendingSuffix == chunkPrefix) {
+                if (k == chunkWords.size) {
+                    // Chunk is already fully contained in the suffix of pending
+                    return pending.trim()
+                }
+                // Append only the non-overlapping remaining words of chunk
+                val nonOverlappingWords = chunkWords.drop(k).joinToString(" ")
+                return "${pending.trim()} $nonOverlappingWords"
+            }
+        }
+
+        return "${pending.trim()} ${chunk.trim()}"
+    }
+
     private fun handleDeepgramMessage(text: String) {
         try {
             val json = JSONObject(text)
@@ -340,37 +373,32 @@ class RadioStreamSttManager(
 
             synchronized(pendingBuffer) {
                 val currentText = pendingBuffer.toString().trim()
-                val normPending = currentText.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
-                val normChunk = cleanChunk.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
+                val mergedText = mergeTranscriptChunk(currentText, cleanChunk)
 
-                if (normPending.isNotEmpty() && (normPending.endsWith(normChunk) || normPending == normChunk)) {
-                    // already present
-                } else {
-                    if (pendingBuffer.isEmpty()) {
-                        bufferStartTime = System.currentTimeMillis()
-                    }
-                    if (pendingBuffer.isNotEmpty()) {
-                        pendingBuffer.append(" ").append(cleanChunk)
-                    } else {
-                        pendingBuffer.append(cleanChunk)
-                    }
+                if (pendingBuffer.isEmpty()) {
+                    bufferStartTime = System.currentTimeMillis()
                 }
+
+                pendingBuffer.clear()
+                pendingBuffer.append(mergedText)
 
                 val fullText = pendingBuffer.toString().trim()
                 val wordCount = fullText.split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
                 val hasSentenceEnd = "[.?!;]\\s*$".toRegex().containsMatchIn(fullText)
                 val elapsedMs = System.currentTimeMillis() - bufferStartTime
 
-                // PRIORITY: Complete fluent sentences for optimal language learning
+                // PRIORITY: Complete fluent sentences for optimal language learning.
+                // If punctuation end (. ? !) found and has >= 5 words, flush immediately.
+                // Otherwise, dynamically extend duration up to 6000ms to allow full sentence completion.
                 if ((hasSentenceEnd && wordCount >= 5) || isSpeechFinal) {
                     flushPendingBuffer(forceAll = isSpeechFinal)
-                } else if (elapsedMs >= 5500 || wordCount >= 18) {
+                } else if (elapsedMs >= 6000 || wordCount >= 20) {
                     flushPendingBuffer(forceAll = true)
                 } else {
                     flushTimerJob?.cancel()
                     flushTimerJob = scope.launch {
-                        delay(3000)
-                        flushPendingBuffer(forceAll = true)
+                        delay(3500)
+                        flushPendingBuffer(forceAll = false)
                     }
                 }
             }
@@ -387,7 +415,7 @@ class RadioStreamSttManager(
         s = s.replace(Regex("\\b(\\w+)(?:\\s+\\1\\b)+", RegexOption.IGNORE_CASE), "$1")
 
         // 2. Remove multi-word phrase loops (e.g. "with the with the" -> "with the")
-        for (phraseLen in 4 downTo 2) {
+        for (phraseLen in 6 downTo 2) {
             val pattern = Regex("(\\b(?:\\w+\\s+){${phraseLen - 1}}\\w+)(?:\\s+\\1\\b)+", RegexOption.IGNORE_CASE)
             s = s.replace(pattern, "$1")
         }
@@ -395,6 +423,20 @@ class RadioStreamSttManager(
         return s.replace(Regex(",\\s*,+"), ",")
             .replace(Regex("\\s+"), " ")
             .trim()
+    }
+
+    private fun isHallucinationLoop(text: String): Boolean {
+        if (text.length < 4) return true
+        val words = text.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9\\s]"), "").split("\\s+".toRegex()).filter { it.isNotEmpty() }
+        if (words.size <= 4) return false
+
+        val uniqueWords = words.toSet()
+        val ratio = uniqueWords.size.toDouble() / words.size.toDouble()
+
+        if (words.size >= 8 && ratio < 0.35) return true
+        if (words.size >= 16 && ratio < 0.45) return true
+
+        return false
     }
 
     private fun flushPendingBuffer(forceAll: Boolean) {
@@ -452,20 +494,15 @@ class RadioStreamSttManager(
         if (cleanedText.length < 3 || cleanedText == lastFlushedText) return
 
         // Hallucination Loop Detection
-        val words = cleanedText.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9\\s]"), "").split("\\s+".toRegex()).filter { it.isNotEmpty() }
-        if (words.size >= 6) {
-            val uniqueCount = words.toSet().size
-            val ratio = uniqueCount.toDouble() / words.size.toDouble()
-            if (ratio < 0.35) {
-                android.util.Log.d("RadioStreamSttManager", "Dropped low-diversity hallucination text: $cleanedText")
-                return
-            }
+        if (isHallucinationLoop(cleanedText)) {
+            android.util.Log.d("RadioStreamSttManager", "Dropped low-diversity hallucination text: $cleanedText")
+            return
         }
 
         // Avoid duplicate sentences
         val normCleaned = cleanedText.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
         synchronized(recentEmittedSentences) {
-            val isDuplicate = recentEmittedSentences.take(5).any { prev ->
+            val isDuplicate = recentEmittedSentences.take(4).any { prev ->
                 val normPrev = prev.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
                 normPrev == normCleaned && normCleaned.isNotEmpty()
             }
@@ -473,7 +510,7 @@ class RadioStreamSttManager(
                 return
             }
             recentEmittedSentences.add(0, cleanedText)
-            if (recentEmittedSentences.size > 15) {
+            if (recentEmittedSentences.size > 10) {
                 recentEmittedSentences.removeAt(recentEmittedSentences.size - 1)
             }
         }

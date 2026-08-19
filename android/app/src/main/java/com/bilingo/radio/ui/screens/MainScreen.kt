@@ -76,12 +76,14 @@ class WebAppInterface(
                                 createdAt: ${subtitle.createdAt},
                                 english: $escapedEn,
                                 traditionalChinese: $escapedZh,
-                                isFinal: true
+                                isFinal: true,
+                                isNative: true
                             };
                             if (window.handleNativeSubtitle) {
                                 window.handleNativeSubtitle(sub);
                             }
                             window.dispatchEvent(new CustomEvent('native-subtitle', { detail: sub }));
+                            window.postMessage({ type: 'NEW_SUBTITLE', data: sub }, '*');
                         })();
                     """.trimIndent()
                     webView.evaluateJavascript(jsCode, null)

@@ -17,10 +17,15 @@ import okhttp3.WebSocketListener
 import okio.ByteString.Companion.toByteString
 import org.json.JSONObject
 import java.io.InputStream
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 data class NativeSubtitle(
     val id: String,
@@ -34,8 +39,8 @@ data class NativeSubtitle(
 
 /**
  * Autonomous Native Radio STT & Bilingual Subtitle Streamer for Android APK.
- * Connects to Deepgram Speech-to-Text directly on Android with paced live audio rate control
- * and strict sentence-boundary buffering to guarantee smooth, non-repetitive, desync-free subtitles.
+ * Connects to Deepgram Speech-to-Text directly on Android with continuous live audio streaming
+ * and multi-tier translation to guarantee smooth, real-time, non-repetitive subtitles in native APK.
  */
 class RadioStreamSttManager(
     private val deepgramApiKey: String = "26c44e288a84756af4f80d41436af0bf7cc10715"
@@ -45,10 +50,7 @@ class RadioStreamSttManager(
     private val translationRepo = GeminiTranslationRepository()
     private val timeFormat = SimpleDateFormat("hh:mm:ss a", Locale.ENGLISH)
 
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val streamingHttpClient: OkHttpClient = buildStreamingClient()
 
     private var currentStreamJob: Job? = null
     private var watchdogJob: Job? = null
@@ -67,22 +69,72 @@ class RadioStreamSttManager(
     var onSubtitleListener: ((NativeSubtitle) -> Unit)? = null
     var onConnectionStateListener: ((Boolean) -> Unit)? = null
 
+    private companion object {
+        fun buildStreamingClient(): OkHttpClient {
+            val builder = OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(0, TimeUnit.MILLISECONDS) // Infinite read timeout for continuous radio broadcast stream
+                .writeTimeout(15, TimeUnit.SECONDS)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .retryOnConnectionFailure(true)
+
+            try {
+                val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+                    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                    override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+                })
+                val sslContext = SSLContext.getInstance("TLS")
+                sslContext.init(null, trustAllCerts, SecureRandom())
+                builder.sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+                builder.hostnameVerifier { _, _ -> true }
+            } catch (e: Exception) {
+                android.util.Log.w("RadioStreamSttManager", "Permissive SSL init note: ${e.message}")
+            }
+
+            return builder.build()
+        }
+    }
+
+    private fun resolveTargetStreamUrl(rawUrl: String): String {
+        if (rawUrl.isBlank()) return "https://nhpr.streamguys1.com/nhpr"
+        if (rawUrl.contains("radio-stream-proxy") && rawUrl.contains("url=")) {
+            try {
+                val uri = android.net.Uri.parse(rawUrl)
+                val extracted = uri.getQueryParameter("url")
+                if (!extracted.isNullOrBlank()) {
+                    return java.net.URLDecoder.decode(extracted, "UTF-8")
+                }
+            } catch (_: Exception) {}
+        }
+        if (rawUrl.startsWith("/")) {
+            return "https://nhpr.streamguys1.com/nhpr"
+        }
+        return rawUrl
+    }
+
     fun start(streamUrl: String, forceRestart: Boolean = false) {
-        if (streamUrl.isBlank()) return
-        if (!forceRestart && isRunning && currentRadioStreamUrl == streamUrl && webSocket != null && (System.currentTimeMillis() - lastAudioDataTime < 15000)) {
+        val targetUrl = resolveTargetStreamUrl(streamUrl)
+        if (targetUrl.isBlank()) return
+
+        if (!forceRestart && isRunning && currentRadioStreamUrl == targetUrl && webSocket != null && (System.currentTimeMillis() - lastAudioDataTime < 15000)) {
+            android.util.Log.d("RadioStreamSttManager", "STT stream already active for: $targetUrl")
             return
         }
 
         stop()
         isRunning = true
-        currentRadioStreamUrl = streamUrl
+        currentRadioStreamUrl = targetUrl
         lastAudioDataTime = System.currentTimeMillis()
         lastTranscriptTime = System.currentTimeMillis()
+
+        android.util.Log.i("RadioStreamSttManager", "Starting native radio STT session for stream: $currentRadioStreamUrl")
 
         startWatchdog()
 
         currentStreamJob = scope.launch {
-            startStreamingPipeline(streamUrl)
+            startStreamingPipeline(currentRadioStreamUrl)
         }
     }
 
@@ -121,9 +173,9 @@ class RadioStreamSttManager(
                 delay(4000)
                 if (!isRunning) break
                 val now = System.currentTimeMillis()
-                val audioStalled = (now - lastAudioDataTime > 12000)
+                val audioStalled = (now - lastAudioDataTime > 15000)
                 val wsDisconnected = (webSocket == null)
-                val transcriptStalled = (now - lastTranscriptTime > 22000)
+                val transcriptStalled = (now - lastTranscriptTime > 25000)
 
                 if (audioStalled || wsDisconnected || transcriptStalled) {
                     android.util.Log.w("RadioStreamSttManager", "Watchdog triggered: audioStalled=$audioStalled, wsDisconnected=$wsDisconnected, transcriptStalled=$transcriptStalled. Reconnecting...")
@@ -143,14 +195,10 @@ class RadioStreamSttManager(
 
     private suspend fun startStreamingPipeline(streamUrl: String) {
         if (!isRunning || !scope.isActive) return
-        android.util.Log.i("RadioStreamSttManager", "Starting native radio STT stream: $streamUrl")
-        
-        // Deepgram parameters tuned for live broadcast radio:
-        // - interim_results=false: prevent interim fragments from polluting the final sentence accumulator
-        // - smart_format=true & punctuate=true: capitalize and place proper sentence boundaries (. ? !)
-        // - endpointing=300 & utterance_end_ms=1200: optimal natural pause detection
-        // - filler_words=false: eliminate filler noise loops
-        val wsUrl = "wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&smart_format=true&punctuate=true&interim_results=false&endpointing=300&utterance_end_ms=1200&filler_words=false"
+        val targetUrl = resolveTargetStreamUrl(streamUrl)
+        android.util.Log.i("RadioStreamSttManager", "Connecting native radio STT stream: $targetUrl")
+
+        val wsUrl = "wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&smart_format=true&punctuate=true&interim_results=true&endpointing=600&utterance_end_ms=1000"
         val wsRequest = Request.Builder()
             .url(wsUrl)
             .addHeader("Authorization", "Token $deepgramApiKey")
@@ -193,9 +241,9 @@ class RadioStreamSttManager(
         try {
             webSocket?.cancel()
         } catch (_: Exception) {}
-        webSocket = httpClient.newWebSocket(wsRequest, wsListener)
+        webSocket = streamingHttpClient.newWebSocket(wsRequest, wsListener)
 
-        // Launch Keep-Alive Ping Loop
+        // Keep-Alive Ping Loop
         scope.launch {
             while (isRunning && isActive && webSocket != null) {
                 delay(5000)
@@ -206,21 +254,22 @@ class RadioStreamSttManager(
             }
         }
 
-        // Connect to Audio Stream and stream bytes with rate-pacing to prevent clock desync
+        // Connect to Audio Stream and stream chunks
         try {
             val audioRequest = Request.Builder()
-                .url(streamUrl)
-                .addHeader("User-Agent", "LiveBilingoRadio/2.2.3")
+                .url(targetUrl)
+                .addHeader("User-Agent", "LiveBilingoRadio/2.2.5")
                 .addHeader("Icy-MetaData", "0")
+                .addHeader("Connection", "keep-alive")
                 .build()
 
-            val audioResponse = httpClient.newCall(audioRequest).execute()
+            val audioResponse = streamingHttpClient.newCall(audioRequest).execute()
             if (!audioResponse.isSuccessful) {
-                android.util.Log.e("RadioStreamSttManager", "Failed to connect to audio stream: HTTP ${audioResponse.code}")
+                android.util.Log.e("RadioStreamSttManager", "Failed to connect to audio stream: HTTP ${audioResponse.code} for $targetUrl")
                 if (isRunning) {
                     delay(3000)
                     if (isRunning) {
-                        startStreamingPipeline(streamUrl)
+                        startStreamingPipeline(targetUrl)
                     }
                 }
                 return
@@ -229,8 +278,6 @@ class RadioStreamSttManager(
             val inputStream: InputStream = audioResponse.body?.byteStream() ?: return
             val buffer = ByteArray(4096)
             var bytesRead: Int
-            var lastPacingTime = System.currentTimeMillis()
-            var bytesSentInWindow = 0L
 
             while (isRunning && scope.isActive) {
                 bytesRead = inputStream.read(buffer)
@@ -239,31 +286,16 @@ class RadioStreamSttManager(
                 lastAudioDataTime = System.currentTimeMillis()
                 if (isWsConnected && webSocket != null) {
                     webSocket?.send(buffer.toByteString(0, bytesRead))
-                    bytesSentInWindow += bytesRead
-
-                    // Rate pacing: Max ~24 KB/s during initial connection buffer bursts to keep STT in real-time sync with radio audio
-                    val elapsed = System.currentTimeMillis() - lastPacingTime
-                    if (elapsed < 1000 && bytesSentInWindow > 28000) {
-                        val sleepTime = 1000 - elapsed
-                        if (sleepTime > 10) {
-                            delay(sleepTime)
-                        }
-                        lastPacingTime = System.currentTimeMillis()
-                        bytesSentInWindow = 0L
-                    } else if (elapsed >= 1000) {
-                        lastPacingTime = System.currentTimeMillis()
-                        bytesSentInWindow = 0L
-                    }
                 }
             }
             try { inputStream.close() } catch (_: Exception) {}
         } catch (e: Exception) {
-            android.util.Log.w("RadioStreamSttManager", "Audio stream read loop error: ${e.message}")
+            android.util.Log.w("RadioStreamSttManager", "Audio stream read loop exception: ${e.message}")
         }
 
-        // Auto-reconnect if stream died while still active
+        // Auto-reconnect if stream ended while still running
         if (isRunning && scope.isActive) {
-            delay(2000)
+            delay(1500)
             if (isRunning && scope.isActive) {
                 startStreamingPipeline(currentRadioStreamUrl)
             }
@@ -273,6 +305,7 @@ class RadioStreamSttManager(
     private fun handleDeepgramMessage(text: String) {
         try {
             val json = JSONObject(text)
+            val isFinal = json.optBoolean("is_final", false) || json.optBoolean("speech_final", false)
             val channel = json.optJSONObject("channel")
             val alternatives = channel?.optJSONArray("alternatives") ?: return
             if (alternatives.length() == 0) return
@@ -280,21 +313,30 @@ class RadioStreamSttManager(
             val rawTranscript = alternatives.getJSONObject(0).optString("transcript", "").trim()
             if (rawTranscript.isEmpty()) return
 
+            lastAudioDataTime = System.currentTimeMillis()
             lastTranscriptTime = System.currentTimeMillis()
+
+            if (!isFinal) return
 
             val cleanChunk = sanitizeText(rawTranscript)
             if (cleanChunk.length < 2) return
 
             synchronized(pendingBuffer) {
                 val currentText = pendingBuffer.toString().trim()
-                
-                // Smart word deduplication & overlap merging
-                val merged = mergeChunks(currentText, cleanChunk)
-                pendingBuffer.clear()
-                pendingBuffer.append(merged)
+                val normPending = currentText.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
+                val normChunk = cleanChunk.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
 
-                if (bufferStartTime == 0L) {
-                    bufferStartTime = System.currentTimeMillis()
+                if (normPending.isNotEmpty() && (normPending.endsWith(normChunk) || normPending == normChunk)) {
+                    // already present
+                } else {
+                    if (pendingBuffer.isEmpty()) {
+                        bufferStartTime = System.currentTimeMillis()
+                    }
+                    if (pendingBuffer.isNotEmpty()) {
+                        pendingBuffer.append(" ").append(cleanChunk)
+                    } else {
+                        pendingBuffer.append(cleanChunk)
+                    }
                 }
 
                 val fullText = pendingBuffer.toString().trim()
@@ -303,21 +345,14 @@ class RadioStreamSttManager(
                 val isSpeechFinal = json.optBoolean("speech_final", false)
                 val elapsedMs = System.currentTimeMillis() - bufferStartTime
 
-                // RULE 3: Strict sentence boundary preservation for learning
-                // Flush immediately if full sentence punctuation (. ? !) is reached with >= 4 words
-                if (hasSentenceEnd && wordCount >= 4) {
+                if ((hasSentenceEnd && wordCount >= 4) || isSpeechFinal) {
                     flushPendingBuffer(false)
-                } else if (isSpeechFinal && wordCount >= 6) {
-                    // Natural speech boundary reached
-                    flushPendingBuffer(false)
-                } else if (elapsedMs >= 5000 || wordCount >= 18) {
-                    // Maximum duration / word threshold reached -> flush complete clause
+                } else if (elapsedMs >= 5500 || wordCount >= 20) {
                     flushPendingBuffer(true)
                 } else {
-                    // Dynamic debounce timer: wait 2200ms for sentence completion
                     flushTimerJob?.cancel()
                     flushTimerJob = scope.launch {
-                        delay(2200)
+                        delay(2500)
                         flushPendingBuffer(false)
                     }
                 }
@@ -327,52 +362,11 @@ class RadioStreamSttManager(
         }
     }
 
-    private fun mergeChunks(existing: String, incoming: String): String {
-        if (existing.isEmpty()) return incoming
-        if (incoming.isEmpty()) return existing
-
-        val normExisting = existing.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
-        val normIncoming = incoming.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
-
-        // Exactly identical or incoming already at the end
-        if (normExisting == normIncoming || normExisting.endsWith(normIncoming)) {
-            return existing
-        }
-
-        // If existing is a prefix of incoming (Deepgram refined transcription)
-        if (normIncoming.startsWith(normExisting) && incoming.length > existing.length) {
-            return incoming
-        }
-
-        // Word overlap checking
-        val existingWords = existing.split("\\s+".toRegex()).filter { it.isNotEmpty() }
-        val incomingWords = incoming.split("\\s+".toRegex()).filter { it.isNotEmpty() }
-
-        val maxOverlapCheck = minOf(6, minOf(existingWords.size, incomingWords.size))
-        var bestOverlap = 0
-
-        for (overlap in maxOverlapCheck downTo 1) {
-            val suffix = existingWords.takeLast(overlap).joinToString(" ").lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
-            val prefix = incomingWords.take(overlap).joinToString(" ").lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
-            if (suffix == prefix) {
-                bestOverlap = overlap
-                break
-            }
-        }
-
-        return if (bestOverlap > 0) {
-            val remainingIncoming = incomingWords.drop(bestOverlap).joinToString(" ")
-            if (remainingIncoming.isNotEmpty()) "$existing $remainingIncoming" else existing
-        } else {
-            "$existing $incoming"
-        }
-    }
-
     private fun sanitizeText(input: String): String {
         if (input.isBlank()) return ""
         var s = input.trim()
 
-        // 1. Remove immediate word stutters (e.g. "the the" -> "the", "two two" -> "two")
+        // 1. Remove immediate word stutters (e.g. "the the" -> "the")
         s = s.replace(Regex("\\b(\\w+)(?:\\s+\\1\\b)+", RegexOption.IGNORE_CASE), "$1")
 
         // 2. Remove multi-word phrase loops (e.g. "with the with the" -> "with the")
@@ -398,7 +392,6 @@ class RadioStreamSttManager(
                 return
             }
 
-            // Find clean sentence boundary (e.g. '.', '!', '?')
             val sentenceEndRegex = Regex("[.?!;](\\s+|$)")
             val matches = sentenceEndRegex.findAll(fullText).toList()
 
@@ -428,13 +421,7 @@ class RadioStreamSttManager(
                     return
                 }
             } else {
-                val wordCount = fullText.split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
-                if (wordCount >= 7) {
-                    rawText = fullText
-                    textToKeep = ""
-                } else {
-                    return
-                }
+                return
             }
 
             pendingBuffer.clear()
@@ -449,18 +436,18 @@ class RadioStreamSttManager(
         var cleanedText = sanitizeText(rawText)
         if (cleanedText.length < 4 || cleanedText == lastFlushedText) return
 
-        // Hallucination Loop Detection (Entropy / Unique words ratio)
+        // Hallucination Loop Detection
         val words = cleanedText.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9\\s]"), "").split("\\s+".toRegex()).filter { it.isNotEmpty() }
         if (words.size >= 6) {
             val uniqueCount = words.toSet().size
             val ratio = uniqueCount.toDouble() / words.size.toDouble()
-            if (ratio < 0.45) {
+            if (ratio < 0.40) {
                 android.util.Log.d("RadioStreamSttManager", "Dropped low-diversity hallucination text: $cleanedText")
                 return
             }
         }
 
-        // Avoid emitting exact duplicate sentences within the last 5 items
+        // Avoid duplicate sentences
         val normCleaned = cleanedText.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
         synchronized(recentEmittedSentences) {
             val isDuplicate = recentEmittedSentences.take(5).any { prev ->
@@ -468,7 +455,6 @@ class RadioStreamSttManager(
                 normPrev == normCleaned && normCleaned.isNotEmpty()
             }
             if (isDuplicate) {
-                android.util.Log.d("RadioStreamSttManager", "Dropped exact duplicate sentence: $cleanedText")
                 return
             }
             recentEmittedSentences.add(0, cleanedText)
@@ -499,6 +485,8 @@ class RadioStreamSttManager(
             isFinal = true,
             isNative = true
         )
+
+        android.util.Log.i("RadioStreamSttManager", "Native Subtitle Emitted: [EN] $englishText | [ZH] ${subtitle.traditionalChinese}")
 
         mainHandler.post {
             onSubtitleListener?.invoke(subtitle)

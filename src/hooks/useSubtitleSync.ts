@@ -105,16 +105,19 @@ export function useSubtitleSync({
   // 1. Native Android Subtitle & Bridge Synchronization Listener
   useEffect(() => {
     (window as any).handleNativeSubtitle = (sub: any) => {
-      if (sub && sub.id && sub.english && sub.traditionalChinese) {
+      if (sub && sub.id && sub.english) {
+        const zh = sub.traditionalChinese || sub.english;
         setSttConnected(true);
-        ingestSubtitle({ ...sub, isNative: true });
+        ingestSubtitle({ ...sub, traditionalChinese: zh, isNative: true });
       }
     };
 
     const handleNativeEvent = (e: any) => {
-      if (e.detail && e.detail.id && e.detail.english && e.detail.traditionalChinese) {
+      const sub = e.detail;
+      if (sub && sub.id && sub.english) {
+        const zh = sub.traditionalChinese || sub.english;
         setSttConnected(true);
-        ingestSubtitle({ ...e.detail, isNative: true });
+        ingestSubtitle({ ...sub, traditionalChinese: zh, isNative: true });
       }
     };
 
@@ -122,8 +125,12 @@ export function useSubtitleSync({
       if (e.data?.type === 'STT_CONNECTION_STATE') {
         setSttConnected(!!e.data.connected);
       } else if (e.data?.type === 'NEW_SUBTITLE' && e.data?.data) {
-        setSttConnected(true);
-        ingestSubtitle(e.data.data);
+        const sub = e.data.data;
+        if (sub && sub.id && sub.english) {
+          const zh = sub.traditionalChinese || sub.english;
+          setSttConnected(true);
+          ingestSubtitle({ ...sub, traditionalChinese: zh, isNative: true });
+        }
       }
     };
 
@@ -141,23 +148,31 @@ export function useSubtitleSync({
   useEffect(() => {
     const isPlaying = playbackStatus === 'PLAYING' || playbackStatus === 'BUFFERING';
 
-    try {
-      if ((window as any).AndroidBridge?.onStationPlaybackChanged) {
-        (window as any).AndroidBridge.onStationPlaybackChanged(
-          activeStation.streamUrl,
-          activeStation.name,
-          isPlaying
-        );
+    const notifyBridge = () => {
+      try {
+        if ((window as any).AndroidBridge?.onStationPlaybackChanged) {
+          (window as any).AndroidBridge.onStationPlaybackChanged(
+            activeStation.streamUrl,
+            activeStation.name,
+            isPlaying
+          );
+        }
+      } catch (e) {
+        console.warn('AndroidBridge STT sync notice:', e);
       }
-    } catch (e) {
-      console.warn('AndroidBridge STT sync notice:', e);
-    }
+    };
+
+    notifyBridge();
+    // Retry in 500ms if bridge was initializing
+    const bridgeRetry = setTimeout(notifyBridge, 500);
 
     safeApiFetch('/api/radio-playback-state', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isPlaying, streamUrl: activeStation.streamUrl }),
     }).catch(() => {});
+
+    return () => clearTimeout(bridgeRetry);
   }, [activeStation.streamUrl, activeStation.name, playbackStatus]);
 
   // 3. Primary SSE Stream with REST polling fallback & Autonomous Recovery Watchdog

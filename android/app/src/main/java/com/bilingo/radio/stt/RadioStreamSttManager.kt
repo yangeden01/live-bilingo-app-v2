@@ -243,6 +243,24 @@ class RadioStreamSttManager(
         } catch (_: Exception) {}
         webSocket = streamingHttpClient.newWebSocket(wsRequest, wsListener)
 
+        // Wait up to 6 seconds for Deepgram WebSocket connection handshake to succeed
+        var waitCount = 0
+        while (!isWsConnected && isRunning && scope.isActive && waitCount < 60) {
+            delay(100)
+            waitCount++
+        }
+
+        if (!isWsConnected || !isRunning || !scope.isActive) {
+            android.util.Log.w("RadioStreamSttManager", "Deepgram WS not connected after wait ($waitCount), retrying in 2s...")
+            if (isRunning && scope.isActive) {
+                delay(2000)
+                if (isRunning && scope.isActive) {
+                    startStreamingPipeline(targetUrl)
+                }
+            }
+            return
+        }
+
         // Keep-Alive Ping Loop
         scope.launch {
             while (isRunning && isActive && webSocket != null) {
@@ -266,9 +284,9 @@ class RadioStreamSttManager(
             val audioResponse = streamingHttpClient.newCall(audioRequest).execute()
             if (!audioResponse.isSuccessful) {
                 android.util.Log.e("RadioStreamSttManager", "Failed to connect to audio stream: HTTP ${audioResponse.code} for $targetUrl")
-                if (isRunning) {
+                if (isRunning && scope.isActive) {
                     delay(3000)
-                    if (isRunning) {
+                    if (isRunning && scope.isActive) {
                         startStreamingPipeline(targetUrl)
                     }
                 }
@@ -279,14 +297,12 @@ class RadioStreamSttManager(
             val buffer = ByteArray(4096)
             var bytesRead: Int
 
-            while (isRunning && scope.isActive) {
+            while (isRunning && scope.isActive && isWsConnected && webSocket != null) {
                 bytesRead = inputStream.read(buffer)
                 if (bytesRead <= 0) break
 
                 lastAudioDataTime = System.currentTimeMillis()
-                if (isWsConnected && webSocket != null) {
-                    webSocket?.send(buffer.toByteString(0, bytesRead))
-                }
+                webSocket?.send(buffer.toByteString(0, bytesRead))
             }
             try { inputStream.close() } catch (_: Exception) {}
         } catch (e: Exception) {
@@ -306,6 +322,7 @@ class RadioStreamSttManager(
         try {
             val json = JSONObject(text)
             val isFinal = json.optBoolean("is_final", false) || json.optBoolean("speech_final", false)
+            val isSpeechFinal = json.optBoolean("speech_final", false)
             val channel = json.optJSONObject("channel")
             val alternatives = channel?.optJSONArray("alternatives") ?: return
             if (alternatives.length() == 0) return
@@ -342,19 +359,18 @@ class RadioStreamSttManager(
                 val fullText = pendingBuffer.toString().trim()
                 val wordCount = fullText.split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
                 val hasSentenceEnd = "[.?!;]\\s*$".toRegex().containsMatchIn(fullText)
-                val isSpeechFinal = json.optBoolean("speech_final", false)
                 val elapsedMs = System.currentTimeMillis() - bufferStartTime
 
                 // PRIORITY: Complete fluent sentences for optimal language learning
                 if ((hasSentenceEnd && wordCount >= 5) || isSpeechFinal) {
-                    flushPendingBuffer(false)
-                } else if (elapsedMs >= 6500 || wordCount >= 22) {
-                    flushPendingBuffer(true)
+                    flushPendingBuffer(forceAll = isSpeechFinal)
+                } else if (elapsedMs >= 5500 || wordCount >= 18) {
+                    flushPendingBuffer(forceAll = true)
                 } else {
                     flushTimerJob?.cancel()
                     flushTimerJob = scope.launch {
-                        delay(3500)
-                        flushPendingBuffer(false)
+                        delay(3000)
+                        flushPendingBuffer(forceAll = true)
                     }
                 }
             }
@@ -387,7 +403,7 @@ class RadioStreamSttManager(
 
         synchronized(pendingBuffer) {
             val fullText = pendingBuffer.toString().trim()
-            if (fullText.length < 5) {
+            if (fullText.length < 3) {
                 pendingBuffer.clear()
                 bufferStartTime = 0L
                 return
@@ -403,7 +419,7 @@ class RadioStreamSttManager(
                 textToKeep = fullText.substring(cutIndex).trim()
             } else if (forceAll) {
                 val wordCount = fullText.split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
-                if (wordCount >= 15) {
+                if (wordCount >= 14) {
                     val clauseRegex = Regex("[,—:](\\s+|$)")
                     val clauseMatches = clauseRegex.findAll(fullText).toList()
                     if (clauseMatches.isNotEmpty()) {
@@ -432,15 +448,15 @@ class RadioStreamSttManager(
             }
         }
 
-        var cleanedText = sanitizeText(rawText)
-        if (cleanedText.length < 4 || cleanedText == lastFlushedText) return
+        val cleanedText = sanitizeText(rawText)
+        if (cleanedText.length < 3 || cleanedText == lastFlushedText) return
 
         // Hallucination Loop Detection
         val words = cleanedText.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9\\s]"), "").split("\\s+".toRegex()).filter { it.isNotEmpty() }
         if (words.size >= 6) {
             val uniqueCount = words.toSet().size
             val ratio = uniqueCount.toDouble() / words.size.toDouble()
-            if (ratio < 0.40) {
+            if (ratio < 0.35) {
                 android.util.Log.d("RadioStreamSttManager", "Dropped low-diversity hallucination text: $cleanedText")
                 return
             }

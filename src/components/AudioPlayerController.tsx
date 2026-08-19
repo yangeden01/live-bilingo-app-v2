@@ -283,6 +283,9 @@ export const AudioPlayerController: React.FC<Props> = ({
 
           if (audioRef.current && audioRef.current.paused) {
             audioRef.current.play().catch((err) => {
+              if (err?.name === 'AbortError' || err?.message?.includes('interrupted by a new load request')) {
+                return;
+              }
               console.warn('[Foreground] Auto-resume blocked:', err);
               setPlaybackStatus('PAUSED');
             });

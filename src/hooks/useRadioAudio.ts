@@ -79,6 +79,46 @@ export function useRadioAudio({
     return `${baseUrl}${separator}${key}=${encodeURIComponent(value)}`;
   };
 
+  const playPromiseRef = useRef<Promise<void> | null>(null);
+
+  // Safe playback trigger handling browser play() promise interruptions
+  const safePlay = useCallback(async (audio: HTMLAudioElement) => {
+    try {
+      const playPromise = audio.play();
+      playPromiseRef.current = playPromise;
+      await playPromise;
+
+      if (userPlaybackIntentRef.current) {
+        playbackStatusRef.current = 'PLAYING';
+        setPlaybackStatus('PLAYING');
+        isReconnectingRef.current = false;
+        retryCountRef.current = 0;
+        onStartVisualizerRef.current?.();
+        window.dispatchEvent(new CustomEvent('scroll-to-subtitles'));
+      }
+    } catch (err: any) {
+      // If play request was interrupted by a new load request or station change, ignore AbortError
+      if (err?.name === 'AbortError' || err?.message?.includes('interrupted by a new load request')) {
+        console.log('[Radio Audio] Play request smoothly superseded by new stream load.');
+        return;
+      }
+      if (err?.name === 'NotAllowedError') {
+        console.warn('[Radio Audio] Autoplay blocked by browser policy. Pausing.');
+        playbackStatusRef.current = 'PAUSED';
+        setPlaybackStatus('PAUSED');
+        return;
+      }
+
+      console.warn('[Radio Audio] Playback attempt error:', err?.message || err);
+      if (userPlaybackIntentRef.current && playbackStatusRef.current !== 'PAUSED') {
+        playbackStatusRef.current = 'BUFFERING';
+        setPlaybackStatus('BUFFERING');
+      }
+    } finally {
+      playPromiseRef.current = null;
+    }
+  }, [setPlaybackStatus]);
+
   // Exponential backoff auto-reconnect
   const handleAutoReconnect = useCallback(() => {
     if (!audioRef.current || isReconnectingRef.current) return;
@@ -110,36 +150,25 @@ export function useRadioAudio({
       const audio = audioRef.current;
       const baseUrl = getProxiedStreamUrl(activeStationRef.current.streamUrl);
       const freshUrl = addQueryParam(baseUrl, '_retry', String(Date.now()));
-      audio.src = freshUrl;
-      audio.load();
-
-      audio
-        .play()
-        .then(() => {
-          playbackStatusRef.current = 'PLAYING';
-          setPlaybackStatus('PLAYING');
+      
+      try {
+        audio.src = freshUrl;
+        safePlay(audio).then(() => {
           isReconnectingRef.current = false;
-          retryCountRef.current = 0;
-          onStartVisualizerRef.current?.();
           safeApiFetch('/api/notify-station-playing', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: activeStationRef.current.streamUrl, name: activeStationRef.current.name }),
           }).catch(() => {});
-        })
-        .catch((err) => {
-          console.warn(`[Auto-Reconnect] Attempt ${attempt} failed:`, err);
-          isReconnectingRef.current = false;
-          if (attempt < 5) {
-            handleAutoReconnect();
-          } else {
-            // Keep in buffering if still intent to play, allow watchdog to recover
-            playbackStatusRef.current = 'BUFFERING';
-            setPlaybackStatus('BUFFERING');
-          }
         });
+      } catch (e) {
+        isReconnectingRef.current = false;
+        if (attempt < 5) {
+          handleAutoReconnect();
+        }
+      }
     }, delayMs);
-  }, [getProxiedStreamUrl, setPlaybackStatus]);
+  }, [getProxiedStreamUrl, safePlay, setPlaybackStatus]);
 
   // Force re-acquisition of stream when exiting elevator / regaining network
   const triggerFreshStreamReconnect = useCallback(() => {
@@ -178,21 +207,8 @@ export function useRadioAudio({
     const baseUrl = getProxiedStreamUrl(activeStationRef.current.streamUrl);
     const liveFreshUrl = addQueryParam(baseUrl, '_net_restore', String(Date.now()));
     audio.src = liveFreshUrl;
-    audio.load();
-
-    audio
-      .play()
-      .then(() => {
-        playbackStatusRef.current = 'PLAYING';
-        setPlaybackStatus('PLAYING');
-        onStartVisualizerRef.current?.();
-        window.dispatchEvent(new CustomEvent('scroll-to-subtitles'));
-      })
-      .catch((e) => {
-        console.warn('[Network Restored] Initial play retry error:', e);
-        handleAutoReconnect();
-      });
-  }, [getProxiedStreamUrl, handleAutoReconnect, setPlaybackStatus]);
+    safePlay(audio);
+  }, [getProxiedStreamUrl, safePlay, setPlaybackStatus]);
 
   // Robust Network Recovery Listeners (Online / Offline / Android Network Broadcast / Focus)
   useEffect(() => {
@@ -300,19 +316,7 @@ export function useRadioAudio({
       const baseUrl = getProxiedStreamUrl(activeStation.streamUrl);
       const liveFreshUrl = addQueryParam(baseUrl, '_t', String(Date.now()));
       audioRef.current.src = liveFreshUrl;
-      audioRef.current.load();
-      audioRef.current
-        .play()
-        .then(() => {
-          playbackStatusRef.current = 'PLAYING';
-          setPlaybackStatus('PLAYING');
-          onStartVisualizerRef.current?.();
-        })
-        .catch((e) => {
-          console.warn('Auto-play on station switch error:', e);
-          playbackStatusRef.current = 'ERROR';
-          setPlaybackStatus('ERROR');
-        });
+      safePlay(audioRef.current);
     } else {
       audioRef.current.load();
     }
@@ -322,7 +326,7 @@ export function useRadioAudio({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: activeStation.streamUrl, name: activeStation.name }),
     });
-  }, [activeStation.id, activeStation.streamUrl, activeStation.name, getProxiedStreamUrl, setPlaybackStatus]);
+  }, [activeStation.id, activeStation.streamUrl, activeStation.name, getProxiedStreamUrl, safePlay, setPlaybackStatus]);
 
   // Main toggle play / pause logic
   const togglePlayPause = useCallback(() => {
@@ -353,35 +357,9 @@ export function useRadioAudio({
       const baseUrl = getProxiedStreamUrl(activeStationRef.current.streamUrl);
       const liveFreshUrl = addQueryParam(baseUrl, '_t', String(Date.now()));
       audio.src = liveFreshUrl;
-      audio.load();
-
-      audio
-        .play()
-        .then(() => {
-          playbackStatusRef.current = 'PLAYING';
-          setPlaybackStatus('PLAYING');
-          onStartVisualizerRef.current?.();
-          window.dispatchEvent(new CustomEvent('scroll-to-subtitles'));
-        })
-        .catch((err) => {
-          console.error('Audio play error:', err);
-          audio.load();
-          audio
-            .play()
-            .then(() => {
-              playbackStatusRef.current = 'PLAYING';
-              setPlaybackStatus('PLAYING');
-              onStartVisualizerRef.current?.();
-              window.dispatchEvent(new CustomEvent('scroll-to-subtitles'));
-            })
-            .catch((e) => {
-              console.error('Audio play retry error:', e);
-              playbackStatusRef.current = 'ERROR';
-              setPlaybackStatus('ERROR');
-            });
-        });
+      safePlay(audio);
     }
-  }, [getProxiedStreamUrl, setPlaybackStatus]);
+  }, [getProxiedStreamUrl, safePlay, setPlaybackStatus]);
 
   // Listen for global window custom events
   useEffect(() => {
@@ -416,26 +394,11 @@ export function useRadioAudio({
         }
       }
 
-      audio
-        .play()
-        .then(() => {
-          setPlaybackStatus('PLAYING');
-          onStartVisualizer?.();
-        })
-        .catch(() => {
-          audio.load();
-          audio
-            .play()
-            .then(() => {
-              setPlaybackStatus('PLAYING');
-              onStartVisualizer?.();
-            })
-            .catch(() => setPlaybackStatus('ERROR'));
-        });
+      safePlay(audio);
     } catch (err) {
       console.warn('Live sync error:', err);
     }
-  }, [activeStation.name, activeStation.streamUrl, onStartVisualizer, setPlaybackStatus]);
+  }, [activeStation.name, activeStation.streamUrl, safePlay, setPlaybackStatus]);
 
   // HTML5 Media Session API integration
   useEffect(() => {

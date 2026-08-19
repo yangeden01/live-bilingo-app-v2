@@ -198,7 +198,7 @@ class RadioStreamSttManager(
         val targetUrl = resolveTargetStreamUrl(streamUrl)
         android.util.Log.i("RadioStreamSttManager", "Connecting native radio STT stream: $targetUrl")
 
-        val wsUrl = "wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&smart_format=true&punctuate=true&interim_results=true&endpointing=600&utterance_end_ms=1000"
+        val wsUrl = "wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&smart_format=true&punctuate=true&interim_results=true&endpointing=300&utterance_end_ms=1000"
         val wsRequest = Request.Builder()
             .url(wsUrl)
             .addHeader("Authorization", "Token $deepgramApiKey")
@@ -254,11 +254,11 @@ class RadioStreamSttManager(
             }
         }
 
-        // Connect to Audio Stream and stream chunks
+        // Connect to Audio Stream and stream chunks with rate pacing
         try {
             val audioRequest = Request.Builder()
                 .url(targetUrl)
-                .addHeader("User-Agent", "LiveBilingoRadio/2.2.5")
+                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0.0.0 Mobile Safari/537.36 RadioStream/2.2.5")
                 .addHeader("Icy-MetaData", "0")
                 .addHeader("Connection", "keep-alive")
                 .build()
@@ -276,8 +276,10 @@ class RadioStreamSttManager(
             }
 
             val inputStream: InputStream = audioResponse.body?.byteStream() ?: return
-            val buffer = ByteArray(4096)
+            val buffer = ByteArray(2048)
             var bytesRead: Int
+            var lastPacingTime = System.currentTimeMillis()
+            var bytesSentInWindow = 0
 
             while (isRunning && scope.isActive) {
                 bytesRead = inputStream.read(buffer)
@@ -286,6 +288,18 @@ class RadioStreamSttManager(
                 lastAudioDataTime = System.currentTimeMillis()
                 if (isWsConnected && webSocket != null) {
                     webSocket?.send(buffer.toByteString(0, bytesRead))
+                    bytesSentInWindow += bytesRead
+                }
+
+                // Smooth rate pacing: keep streaming aligned with real-time audio clock (max 32KB/sec)
+                val elapsed = System.currentTimeMillis() - lastPacingTime
+                if (elapsed < 1000 && bytesSentInWindow > 32000) {
+                    delay(1000 - elapsed)
+                    lastPacingTime = System.currentTimeMillis()
+                    bytesSentInWindow = 0
+                } else if (elapsed >= 1000) {
+                    lastPacingTime = System.currentTimeMillis()
+                    bytesSentInWindow = 0
                 }
             }
             try { inputStream.close() } catch (_: Exception) {}
@@ -345,15 +359,15 @@ class RadioStreamSttManager(
                 val isSpeechFinal = json.optBoolean("speech_final", false)
                 val elapsedMs = System.currentTimeMillis() - bufferStartTime
 
-                if ((hasSentenceEnd && wordCount >= 4) || isSpeechFinal) {
+                if ((hasSentenceEnd && wordCount >= 3) || isSpeechFinal) {
                     flushPendingBuffer(false)
-                } else if (elapsedMs >= 5500 || wordCount >= 20) {
+                } else if (elapsedMs >= 4000 || wordCount >= 14) {
                     flushPendingBuffer(true)
                 } else {
                     flushTimerJob?.cancel()
                     flushTimerJob = scope.launch {
-                        delay(2500)
-                        flushPendingBuffer(false)
+                        delay(2000)
+                        flushPendingBuffer(true)
                     }
                 }
             }
@@ -402,7 +416,7 @@ class RadioStreamSttManager(
                 textToKeep = fullText.substring(cutIndex).trim()
             } else if (forceAll) {
                 val wordCount = fullText.split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
-                if (wordCount >= 10) {
+                if (wordCount >= 8) {
                     val clauseRegex = Regex("[,—:](\\s+|$)")
                     val clauseMatches = clauseRegex.findAll(fullText).toList()
                     if (clauseMatches.isNotEmpty()) {
@@ -414,7 +428,7 @@ class RadioStreamSttManager(
                         rawText = fullText
                         textToKeep = ""
                     }
-                } else if (wordCount >= 4) {
+                } else if (wordCount >= 2) {
                     rawText = fullText
                     textToKeep = ""
                 } else {

@@ -5,6 +5,7 @@ import { safeApiFetch } from '../utils/safeFetch';
 import { clientSubtitleEngine } from '../utils/clientSubtitleEngine';
 import { DecoupledTimeAligner } from '../utils/DecoupledTimeAligner';
 import { sanitizeTranscriptText, isHallucinationLoop } from '../utils/textSanitizer';
+import { recordSttStreamLatency } from '../main';
 
 interface UseSubtitleSyncOptions {
   playbackStatus: PlaybackStatus;
@@ -107,6 +108,12 @@ export function useSubtitleSync({
     (window as any).handleNativeSubtitle = (sub: any) => {
       if (sub && sub.id && sub.english) {
         const zh = sub.traditionalChinese || sub.english;
+        const latencyMs = sub.createdAt ? Math.max(0, Date.now() - Number(sub.createdAt)) : 120;
+        recordSttStreamLatency('Android Native STT', latencyMs, {
+          english: sub.english,
+          id: sub.id,
+          createdAt: sub.createdAt,
+        });
         setSttConnected(true);
         ingestSubtitle({ ...sub, traditionalChinese: zh, isNative: true });
       }
@@ -116,6 +123,12 @@ export function useSubtitleSync({
       const sub = e.detail;
       if (sub && sub.id && sub.english) {
         const zh = sub.traditionalChinese || sub.english;
+        const latencyMs = sub.createdAt ? Math.max(0, Date.now() - Number(sub.createdAt)) : 120;
+        recordSttStreamLatency('Android Native STT', latencyMs, {
+          english: sub.english,
+          id: sub.id,
+          createdAt: sub.createdAt,
+        });
         setSttConnected(true);
         ingestSubtitle({ ...sub, traditionalChinese: zh, isNative: true });
       }
@@ -128,6 +141,12 @@ export function useSubtitleSync({
         const sub = e.data.data;
         if (sub && sub.id && sub.english) {
           const zh = sub.traditionalChinese || sub.english;
+          const latencyMs = sub.createdAt ? Math.max(0, Date.now() - Number(sub.createdAt)) : 120;
+          recordSttStreamLatency('Android Native STT', latencyMs, {
+            english: sub.english,
+            id: sub.id,
+            createdAt: sub.createdAt,
+          });
           setSttConnected(true);
           ingestSubtitle({ ...sub, traditionalChinese: zh, isNative: true });
         }
@@ -217,6 +236,12 @@ export function useSubtitleSync({
                   traditionalChinese: sub.traditionalChinese,
                   isFinal: true,
                 };
+                const latencyMs = Math.max(0, Date.now() - subCreatedAt);
+                recordSttStreamLatency('REST Polling Fallback', latencyMs, {
+                  english: sub.english,
+                  id: sub.id,
+                  createdAt: subCreatedAt,
+                });
                 clientSubtitleEngine.recordExternalSubtitle();
                 if (playbackStatusRef.current === 'PLAYING' || playbackStatusRef.current === 'BUFFERING') {
                   ingestSubtitle(newItem);
@@ -276,6 +301,13 @@ export function useSubtitleSync({
                   traditionalChinese: data.traditionalChinese,
                   isFinal: true,
                 };
+
+                const latencyMs = Math.max(0, Date.now() - createdAt);
+                recordSttStreamLatency('Server SSE Stream', latencyMs, {
+                  english: data.english,
+                  id: data.id,
+                  createdAt: createdAt,
+                });
 
                 clientSubtitleEngine.recordExternalSubtitle();
                 ingestSubtitle(newItem);
@@ -428,6 +460,11 @@ export function useSubtitleSync({
       clientSubtitleEngine.start(
         activeStation,
         (item) => {
+          recordSttStreamLatency('Client Web STT', 250, {
+            english: item.english,
+            id: item.id,
+            createdAt: item.createdAt,
+          });
           ingestSubtitle(item);
         },
         (connected) => {

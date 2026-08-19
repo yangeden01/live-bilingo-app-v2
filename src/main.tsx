@@ -4,8 +4,134 @@ import App from './App.tsx';
 import './index.css';
 import { triggerAutoDebug } from './utils/safeFetch.ts';
 
+// STT Stream Latency Telemetry Interfaces
+export interface SttLatencyMetric {
+  id: string;
+  source: string;
+  latencyMs: number;
+  textSnippet: string;
+  timestamp: number;
+  audioTimeOffset?: number;
+}
+
+export interface SttLatencyStats {
+  currentLatencyMs: number;
+  avgLatencyMs: number;
+  minLatencyMs: number;
+  maxLatencyMs: number;
+  totalCount: number;
+  lastSource: string;
+  lastReceivedAt: number;
+  history: SttLatencyMetric[];
+}
+
+const latencyHistory: SttLatencyMetric[] = [];
+let totalLatencySum = 0;
+let totalLatencyCount = 0;
+let minLatency = Infinity;
+let maxLatency = 0;
+let lastSttStats: SttLatencyStats | null = null;
+
+// Global STT Stream Latency Measurement & Logger
+export function recordSttStreamLatency(
+  source: string,
+  latencyMs: number,
+  info?: { english?: string; id?: string; createdAt?: number; audioTimeOffset?: number }
+): SttLatencyStats {
+  const safeLatency = Math.max(0, Math.round(latencyMs));
+  totalLatencyCount++;
+  totalLatencySum += safeLatency;
+  minLatency = Math.min(minLatency, safeLatency);
+  maxLatency = Math.max(maxLatency, safeLatency);
+  const avgLatency = Math.round(totalLatencySum / totalLatencyCount);
+
+  const snippet = info?.english
+    ? info.english.length > 35
+      ? info.english.substring(0, 35) + '...'
+      : info.english
+    : '';
+
+  const metric: SttLatencyMetric = {
+    id: info?.id || `stt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    source,
+    latencyMs: safeLatency,
+    textSnippet: snippet,
+    timestamp: Date.now(),
+    audioTimeOffset: info?.audioTimeOffset,
+  };
+
+  latencyHistory.unshift(metric);
+  if (latencyHistory.length > 25) {
+    latencyHistory.pop();
+  }
+
+  const stats: SttLatencyStats = {
+    currentLatencyMs: safeLatency,
+    avgLatencyMs: avgLatency,
+    minLatencyMs: minLatency === Infinity ? safeLatency : minLatency,
+    maxLatencyMs: maxLatency,
+    totalCount: totalLatencyCount,
+    lastSource: source,
+    lastReceivedAt: Date.now(),
+    history: [...latencyHistory],
+  };
+
+  lastSttStats = stats;
+
+  // Log to Android Bridge / Console via logToNative
+  logToNative(
+    'log',
+    `[STT Stream Latency] Source: ${source} | Latency: ${safeLatency}ms (Avg: ${avgLatency}ms, Min: ${minLatency}ms, Max: ${maxLatency}ms) | "${snippet}"`,
+    {
+      latencyMs: safeLatency,
+      avgLatencyMs: avgLatency,
+      minLatencyMs: minLatency,
+      maxLatencyMs: maxLatency,
+      source,
+      snippet,
+      id: info?.id,
+      timestamp: Date.now(),
+    }
+  );
+
+  if (typeof window !== 'undefined') {
+    (window as any).__STT_LATENCY_STATS__ = stats;
+    try {
+      window.dispatchEvent(new CustomEvent('stt-latency-update', { detail: stats }));
+    } catch (_) {}
+  }
+
+  return stats;
+}
+
+export function resetSttStreamLatency() {
+  latencyHistory.length = 0;
+  totalLatencySum = 0;
+  totalLatencyCount = 0;
+  minLatency = Infinity;
+  maxLatency = 0;
+  lastSttStats = null;
+  if (typeof window !== 'undefined') {
+    (window as any).__STT_LATENCY_STATS__ = null;
+    try {
+      window.dispatchEvent(new CustomEvent('stt-latency-update', { detail: null }));
+    } catch (_) {}
+  }
+}
+
+export function getSttStreamStats(): SttLatencyStats | null {
+  return lastSttStats;
+}
+
+// Expose globals for WebView / testing
+if (typeof window !== 'undefined') {
+  (window as any).recordSttStreamLatency = recordSttStreamLatency;
+  (window as any).resetSttStreamLatency = resetSttStreamLatency;
+  (window as any).getSttStreamStats = getSttStreamStats;
+}
+
 // Safe Logger for Android WebView and Console
-function logToNative(type: 'log' | 'warn' | 'error', message: string, detail?: any) {
+export function logToNative(type: 'log' | 'warn' | 'error', message: string, detail?: any) {
   const detailStr = detail ? (typeof detail === 'string' ? detail : JSON.stringify(detail)) : '';
   const formatted = `[BilingoJS ${type.toUpperCase()}] ${message} ${detailStr}`;
   if (type === 'error') {

@@ -7,6 +7,7 @@ import { Material3AndroidFrame } from './components/Material3AndroidFrame';
 import { AndroidCodeExplorer } from './components/AndroidCodeExplorer';
 import { StationManagerModal } from './components/StationManagerModal';
 import { DictionaryModal } from './components/DictionaryModal';
+import { SttLatencyDebugPanel } from './components/SttLatencyDebugPanel';
 import { getApiUrl } from './utils/apiUrl';
 import { safeApiFetch } from './utils/safeFetch';
 import { vibrateGitPushSuccess, vibrateZipExportSuccess } from './utils/haptics';
@@ -1099,8 +1100,14 @@ export default function App() {
         </div>
       </header>
 
+      {/* Real-time Subtitle Reception Latency Diagnostic Panel */}
+      <SttLatencyDebugPanel
+        sttConnected={sttConnected}
+        activeStationName={activeStation?.name || ''}
+      />
+
       {/* Main Container */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-12 pb-[max(3rem,env(safe-area-inset-bottom))] space-y-6">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-12 pb-[max(3rem,env(safe-area-inset-bottom))] space-y-6">
         {/* Global Radio Stream Controller */}
         <AudioPlayerController
           playbackStatus={playbackStatus}

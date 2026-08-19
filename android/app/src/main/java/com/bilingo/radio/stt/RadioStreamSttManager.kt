@@ -9,6 +9,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -52,9 +53,11 @@ class RadioStreamSttManager(
 
     private val streamingHttpClient: OkHttpClient = buildStreamingClient()
 
+    private var currentSessionId = 0L
     private var currentStreamJob: Job? = null
     private var watchdogJob: Job? = null
     private var webSocket: WebSocket? = null
+    private var currentAudioCall: Call? = null
     private var currentRadioStreamUrl: String = ""
     private var isRunning = false
     private var lastAudioDataTime = 0L
@@ -126,15 +129,17 @@ class RadioStreamSttManager(
         stop()
         isRunning = true
         currentRadioStreamUrl = targetUrl
-        lastAudioDataTime = System.currentTimeMillis()
-        lastTranscriptTime = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
+        lastAudioDataTime = now
+        lastTranscriptTime = now
 
         android.util.Log.i("RadioStreamSttManager", "Starting native radio STT session for stream: $currentRadioStreamUrl")
 
         startWatchdog()
 
+        val sessionId = ++currentSessionId
         currentStreamJob = scope.launch {
-            startStreamingPipeline(currentRadioStreamUrl)
+            startStreamingPipeline(currentRadioStreamUrl, sessionId)
         }
     }
 
@@ -147,6 +152,7 @@ class RadioStreamSttManager(
 
     fun stop() {
         isRunning = false
+        ++currentSessionId
         watchdogJob?.cancel()
         watchdogJob = null
         currentStreamJob?.cancel()
@@ -154,7 +160,12 @@ class RadioStreamSttManager(
         flushTimerJob?.cancel()
         flushTimerJob = null
         try {
+            currentAudioCall?.cancel()
+        } catch (_: Exception) {}
+        currentAudioCall = null
+        try {
             webSocket?.close(1000, "Normal closure")
+            webSocket?.cancel()
         } catch (_: Exception) {}
         webSocket = null
         synchronized(pendingBuffer) {
@@ -175,17 +186,22 @@ class RadioStreamSttManager(
                 val now = System.currentTimeMillis()
                 val audioStalled = (now - lastAudioDataTime > 15000)
                 val wsDisconnected = (webSocket == null)
-                val transcriptStalled = (now - lastTranscriptTime > 25000)
+                val transcriptStalled = isRunning && (now - lastTranscriptTime > 25000)
 
                 if (audioStalled || wsDisconnected || transcriptStalled) {
-                    android.util.Log.w("RadioStreamSttManager", "Watchdog triggered: audioStalled=$audioStalled, wsDisconnected=$wsDisconnected, transcriptStalled=$transcriptStalled. Reconnecting...")
-                    if (currentRadioStreamUrl.isNotBlank()) {
-                        scope.launch {
-                            try {
-                                webSocket?.cancel()
-                            } catch (_: Exception) {}
-                            webSocket = null
-                            startStreamingPipeline(currentRadioStreamUrl)
+                    android.util.Log.w("RadioStreamSttManager", "Watchdog triggered: audioStalled=$audioStalled, wsDisconnected=$wsDisconnected, transcriptStalled=$transcriptStalled. Reconnecting STT stream...")
+                    if (currentRadioStreamUrl.isNotBlank() && isRunning) {
+                        // Immediately reset timestamps to prevent repeating watchdog triggers while reconnecting
+                        lastAudioDataTime = now
+                        lastTranscriptTime = now
+
+                        // Flush any pending text before session switch
+                        flushPendingBuffer(forceAll = true)
+
+                        val newSessionId = ++currentSessionId
+                        currentStreamJob?.cancel()
+                        currentStreamJob = scope.launch {
+                            startStreamingPipeline(currentRadioStreamUrl, newSessionId)
                         }
                     }
                 }
@@ -193,10 +209,24 @@ class RadioStreamSttManager(
         }
     }
 
-    private suspend fun startStreamingPipeline(streamUrl: String) {
-        if (!isRunning || !scope.isActive) return
+    private suspend fun startStreamingPipeline(streamUrl: String, sessionId: Long) {
+        if (!isRunning || !scope.isActive || sessionId != currentSessionId) return
         val targetUrl = resolveTargetStreamUrl(streamUrl)
-        android.util.Log.i("RadioStreamSttManager", "Connecting native radio STT stream: $targetUrl")
+        android.util.Log.i("RadioStreamSttManager", "[Session #$sessionId] Connecting native radio STT stream: $targetUrl")
+
+        val now = System.currentTimeMillis()
+        lastAudioDataTime = now
+        lastTranscriptTime = now
+
+        try {
+            currentAudioCall?.cancel()
+        } catch (_: Exception) {}
+        currentAudioCall = null
+
+        try {
+            webSocket?.cancel()
+        } catch (_: Exception) {}
+        webSocket = null
 
         val wsUrl = "wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&smart_format=true&punctuate=true&interim_results=true&endpointing=600&utterance_end_ms=1000"
         val wsRequest = Request.Builder()
@@ -208,28 +238,36 @@ class RadioStreamSttManager(
 
         val wsListener = object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
+                if (sessionId != currentSessionId) {
+                    try { ws.close(1000, "Old session") } catch (_: Exception) {}
+                    return
+                }
                 isWsConnected = true
+                lastAudioDataTime = System.currentTimeMillis()
                 lastTranscriptTime = System.currentTimeMillis()
-                android.util.Log.i("RadioStreamSttManager", "Deepgram WebSocket connected successfully")
+                android.util.Log.i("RadioStreamSttManager", "[Session #$sessionId] Deepgram WebSocket connected successfully")
                 mainHandler.post {
                     onConnectionStateListener?.invoke(true)
                 }
             }
 
             override fun onMessage(ws: WebSocket, text: String) {
+                if (sessionId != currentSessionId) return
                 handleDeepgramMessage(text)
             }
 
             override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
+                if (sessionId != currentSessionId) return
                 isWsConnected = false
                 webSocket = null
-                android.util.Log.w("RadioStreamSttManager", "Deepgram WebSocket error: ${t.message}")
+                android.util.Log.w("RadioStreamSttManager", "[Session #$sessionId] Deepgram WebSocket error: ${t.message}")
                 mainHandler.post {
                     onConnectionStateListener?.invoke(false)
                 }
             }
 
             override fun onClosed(ws: WebSocket, code: Int, reason: String) {
+                if (sessionId != currentSessionId) return
                 isWsConnected = false
                 webSocket = null
                 mainHandler.post {
@@ -238,32 +276,30 @@ class RadioStreamSttManager(
             }
         }
 
-        try {
-            webSocket?.cancel()
-        } catch (_: Exception) {}
-        webSocket = streamingHttpClient.newWebSocket(wsRequest, wsListener)
+        val currentWs = streamingHttpClient.newWebSocket(wsRequest, wsListener)
+        webSocket = currentWs
 
         // Wait up to 6 seconds for Deepgram WebSocket connection handshake to succeed
         var waitCount = 0
-        while (!isWsConnected && isRunning && scope.isActive && waitCount < 60) {
+        while (!isWsConnected && isRunning && scope.isActive && sessionId == currentSessionId && waitCount < 60) {
             delay(100)
             waitCount++
         }
 
-        if (!isWsConnected || !isRunning || !scope.isActive) {
-            android.util.Log.w("RadioStreamSttManager", "Deepgram WS not connected after wait ($waitCount), retrying in 2s...")
-            if (isRunning && scope.isActive) {
+        if (!isWsConnected || !isRunning || !scope.isActive || sessionId != currentSessionId) {
+            android.util.Log.w("RadioStreamSttManager", "[Session #$sessionId] Deepgram WS not connected after wait ($waitCount), retrying in 2s...")
+            if (isRunning && scope.isActive && sessionId == currentSessionId) {
                 delay(2000)
-                if (isRunning && scope.isActive) {
-                    startStreamingPipeline(targetUrl)
+                if (isRunning && scope.isActive && sessionId == currentSessionId) {
+                    startStreamingPipeline(targetUrl, sessionId)
                 }
             }
             return
         }
 
-        // Keep-Alive Ping Loop
+        // Keep-Alive Ping Loop (every 5 seconds)
         scope.launch {
-            while (isRunning && isActive && webSocket != null) {
+            while (isRunning && isActive && sessionId == currentSessionId && webSocket != null) {
                 delay(5000)
                 try {
                     val pingJson = JSONObject().apply { put("type", "KeepAlive") }
@@ -272,7 +308,7 @@ class RadioStreamSttManager(
             }
         }
 
-        // Connect to Audio Stream and stream continuously without artificial delays
+        // Connect to Audio Stream and stream continuously
         try {
             val audioRequest = Request.Builder()
                 .url(targetUrl)
@@ -281,13 +317,16 @@ class RadioStreamSttManager(
                 .addHeader("Connection", "keep-alive")
                 .build()
 
-            val audioResponse = streamingHttpClient.newCall(audioRequest).execute()
+            val call = streamingHttpClient.newCall(audioRequest)
+            currentAudioCall = call
+            val audioResponse = call.execute()
+
             if (!audioResponse.isSuccessful) {
                 android.util.Log.e("RadioStreamSttManager", "Failed to connect to audio stream: HTTP ${audioResponse.code} for $targetUrl")
-                if (isRunning && scope.isActive) {
+                if (isRunning && scope.isActive && sessionId == currentSessionId) {
                     delay(3000)
-                    if (isRunning && scope.isActive) {
-                        startStreamingPipeline(targetUrl)
+                    if (isRunning && scope.isActive && sessionId == currentSessionId) {
+                        startStreamingPipeline(targetUrl, sessionId)
                     }
                 }
                 return
@@ -297,7 +336,7 @@ class RadioStreamSttManager(
             val buffer = ByteArray(4096)
             var bytesRead: Int
 
-            while (isRunning && scope.isActive && isWsConnected && webSocket != null) {
+            while (isRunning && scope.isActive && sessionId == currentSessionId && isWsConnected && webSocket != null) {
                 bytesRead = inputStream.read(buffer)
                 if (bytesRead <= 0) break
 
@@ -306,49 +345,60 @@ class RadioStreamSttManager(
             }
             try { inputStream.close() } catch (_: Exception) {}
         } catch (e: Exception) {
-            android.util.Log.w("RadioStreamSttManager", "Audio stream read loop exception: ${e.message}")
+            android.util.Log.w("RadioStreamSttManager", "[Session #$sessionId] Audio stream read loop notice: ${e.message}")
         }
 
         // Auto-reconnect if stream ended while still running
-        if (isRunning && scope.isActive) {
+        if (isRunning && scope.isActive && sessionId == currentSessionId) {
             delay(1500)
-            if (isRunning && scope.isActive) {
-                startStreamingPipeline(currentRadioStreamUrl)
+            if (isRunning && scope.isActive && sessionId == currentSessionId) {
+                val nextSessionId = ++currentSessionId
+                startStreamingPipeline(currentRadioStreamUrl, nextSessionId)
             }
         }
     }
 
     private fun mergeTranscriptChunk(pending: String, chunk: String): String {
-        if (pending.isBlank()) return chunk.trim()
-        if (chunk.isBlank()) return pending.trim()
+        val p = pending.trim()
+        val c = chunk.trim()
+        if (p.isEmpty()) return c
+        if (c.isEmpty()) return p
 
-        val pendingWords = pending.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }
-        val chunkWords = chunk.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }
+        val pWords = p.split("\\s+".toRegex()).filter { it.isNotEmpty() }
+        val cWords = c.split("\\s+".toRegex()).filter { it.isNotEmpty() }
 
-        if (pendingWords.isEmpty()) return chunk.trim()
-        if (chunkWords.isEmpty()) return pending.trim()
+        if (pWords.isEmpty()) return c
+        if (cWords.isEmpty()) return p
 
-        // Normalize words for comparison
-        val normPending = pendingWords.map { it.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "") }
-        val normChunk = chunkWords.map { it.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "") }
+        val normP = pWords.map { it.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "") }
+        val normC = cWords.map { it.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "") }
 
-        // Find longest suffix-prefix overlap (from max possible down to 1)
-        val maxOverlap = minOf(pendingWords.size, chunkWords.size)
-        for (k in maxOverlap downTo 1) {
-            val pendingSuffix = normPending.takeLast(k)
-            val chunkPrefix = normChunk.take(k)
+        // Find longest suffix-prefix overlap (min 2 words down to 1)
+        val maxOverlap = minOf(pWords.size, cWords.size)
+        for (k in maxOverlap downTo 2) {
+            val pendingSuffix = normP.takeLast(k)
+            val chunkPrefix = normC.take(k)
             if (pendingSuffix == chunkPrefix) {
-                if (k == chunkWords.size) {
-                    // Chunk is already fully contained in the suffix of pending
-                    return pending.trim()
+                if (k == cWords.size) {
+                    return p
                 }
-                // Append only the non-overlapping remaining words of chunk
-                val nonOverlappingWords = chunkWords.drop(k).joinToString(" ")
-                return "${pending.trim()} $nonOverlappingWords"
+                val nonOverlappingWords = cWords.drop(k).joinToString(" ")
+                return "$p $nonOverlappingWords"
             }
         }
 
-        return "${pending.trim()} ${chunk.trim()}"
+        // Single word overlap check
+        if (maxOverlap >= 1 && normP.last() == normC.first() && normP.last().isNotEmpty()) {
+            if (cWords.size == 1) {
+                return p
+            }
+            if (normP.last().length >= 4) {
+                val nonOverlappingWords = cWords.drop(1).joinToString(" ")
+                return "$p $nonOverlappingWords"
+            }
+        }
+
+        return "$p $c"
     }
 
     private fun handleDeepgramMessage(text: String) {
@@ -388,17 +438,18 @@ class RadioStreamSttManager(
                 val elapsedMs = System.currentTimeMillis() - bufferStartTime
 
                 // PRIORITY: Complete fluent sentences for optimal language learning.
-                // If punctuation end (. ? !) found and has >= 5 words, flush immediately.
-                // Otherwise, dynamically extend duration up to 6000ms to allow full sentence completion.
-                if ((hasSentenceEnd && wordCount >= 5) || isSpeechFinal) {
+                // 1. If sentence boundary (. ? !) found and has >= 8 words (or speech_final) -> flush immediately
+                if ((hasSentenceEnd && wordCount >= 8) || isSpeechFinal) {
                     flushPendingBuffer(forceAll = isSpeechFinal)
-                } else if (elapsedMs >= 6000 || wordCount >= 20) {
+                } else if (elapsedMs >= 6500 || wordCount >= 22) {
+                    // 2. Continuous sentence duration exceeded 6.5s or 22 words -> flush at clause boundary
                     flushPendingBuffer(forceAll = true)
                 } else {
+                    // 3. Dynamic inactivity flush: If speaker pauses for 3.5s, flush remaining text completely (forceAll = true)
                     flushTimerJob?.cancel()
                     flushTimerJob = scope.launch {
                         delay(3500)
-                        flushPendingBuffer(forceAll = false)
+                        flushPendingBuffer(forceAll = true)
                     }
                 }
             }
@@ -426,15 +477,24 @@ class RadioStreamSttManager(
     }
 
     private fun isHallucinationLoop(text: String): Boolean {
-        if (text.length < 4) return true
+        if (text.length < 3) return true
         val words = text.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9\\s]"), "").split("\\s+".toRegex()).filter { it.isNotEmpty() }
-        if (words.size <= 4) return false
+        if (words.size <= 3) return false
 
         val uniqueWords = words.toSet()
         val ratio = uniqueWords.size.toDouble() / words.size.toDouble()
 
         if (words.size >= 8 && ratio < 0.35) return true
-        if (words.size >= 16 && ratio < 0.45) return true
+        if (words.size >= 15 && ratio < 0.45) return true
+
+        for (len in 2..4) {
+            val counts = mutableMapOf<String, Int>()
+            for (i in 0..(words.size - len)) {
+                val phrase = words.subList(i, i + len).joinToString(" ")
+                counts[phrase] = (counts[phrase] ?: 0) + 1
+                if (counts[phrase]!! >= 4) return true
+            }
+        }
 
         return false
     }
@@ -461,7 +521,7 @@ class RadioStreamSttManager(
                 textToKeep = fullText.substring(cutIndex).trim()
             } else if (forceAll) {
                 val wordCount = fullText.split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
-                if (wordCount >= 14) {
+                if (wordCount >= 15) {
                     val clauseRegex = Regex("[,—:](\\s+|$)")
                     val clauseMatches = clauseRegex.findAll(fullText).toList()
                     if (clauseMatches.isNotEmpty()) {

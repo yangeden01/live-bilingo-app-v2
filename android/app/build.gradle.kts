@@ -20,7 +20,7 @@ android {
 
     signingConfigs {
         create("release") {
-            val ksFile = file("release.keystore")
+            val ksFile = project.file("release.keystore")
             val storePass = System.getenv("RELEASE_STORE_PASSWORD")?.ifEmpty { null }
                 ?: System.getenv("KEYSTORE_PASSWORD")?.ifEmpty { null }
                 ?: "bilingo123456"
@@ -31,25 +31,18 @@ android {
                 ?: System.getenv("KEY_ALIAS")?.ifEmpty { null }
                 ?: "bilingokey"
 
-            if (ksFile.exists() && ksFile.length() > 100) {
-                storeFile = ksFile
-                storePassword = storePass
-                keyAlias = alias
-                keyPassword = keyPass
-                enableV1Signing = true
-                enableV2Signing = true
-            }
+            storeFile = ksFile
+            storePassword = storePass
+            keyAlias = alias
+            keyPassword = keyPass
+            enableV1Signing = true
+            enableV2Signing = true
         }
     }
 
     buildTypes {
         release {
-            val releaseSigning = signingConfigs.findByName("release")
-            if (releaseSigning?.storeFile?.exists() == true) {
-                signingConfig = releaseSigning
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -57,12 +50,7 @@ android {
             )
         }
         debug {
-            val releaseSigning = signingConfigs.findByName("release")
-            if (releaseSigning?.storeFile?.exists() == true) {
-                signingConfig = releaseSigning
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
         }
     }

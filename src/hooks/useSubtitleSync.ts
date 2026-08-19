@@ -107,14 +107,14 @@ export function useSubtitleSync({
     (window as any).handleNativeSubtitle = (sub: any) => {
       if (sub && sub.id && sub.english && sub.traditionalChinese) {
         setSttConnected(true);
-        ingestSubtitle(sub);
+        ingestSubtitle({ ...sub, isNative: true });
       }
     };
 
     const handleNativeEvent = (e: any) => {
       if (e.detail && e.detail.id && e.detail.english && e.detail.traditionalChinese) {
         setSttConnected(true);
-        ingestSubtitle(e.detail);
+        ingestSubtitle({ ...e.detail, isNative: true });
       }
     };
 

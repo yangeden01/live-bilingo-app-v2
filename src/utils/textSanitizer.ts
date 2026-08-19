@@ -14,14 +14,26 @@ export function sanitizeTranscriptText(text: string): string {
 
   // 2. Remove multi-word phrase repetition loops (e.g., 2 to 6 word chunks repeating >= 2 times)
   // Example: "and set up and set up and set up" -> "and set up"
-  // Example: "and cents and cents" -> "and cents"
+  // Example: "with the 10 the with the 10 the" -> "with the 10 the"
   for (let phraseLen = 6; phraseLen >= 2; phraseLen--) {
-    // Regex matches a sequence of N words repeated 2 or more times
     const pattern = new RegExp(`(\\b(?:\\w+\\s+){${phraseLen - 1}}\\w+)(?:\\s+\\1\\b)+`, 'gi');
     cleaned = cleaned.replace(pattern, '$1');
   }
 
-  // 3. Clean up dangling conjunctions at ends of broken sentences
+  // 3. Remove trailing stutter words if word appears multiple times at end (e.g. "with the 10 the" -> "with the 10")
+  const tokens = cleaned.split(/\s+/);
+  if (tokens.length >= 4) {
+    const lastWord = tokens[tokens.length - 1].toLowerCase();
+    if (['the', 'a', 'an', 'at', 'in', 'on', 'with', 'to', 'of', 'and', 'or'].includes(lastWord)) {
+      const priorMatches = tokens.slice(0, -1).filter(w => w.toLowerCase() === lastWord);
+      if (priorMatches.length >= 2) {
+        tokens.pop();
+        cleaned = tokens.join(' ');
+      }
+    }
+  }
+
+  // 4. Clean up dangling conjunctions at ends of broken sentences
   cleaned = cleaned
     .replace(/,\s*,+/g, ',')
     .replace(/\s+/g, ' ')

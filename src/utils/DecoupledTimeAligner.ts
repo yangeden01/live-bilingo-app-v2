@@ -93,9 +93,11 @@ export class DecoupledTimeAligner {
     const isAlreadyQueued = this.queue.some(q => q.item.id === item.id || (q.item.english === item.english && Math.abs((q.item.createdAt || 0) - (item.createdAt || 0)) < 3000));
     if (isAlreadyQueued) return;
 
-    // Check if subtitle arrived very late (e.g. from history poll), release immediately without artificial delay
+    // Check if subtitle arrived from native Android bridge or late from history poll
     const age = now - (item.createdAt || now);
-    const delay = age > 8000 ? 0 : this.targetBufferDelayMs;
+    const isNative = Boolean((item as any).isNative || (typeof window !== 'undefined' && (window as any).AndroidBridge));
+    const effectiveDelay = isNative ? 500 : this.targetBufferDelayMs;
+    const delay = age > 6000 ? 0 : effectiveDelay;
 
     this.queue.push({
       item: {

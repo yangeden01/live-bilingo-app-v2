@@ -11,6 +11,14 @@ fi
 
 TOKEN="${GITHUB_TOKEN}"
 if [ -z "$TOKEN" ]; then
+  # Fallback to extracting from remote url if already configured
+  REMOTE_URL=$(git remote get-url origin 2>/dev/null || true)
+  if [[ "$REMOTE_URL" =~ https://([^@]+)@github.com ]]; then
+    TOKEN="${BASH_REMATCH[1]}"
+  fi
+fi
+
+if [ -z "$TOKEN" ]; then
   echo "Error: GITHUB_TOKEN is not set in .env or environment."
   exit 1
 fi

@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { SubtitleItem } from '../types';
-import { Clock, Volume2, VolumeX, Bookmark, BookmarkCheck, Zap, Tag } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Clock, Volume2, VolumeX, Bookmark, BookmarkCheck, Tag } from 'lucide-react';
 import { speakText, stopSpeech } from '../utils/tts';
 
 interface Props {
@@ -185,13 +184,6 @@ export const BilingualSubtitleCard: React.FC<Props> = ({
       ? 'bg-slate-100 text-slate-600'
       : 'bg-slate-700/80 text-slate-300';
 
-  const tagBg =
-    theme === 'paper'
-      ? 'bg-amber-100/90 text-amber-900 font-medium'
-      : theme === 'light'
-      ? 'bg-emerald-50 text-emerald-700 font-medium'
-      : 'bg-emerald-950/40 text-emerald-300 font-medium';
-
   const bookmarkBtnClass = subtitle.bookmarked
     ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/30 ring-2 ring-amber-300'
     : theme === 'paper'
@@ -227,7 +219,7 @@ export const BilingualSubtitleCard: React.FC<Props> = ({
 
   return (
     <div
-      className={`rounded-2xl p-4 sm:p-5 shadow-sm border transition-[border-color,box-shadow,background-color] duration-300 hover:shadow-md relative group ${cardBgClass}`}
+      className={`rounded-2xl p-3 sm:p-3.5 shadow-sm border transition-[border-color,box-shadow,background-color] duration-300 hover:shadow-md relative group ${cardBgClass}`}
     >
       {/* Bookmark Index Tab (Pinned on Top-Left Corner Edge, Page-Flag Style) */}
       {segmentNumber !== undefined && (
@@ -242,40 +234,36 @@ export const BilingualSubtitleCard: React.FC<Props> = ({
       )}
 
       {/* Top Bar: Timestamp & Action Buttons */}
-      <div className="flex items-center justify-between mb-3 text-xs opacity-90">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center justify-between mb-1.5 text-xs opacity-90">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {isLatest && !isInterim && (
-            <span className="inline-flex items-center gap-1 font-bold px-2.5 py-0.5 rounded-full text-[11px] bg-rose-500/15 text-rose-500 dark:text-rose-400 border border-rose-500/30">
+            <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] bg-rose-500/15 text-rose-500 dark:text-rose-400 border border-rose-500/30">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping shrink-0" />
               即時廣播
             </span>
           )}
 
           {isInterim && (
-            <span className="inline-flex items-center gap-1 font-bold px-2.5 py-0.5 rounded-full text-[11px] bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 animate-pulse">
+            <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 animate-pulse">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping shrink-0" />
               即時辨識中
             </span>
           )}
 
-          <span className={`inline-flex items-center gap-1 font-mono px-2 py-0.5 rounded-full ${timestampBg}`}>
+          <span className={`inline-flex items-center gap-1 font-mono px-2 py-0.5 rounded-full text-[11px] ${timestampBg}`}>
             <Clock className="w-3 h-3 text-amber-600 dark:text-blue-400" />
             {subtitle.createdAt
               ? new Date(subtitle.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
               : subtitle.timestamp}
           </span>
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] ${tagBg}`}>
-            <Zap className="w-3 h-3 text-emerald-500" />
-            本機即時翻譯
-          </span>
         </div>
 
-        <div className="flex items-center gap-3.5 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           {onBookmarkToggle && (
             <button
               onClick={() => onBookmarkToggle(subtitle.id)}
               title={subtitle.bookmarked ? '已收藏 (點擊取消)' : '收藏此句'}
-              className={`w-11 h-11 sm:w-13 sm:h-12 rounded-2xl transition-all cursor-pointer flex items-center justify-center shadow-sm active:scale-95 ${bookmarkBtnClass}`}
+              className={`w-8.5 h-8.5 sm:w-9.5 sm:h-9.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-sm active:scale-95 ${bookmarkBtnClass}`}
             >
               {subtitle.bookmarked ? (
                 <BookmarkCheck className="w-5 h-5 sm:w-6 sm:h-6 fill-current" />
@@ -289,7 +277,7 @@ export const BilingualSubtitleCard: React.FC<Props> = ({
           <button
             onClick={handleSpeak}
             title={isSpeaking ? '按一下停止朗讀' : '全句英文朗讀 (English TTS)'}
-            className={`w-11 h-11 sm:w-13 sm:h-12 rounded-2xl transition-all cursor-pointer flex items-center justify-center shadow-sm active:scale-95 ${speakBtnClass}`}
+            className={`w-8.5 h-8.5 sm:w-9.5 sm:h-9.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-sm active:scale-95 ${speakBtnClass}`}
           >
             {isSpeaking ? (
               <VolumeX className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -301,14 +289,14 @@ export const BilingualSubtitleCard: React.FC<Props> = ({
       </div>
 
       {/* English Original Transcript with Clickable Words & Search Highlighting */}
-      <div className="mb-2">
+      <div className="mb-1.5">
         <p className={`${englishTextClass} ${fontSizeClasses}`}>
           {renderEnglishText()}
         </p>
       </div>
 
       {/* Traditional Chinese Translation with Search Highlighting */}
-      <div className="pt-1 flex items-start gap-2">
+      <div className="pt-0.5 flex items-start gap-2">
         <div className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${bulletDotClass}`}></div>
         <p className={`${chineseTextClass} ${fontSizeClasses}`}>
           {renderChineseText()}

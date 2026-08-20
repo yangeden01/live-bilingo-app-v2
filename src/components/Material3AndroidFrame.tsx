@@ -760,7 +760,7 @@ export const Material3AndroidFrame: React.FC<Props> = ({
         </AnimatePresence>
 
         {/* Subtitle / History / Bookmark List Container */}
-        <div ref={listContainerRef} className={`flex-1 p-3 sm:p-4 pt-4 sm:pt-5 overflow-y-auto space-y-4 relative transition-colors duration-200 ${listBg}`}>
+        <div ref={listContainerRef} className={`flex-1 p-2.5 sm:p-3.5 pt-2.5 sm:pt-3.5 overflow-y-auto space-y-2.5 sm:space-y-3 relative transition-colors duration-200 ${listBg}`}>
           {filteredSubtitles.length === 0 ? (
             <div className="flex flex-col items-center justify-center min-h-[360px] text-center p-6">
               <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 border ${

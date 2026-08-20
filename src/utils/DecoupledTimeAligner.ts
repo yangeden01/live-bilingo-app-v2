@@ -115,6 +115,11 @@ export class DecoupledTimeAligner {
         this.onInterimCallback(null);
       }
     }
+
+    // Immediately evaluate queue if delay is 0
+    if (delay === 0) {
+      this.tick();
+    }
   }
 
   /**

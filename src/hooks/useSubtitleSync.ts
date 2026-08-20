@@ -28,6 +28,7 @@ export function useSubtitleSync({
   const playbackStatusRef = useRef(playbackStatus);
   const eventSourceRef = useRef<EventSource | null>(null);
   const lastProcessedSubtitleIdRef = useRef<Set<string>>(new Set());
+  const lastSubtitleReceivedTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {
     playbackStatusRef.current = playbackStatus;
@@ -58,6 +59,8 @@ export function useSubtitleSync({
   const ingestSubtitle = useCallback(
     (item: SubtitleItem) => {
       if (!item || !item.id || !item.english) return;
+
+      lastSubtitleReceivedTimeRef.current = Date.now();
 
       // Filter out internal system connection notifications
       if (item.id.startsWith('station-play-') || item.english.includes('Connected to live radio stream')) {
@@ -107,6 +110,7 @@ export function useSubtitleSync({
   useEffect(() => {
     (window as any).handleNativeSubtitle = (sub: any) => {
       if (sub && sub.id && sub.english) {
+        lastSubtitleReceivedTimeRef.current = Date.now();
         const zh = sub.traditionalChinese || sub.english;
         const latencyMs = sub.createdAt ? Math.max(0, Date.now() - Number(sub.createdAt)) : 120;
         recordSttStreamLatency('Android Native STT', latencyMs, {
@@ -122,6 +126,7 @@ export function useSubtitleSync({
     const handleNativeEvent = (e: any) => {
       const sub = e.detail;
       if (sub && sub.id && sub.english) {
+        lastSubtitleReceivedTimeRef.current = Date.now();
         const zh = sub.traditionalChinese || sub.english;
         const latencyMs = sub.createdAt ? Math.max(0, Date.now() - Number(sub.createdAt)) : 120;
         recordSttStreamLatency('Android Native STT', latencyMs, {
@@ -140,6 +145,7 @@ export function useSubtitleSync({
       } else if (e.data?.type === 'NEW_SUBTITLE' && e.data?.data) {
         const sub = e.data.data;
         if (sub && sub.id && sub.english) {
+          lastSubtitleReceivedTimeRef.current = Date.now();
           const zh = sub.traditionalChinese || sub.english;
           const latencyMs = sub.createdAt ? Math.max(0, Date.now() - Number(sub.createdAt)) : 120;
           recordSttStreamLatency('Android Native STT', latencyMs, {
@@ -355,19 +361,18 @@ export function useSubtitleSync({
     livenessWatchdogInterval = setInterval(() => {
       if (playbackStatusRef.current === 'PLAYING') {
         const now = Date.now();
-        if (now - lastSubtitleReceivedTime > 18000) {
-          console.log('[Subtitle Watchdog] Stalled subtitle flow detected (>18s). Re-syncing STT pipeline...');
+        const isNativeApp = typeof window !== 'undefined' && !!(window as any).AndroidBridge;
+
+        // In Native Android APK mode, RadioStreamSttManager has its own independent audio packet watchdog.
+        // We only trigger web server notification if non-native web mode is stalled > 30s.
+        if (!isNativeApp && now - lastSubtitleReceivedTimeRef.current > 30000) {
+          console.log('[Subtitle Watchdog] Stalled web subtitle flow detected (>30s). Re-syncing STT pipeline...');
+          lastSubtitleReceivedTimeRef.current = now;
           safeApiFetch('/api/notify-station-playing', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: activeStation.streamUrl, name: activeStation.name, forceRestart: true }),
           }).catch(() => {});
-
-          try {
-            if ((window as any).AndroidBridge?.onNetworkRestored) {
-              (window as any).AndroidBridge.onNetworkRestored();
-            }
-          } catch (e) {}
 
           pollSubtitles(true);
           if (!es || es.readyState === EventSource.CLOSED) {
@@ -380,7 +385,7 @@ export function useSubtitleSync({
     const triggerComprehensiveSubtitleRecovery = () => {
       console.log('[Subtitle Sync] Restoring subtitle sync across SSE, Android Bridge & REST polling...');
       lastPollTimestamp = Math.max(0, Date.now() - 6000);
-      lastSubtitleReceivedTime = Date.now();
+      lastSubtitleReceivedTimeRef.current = Date.now();
 
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);

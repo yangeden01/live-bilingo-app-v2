@@ -94,6 +94,17 @@ export function useRadioAudio({
         isReconnectingRef.current = false;
         retryCountRef.current = 0;
         onStartVisualizerRef.current?.();
+
+        try {
+          if ((window as any).AndroidBridge?.onStationPlaybackChanged) {
+            (window as any).AndroidBridge.onStationPlaybackChanged(
+              activeStationRef.current.streamUrl,
+              activeStationRef.current.name,
+              true
+            );
+          }
+        } catch (e) {}
+
         window.dispatchEvent(new CustomEvent('scroll-to-subtitles'));
       }
     } catch (err: any) {
@@ -339,6 +350,16 @@ export function useRadioAudio({
         audioRef.current.pause();
       }
       onClearSubtitleQueueRef.current?.();
+
+      try {
+        if ((window as any).AndroidBridge?.onStationPlaybackChanged) {
+          (window as any).AndroidBridge.onStationPlaybackChanged(
+            activeStationRef.current.streamUrl,
+            activeStationRef.current.name,
+            false
+          );
+        }
+      } catch (e) {}
     } else {
       onClearSubtitleQueueRef.current?.();
 
@@ -348,6 +369,16 @@ export function useRadioAudio({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: activeStationRef.current.streamUrl, name: activeStationRef.current.name }),
       }).catch(() => {});
+
+      try {
+        if ((window as any).AndroidBridge?.onStationPlaybackChanged) {
+          (window as any).AndroidBridge.onStationPlaybackChanged(
+            activeStationRef.current.streamUrl,
+            activeStationRef.current.name,
+            true
+          );
+        }
+      } catch (e) {}
 
       playbackStatusRef.current = 'BUFFERING';
       setPlaybackStatus('BUFFERING');

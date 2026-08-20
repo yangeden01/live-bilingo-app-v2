@@ -12,6 +12,7 @@ import { getApiUrl } from './utils/apiUrl';
 import { safeApiFetch } from './utils/safeFetch';
 import { vibrateGitPushSuccess, vibrateZipExportSuccess } from './utils/haptics';
 import { sanitizeTranscriptText, isHallucinationLoop } from './utils/textSanitizer';
+import { getPersistentItem, setPersistentItem } from './utils/persistentStorage';
 import { Radio, Code2, Smartphone, Cpu, CheckCircle2, Sparkles, Volume2, ShieldCheck, Download, ListMusic, BookOpen, RefreshCw, Copy, Play, Pause, Sun, Moon, Bell, Power } from 'lucide-react';
 
 const DEFAULT_STATIONS: RadioStation[] = [
@@ -362,7 +363,7 @@ export default function App() {
 
   const [stations, setStations] = useState<RadioStation[]>(() => {
     try {
-      const saved = localStorage.getItem('live_bilingo_stations');
+      const saved = getPersistentItem('live_bilingo_stations');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length === 5) {
@@ -375,8 +376,8 @@ export default function App() {
 
   const [activeStation, setActiveStation] = useState<RadioStation>(() => {
     try {
-      const savedId = localStorage.getItem('live_bilingo_active_station_id');
-      const savedStations = localStorage.getItem('live_bilingo_stations');
+      const savedId = getPersistentItem('live_bilingo_active_station_id');
+      const savedStations = getPersistentItem('live_bilingo_stations');
       const stationList: RadioStation[] = savedStations ? JSON.parse(savedStations) : DEFAULT_STATIONS;
       if (savedId) {
         const found = stationList.find((s) => s.id === savedId);
@@ -386,11 +387,11 @@ export default function App() {
     return DEFAULT_STATIONS[0];
   });
 
-  // Persist stations and activeStation ID to localStorage whenever changed
+  // Persist stations and activeStation ID to persistent storage whenever changed
   useEffect(() => {
     try {
       if (stations && stations.length > 0) {
-        localStorage.setItem('live_bilingo_stations', JSON.stringify(stations));
+        setPersistentItem('live_bilingo_stations', JSON.stringify(stations));
       }
     } catch (e) {}
   }, [stations]);
@@ -398,7 +399,7 @@ export default function App() {
   useEffect(() => {
     try {
       if (activeStation?.id) {
-        localStorage.setItem('live_bilingo_active_station_id', activeStation.id);
+        setPersistentItem('live_bilingo_active_station_id', activeStation.id);
       }
     } catch (e) {}
   }, [activeStation]);
@@ -409,7 +410,7 @@ export default function App() {
   // Global Reading Mode State (Auto System + Ambient Light Sensor | Paper | Light | Dark)
   const [readingMode, setReadingMode] = useState<ReadingMode>(() => {
     try {
-      const saved = localStorage.getItem('radio_reading_mode');
+      const saved = getPersistentItem('radio_reading_mode');
       if (saved === 'system' || saved === 'paper' || saved === 'light' || saved === 'dark') {
         return saved;
       }
@@ -428,7 +429,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('radio_reading_mode', readingMode);
+      setPersistentItem('radio_reading_mode', readingMode);
     } catch (e) {}
 
     if (typeof window === 'undefined') return;
@@ -557,10 +558,10 @@ export default function App() {
     }
   }, [activeStation]);
 
-  // Real-time live broadcast subtitles with localStorage cache persistence across version updates
+  // Real-time live broadcast subtitles with persistent storage across app restarts and updates
   const [subtitles, setSubtitles] = useState<SubtitleItem[]>(() => {
     try {
-      const saved = localStorage.getItem('radio_subtitles_cache');
+      const saved = getPersistentItem('radio_subtitles_cache');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -603,7 +604,7 @@ export default function App() {
   // Current real-time streaming partial subtitle (interim)
   const [interimSubtitle, setInterimSubtitle] = useState<SubtitleItem | null>(null);
 
-  // Refresh top subtitle timestamp on startup so user sees current local time & signal Android bridge page ready
+  // Refresh top subtitle timestamp on startup, signal Android bridge page ready, & sync native persistent storage
   useEffect(() => {
     try {
       if ((window as any).AndroidBridge?.onPageReady) {
@@ -612,6 +613,23 @@ export default function App() {
     } catch (e) {
       console.warn('AndroidBridge call error:', e);
     }
+
+    // Double check if native AndroidBridge has cached subtitles and current state is only defaults
+    try {
+      const nativeSaved = (window as any).AndroidBridge?.getPersistentData?.('radio_subtitles_cache');
+      if (nativeSaved) {
+        const parsed = JSON.parse(nativeSaved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSubtitles((prev) => {
+            const hasOnlyInit = prev.every((item) => item.id.startsWith('init-default-'));
+            if (hasOnlyInit) {
+              return parsed;
+            }
+            return prev;
+          });
+        }
+      }
+    } catch (_) {}
 
     setSubtitles((prev) => {
       if (!prev || prev.length === 0) return prev;
@@ -631,10 +649,10 @@ export default function App() {
     });
   }, []);
 
-  // Persist subtitles in localStorage whenever updated
+  // Persist subtitles in persistent storage whenever updated
   useEffect(() => {
     try {
-      localStorage.setItem('radio_subtitles_cache', JSON.stringify(subtitles));
+      setPersistentItem('radio_subtitles_cache', JSON.stringify(subtitles));
     } catch (e) {
       console.warn('Failed to save subtitles cache:', e);
     }
@@ -765,7 +783,7 @@ export default function App() {
     setSubtitles((prev) => {
       const updated = prev.map((item) => ({ ...item, bookmarked: false }));
       try {
-        localStorage.setItem('radio_subtitles_cache', JSON.stringify(updated));
+        setPersistentItem('radio_subtitles_cache', JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
@@ -776,7 +794,7 @@ export default function App() {
       // Independently preserve all bookmarked subtitles when clearing history
       const bookmarkedOnly = prev.filter((item) => item.bookmarked);
       try {
-        localStorage.setItem('radio_subtitles_cache', JSON.stringify(bookmarkedOnly));
+        setPersistentItem('radio_subtitles_cache', JSON.stringify(bookmarkedOnly));
       } catch (e) {}
       return bookmarkedOnly;
     });

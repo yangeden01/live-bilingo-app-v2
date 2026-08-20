@@ -325,7 +325,10 @@ class AppErrorBoundary extends (React.Component as any) {
 let mountRetryCount = 0;
 const MAX_MOUNT_RETRIES = 10;
 
+let isAppMounted = false;
+
 function mountApp() {
+  if (isAppMounted) return;
   logToNative('log', `mountApp() triggered. Retry attempt: ${mountRetryCount}`);
   let rootElement = document.getElementById('root');
 
@@ -348,6 +351,7 @@ function mountApp() {
   }
 
   try {
+    isAppMounted = true;
     logToNative('log', 'Creating React root and rendering App...');
     const root = createRoot(rootElement);
     root.render(
@@ -370,6 +374,7 @@ function mountApp() {
       }
     }
   } catch (err) {
+    isAppMounted = false;
     logToNative('error', 'Critical error during mountApp createRoot render:', err);
 
     if (rootElement) {
@@ -391,7 +396,11 @@ function mountApp() {
   }
 }
 
-mountApp();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', mountApp, { once: true });
+} else {
+  mountApp();
+}
 
 
 

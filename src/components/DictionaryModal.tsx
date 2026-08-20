@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { speakText, stopSpeech } from '../utils/tts';
 import { getApiUrl } from '../utils/apiUrl';
 import { safeApiFetch } from '../utils/safeFetch';
+import { getPersistentItem, setPersistentItem } from '../utils/persistentStorage';
 
 interface DictionaryMeaning {
   partOfSpeech: string;
@@ -94,7 +95,8 @@ export const DictionaryModal: React.FC<Props> = ({ isOpen, onClose, initialWord 
 
   const [savedWords, setSavedWords] = useState<string[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem('saved_dict_words') || '[]');
+      const saved = getPersistentItem('saved_dict_words');
+      return saved ? JSON.parse(saved) : [];
     } catch (e) {
       return [];
     }
@@ -287,7 +289,7 @@ export const DictionaryModal: React.FC<Props> = ({ isOpen, onClose, initialWord 
       const isSaved = prev.includes(word);
       const updated = isSaved ? prev.filter((w) => w !== word) : [...prev, word];
       try {
-        localStorage.setItem('saved_dict_words', JSON.stringify(updated));
+        setPersistentItem('saved_dict_words', JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });

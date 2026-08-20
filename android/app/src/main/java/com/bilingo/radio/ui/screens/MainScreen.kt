@@ -306,6 +306,26 @@ class WebAppInterface(
     }
 
     @JavascriptInterface
+    fun savePersistentData(key: String, value: String) {
+        try {
+            val prefs = context.getSharedPreferences("bilingo_persistent_data", Context.MODE_PRIVATE)
+            prefs.edit().putString(key, value).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    @JavascriptInterface
+    fun getPersistentData(key: String): String {
+        return try {
+            val prefs = context.getSharedPreferences("bilingo_persistent_data", Context.MODE_PRIVATE)
+            prefs.getString(key, "") ?: ""
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    @JavascriptInterface
     fun exitApp(clearCache: Boolean) {
         Handler(Looper.getMainLooper()).post {
             try {
@@ -315,10 +335,8 @@ class WebAppInterface(
 
                 if (clearCache) {
                     try {
+                        // Only clear temporary web cache if explicitly asked, but NEVER delete WebStorage / LocalStorage / SharedPreferences
                         getWebView()?.clearCache(true)
-                        context.findMainActivity()?.activeWebView?.clearCache(true)
-                        android.webkit.WebStorage.getInstance().deleteAllData()
-                        context.cacheDir.deleteRecursively()
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
@@ -569,10 +587,27 @@ fun MainScreen(
                                 }
                                 return true
                             }
+                            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                                super.onPageStarted(view, url, favicon)
+                                try {
+                                    view?.resumeTimers()
+                                } catch (_: Exception) {}
+                            }
+
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                try {
+                                    view?.resumeTimers()
+                                } catch (_: Exception) {}
+                            }
                         }
 
                         webViewInstance = this
                         (ctx as? MainActivity)?.activeWebView = this
+                        try {
+                            resumeTimers()
+                            onResume()
+                        } catch (_: Exception) {}
                         loadUrl(localAppUrl)
                     }
                 } catch (e: Exception) {

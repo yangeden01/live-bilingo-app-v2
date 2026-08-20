@@ -265,10 +265,26 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        try {
+            activeWebView?.resumeTimers()
+            activeWebView?.onResume()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         appUpdateManager?.appUpdateInfo?.addOnSuccessListener { appUpdateInfo ->
             if (appUpdateInfo.installStatus() == InstallStatus.DOWNLOADED) {
                 appUpdateManager?.completeUpdate()
             }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        try {
+            activeWebView?.onPause()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -284,7 +300,7 @@ class MainActivity : ComponentActivity() {
             activeWebView?.apply {
                 loadUrl("about:blank")
                 stopLoading()
-                pauseTimers()
+                // Do NOT call pauseTimers() as it freezes JS timers process-wide for subsequent Activity restarts
                 destroy()
             }
             activeWebView = null

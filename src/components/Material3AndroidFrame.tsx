@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { playBeanWallImpactSound } from '../utils/sound';
+import { getPersistentItem, setPersistentItem } from '../utils/persistentStorage';
 
 interface Props {
   subtitles: SubtitleItem[];
@@ -77,7 +78,7 @@ export const Material3AndroidFrame: React.FC<Props> = ({
   } | null>(null);
   const [fontSize, setFontSize] = useState<'small' | 'medium' | 'large'>(() => {
     try {
-      const saved = localStorage.getItem('radio_subtitle_font_size');
+      const saved = getPersistentItem('radio_subtitle_font_size');
       if (saved === 'small' || saved === 'medium' || saved === 'large') return saved;
     } catch (e) {}
     return 'small';
@@ -85,7 +86,7 @@ export const Material3AndroidFrame: React.FC<Props> = ({
 
   const [localReadingMode, setLocalReadingMode] = useState<ReadingMode>(() => {
     try {
-      const saved = localStorage.getItem('radio_reading_mode');
+      const saved = getPersistentItem('radio_reading_mode');
       if (saved === 'system' || saved === 'paper' || saved === 'light' || saved === 'dark') {
         return saved;
       }
@@ -113,7 +114,7 @@ export const Material3AndroidFrame: React.FC<Props> = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem('radio_reading_mode', readingMode);
+      setPersistentItem('radio_reading_mode', readingMode);
     } catch (e) {}
 
     if (typeof window === 'undefined') return;
@@ -189,14 +190,14 @@ export const Material3AndroidFrame: React.FC<Props> = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem('radio_subtitle_font_size', fontSize);
+      setPersistentItem('radio_subtitle_font_size', fontSize);
     } catch (e) {}
   }, [fontSize]);
   const [sortAscending, setSortAscending] = useState(false); // false = newest first, true = oldest first
   const [liveClearedAt, setLiveClearedAt] = useState<number | null>(null);
   const [historyClearedAt, setHistoryClearedAt] = useState<number | null>(() => {
     try {
-      const saved = localStorage.getItem('radio_history_cleared_at');
+      const saved = getPersistentItem('radio_history_cleared_at');
       if (saved) return Number(saved) || null;
     } catch (e) {}
     return null;
@@ -1003,7 +1004,7 @@ export const Material3AndroidFrame: React.FC<Props> = ({
                         const now = Date.now();
                         setHistoryClearedAt(now);
                         try {
-                          localStorage.setItem('radio_history_cleared_at', now.toString());
+                          setPersistentItem('radio_history_cleared_at', now.toString());
                         } catch (e) {}
                         onClearSubtitles();
                         setLiveClearedAt(null);

@@ -960,9 +960,8 @@ function startBackendDeepgramStreaming(streamUrl = currentRadioStreamUrl) {
     }
     const wsClosed = !deepgramWs || deepgramWs.readyState !== import_ws.default.OPEN;
     const audioStalled = Date.now() - lastAudioDataTime > 15e3;
-    const transcriptStalled = isStreamingActive && Date.now() - lastTranscriptTime > 25e3;
-    if (wsClosed || audioStalled || transcriptStalled) {
-      console.warn(`[Watchdog] Session #${activeSessionId} stalled (wsClosed: ${wsClosed}, audioStalled: ${audioStalled}, transcriptStalled: ${transcriptStalled}). Force re-initializing STT stream...`);
+    if (wsClosed || audioStalled) {
+      console.warn(`[Watchdog] Session #${activeSessionId} stalled (wsClosed: ${wsClosed}, audioStalled: ${audioStalled}). Force re-initializing STT stream...`);
       if (pendingTranscriptBuffer && pendingTranscriptBuffer.trim()) {
         flushTranscriptParagraph(true);
       }

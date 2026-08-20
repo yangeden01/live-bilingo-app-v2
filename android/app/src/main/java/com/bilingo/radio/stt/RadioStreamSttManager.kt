@@ -78,6 +78,7 @@ class RadioStreamSttManager(
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(0, TimeUnit.MILLISECONDS) // Infinite read timeout for continuous radio broadcast stream
                 .writeTimeout(15, TimeUnit.SECONDS)
+                .pingInterval(5, TimeUnit.SECONDS)
                 .followRedirects(true)
                 .followSslRedirects(true)
                 .retryOnConnectionFailure(true)
@@ -186,10 +187,9 @@ class RadioStreamSttManager(
                 val now = System.currentTimeMillis()
                 val audioStalled = (now - lastAudioDataTime > 15000)
                 val wsDisconnected = (webSocket == null)
-                val transcriptStalled = isRunning && (now - lastTranscriptTime > 25000)
 
-                if (audioStalled || wsDisconnected || transcriptStalled) {
-                    android.util.Log.w("RadioStreamSttManager", "Watchdog triggered: audioStalled=$audioStalled, wsDisconnected=$wsDisconnected, transcriptStalled=$transcriptStalled. Reconnecting STT stream...")
+                if (audioStalled || wsDisconnected) {
+                    android.util.Log.w("RadioStreamSttManager", "Watchdog triggered: audioStalled=$audioStalled, wsDisconnected=$wsDisconnected. Reconnecting STT stream...")
                     if (currentRadioStreamUrl.isNotBlank() && isRunning) {
                         // Immediately reset timestamps to prevent repeating watchdog triggers while reconnecting
                         lastAudioDataTime = now
@@ -438,8 +438,8 @@ class RadioStreamSttManager(
                 val elapsedMs = System.currentTimeMillis() - bufferStartTime
 
                 // PRIORITY: Complete fluent sentences for optimal language learning.
-                // 1. If sentence boundary (. ? !) found and has >= 8 words (or speech_final) -> flush immediately
-                if ((hasSentenceEnd && wordCount >= 8) || isSpeechFinal) {
+                // 1. If sentence boundary (. ? !) found and has >= 5 words (or speech_final) -> flush immediately
+                if ((hasSentenceEnd && wordCount >= 5) || isSpeechFinal) {
                     flushPendingBuffer(forceAll = isSpeechFinal)
                 } else if (elapsedMs >= 6500 || wordCount >= 22) {
                     // 2. Continuous sentence duration exceeded 6.5s or 22 words -> flush at clause boundary

@@ -15,11 +15,29 @@ class LiveBilingoApp : Application() {
         // 1. Install Global Uncaught Exception Handler to prevent hard OS crash popups
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            Log.e("LiveBilingoApp", "Uncaught exception caught on thread ${thread.name}: ${throwable.message}", throwable)
+            val message = throwable.message ?: ""
+            val isIgnorable = throwable is IllegalStateException && (
+                message.contains("ForegroundService", ignoreCase = true) ||
+                message.contains("WebView", ignoreCase = true) ||
+                message.contains("Not allowed to start service", ignoreCase = true)
+            ) || throwable is android.os.DeadSystemException ||
+            throwable is java.io.IOException ||
+            message.contains("RenderProcessGone", ignoreCase = true)
+
+            Log.e("LiveBilingoApp", "Uncaught exception on thread ${thread.name} (ignorable=$isIgnorable): ${throwable.message}", throwable)
+
+            if (isIgnorable || thread.name != "main") {
+                // Recover safely from non-fatal background/service/WebView crashes without killing the process with OS crash dialog
+                Log.w("LiveBilingoApp", "Suppressed non-fatal uncaught exception to preserve user session.")
+                return@setDefaultUncaughtExceptionHandler
+            }
+
             try {
-                // Safely log and fallback rather than crashing OS process abruptly
-            } catch (_: Exception) {}
-            defaultHandler?.uncaughtException(thread, throwable)
+                // If a fatal main-thread error occurs, cleanly finish or pass to default handler
+                defaultHandler?.uncaughtException(thread, throwable)
+            } catch (e: Exception) {
+                Log.e("LiveBilingoApp", "Error in defaultHandler: ${e.message}")
+            }
         }
 
         // 2. Pre-create Notification Channel

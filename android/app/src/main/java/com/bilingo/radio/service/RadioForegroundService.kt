@@ -314,12 +314,10 @@ class RadioForegroundService : Service() {
             lastStation = ""
             lastPlaying = null
             try {
-                val intent = Intent(context, RadioForegroundService::class.java).apply {
-                    action = ACTION_STOP
-                }
-                context.startService(intent)
+                // Safely invoke stopService directly to avoid background startService IllegalStateException
+                context.stopService(Intent(context, RadioForegroundService::class.java))
             } catch (e: Throwable) {
-                android.util.Log.e("RadioForegroundService", "Failed to stop service", e)
+                android.util.Log.w("RadioForegroundService", "Failed to stop service directly: ${e.message}")
             }
         }
     }

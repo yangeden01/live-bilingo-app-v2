@@ -263,6 +263,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        try {
+            activeWebView?.resumeTimers()
+            activeWebView?.onResume()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         try {
@@ -297,10 +308,15 @@ class MainActivity : ComponentActivity() {
             e.printStackTrace()
         }
         try {
+            activeWebAppInterface?.destroy()
+            activeWebAppInterface = null
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        try {
             activeWebView?.apply {
-                loadUrl("about:blank")
+                (parent as? android.view.ViewGroup)?.removeView(this)
                 stopLoading()
-                // Do NOT call pauseTimers() as it freezes JS timers process-wide for subsequent Activity restarts
                 destroy()
             }
             activeWebView = null

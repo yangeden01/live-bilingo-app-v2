@@ -56,6 +56,9 @@ class WebAppInterface(
     private val onRetry: () -> Unit,
     private val onAppLoaded: () -> Unit
 ) {
+    @Volatile
+    var isDestroyed = false
+
     private var tts: android.speech.tts.TextToSpeech? = null
     private var isTtsReady = false
     private var isTtsInitializing = false
@@ -63,47 +66,66 @@ class WebAppInterface(
 
     init {
         sttManager.onSubtitleListener = { subtitle ->
-            Handler(Looper.getMainLooper()).post {
-                try {
-                    val webView = getWebView() ?: context.findMainActivity()?.activeWebView ?: return@post
-                    val escapedEn = org.json.JSONObject.quote(subtitle.english)
-                    val escapedZh = org.json.JSONObject.quote(subtitle.traditionalChinese)
-                    val jsCode = """
-                        (function() {
-                            const sub = {
-                                id: '${subtitle.id}',
-                                timestamp: '${subtitle.timestamp}',
-                                createdAt: ${subtitle.createdAt},
-                                english: $escapedEn,
-                                traditionalChinese: $escapedZh,
-                                isFinal: true,
-                                isNative: true
-                            };
-                            if (window.handleNativeSubtitle) {
-                                window.handleNativeSubtitle(sub);
-                            }
-                            window.dispatchEvent(new CustomEvent('native-subtitle', { detail: sub }));
-                            window.postMessage({ type: 'NEW_SUBTITLE', data: sub }, '*');
-                        })();
-                    """.trimIndent()
-                    webView.evaluateJavascript(jsCode, null)
-                } catch (e: Exception) {
-                    android.util.Log.e("WebAppInterface", "Error sending subtitle to WebView: ${e.message}")
+            if (!isDestroyed) {
+                Handler(Looper.getMainLooper()).post {
+                    if (isDestroyed) return@post
+                    try {
+                        val webView = getWebView() ?: context.findMainActivity()?.activeWebView ?: return@post
+                        val escapedEn = org.json.JSONObject.quote(subtitle.english)
+                        val escapedZh = org.json.JSONObject.quote(subtitle.traditionalChinese)
+                        val jsCode = """
+                            (function() {
+                                const sub = {
+                                    id: '${subtitle.id}',
+                                    timestamp: '${subtitle.timestamp}',
+                                    createdAt: ${subtitle.createdAt},
+                                    english: $escapedEn,
+                                    traditionalChinese: $escapedZh,
+                                    isFinal: true,
+                                    isNative: true
+                                };
+                                if (window.handleNativeSubtitle) {
+                                    window.handleNativeSubtitle(sub);
+                                }
+                                window.dispatchEvent(new CustomEvent('native-subtitle', { detail: sub }));
+                                window.postMessage({ type: 'NEW_SUBTITLE', data: sub }, '*');
+                            })();
+                        """.trimIndent()
+                        webView.evaluateJavascript(jsCode, null)
+                    } catch (e: Throwable) {
+                        android.util.Log.w("WebAppInterface", "Error sending subtitle to WebView: ${e.message}")
+                    }
                 }
             }
         }
 
         sttManager.onConnectionStateListener = { connected ->
-            Handler(Looper.getMainLooper()).post {
-                try {
-                    val webView = getWebView() ?: context.findMainActivity()?.activeWebView ?: return@post
-                    webView.evaluateJavascript(
-                        "window.postMessage({ type: 'STT_CONNECTION_STATE', connected: $connected }, '*');",
-                        null
-                    )
-                } catch (_: Exception) {}
+            if (!isDestroyed) {
+                Handler(Looper.getMainLooper()).post {
+                    if (isDestroyed) return@post
+                    try {
+                        val webView = getWebView() ?: context.findMainActivity()?.activeWebView ?: return@post
+                        webView.evaluateJavascript(
+                            "window.postMessage({ type: 'STT_CONNECTION_STATE', connected: $connected }, '*');",
+                            null
+                        )
+                    } catch (_: Throwable) {}
+                }
             }
         }
+    }
+
+    fun destroy() {
+        isDestroyed = true
+        try {
+            sttManager.stop()
+        } catch (_: Exception) {}
+        try {
+            tts?.stop()
+            tts?.shutdown()
+            tts = null
+            isTtsReady = false
+        } catch (_: Exception) {}
     }
 
     private fun ensureTtsInitialized(onReady: (() -> Unit)? = null) {

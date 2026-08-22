@@ -1,6 +1,6 @@
 {
   "name": "Live Bilingo 雙語電台",
-  "description": "即時廣播與AI雙語字幕電台應用程式 v2.2.5 (修復APK升級覆蓋安裝與雙語字幕即時更新通道)",
+  "description": "即時廣播與AI雙語字幕電台應用程式 v2.2.6 (修復背景喚醒崩潰與Activity重啟生命週期防護)",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

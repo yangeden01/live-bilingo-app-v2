@@ -7,6 +7,7 @@ import { triggerAutoDebug } from './utils/safeFetch.ts';
 // STT Stream Latency Telemetry Interfaces
 export interface SttLatencyMetric {
   id: string;
+  subtitleId?: string;
   source: string;
   latencyMs: number;
   textSnippet: string;
@@ -52,7 +53,8 @@ export function recordSttStreamLatency(
     : '';
 
   const metric: SttLatencyMetric = {
-    id: info?.id || `stt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: `metric-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    subtitleId: info?.id,
     source,
     latencyMs: safeLatency,
     textSnippet: snippet,

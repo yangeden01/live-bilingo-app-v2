@@ -37,9 +37,8 @@ export function SttLatencyDebugPanel({ sttConnected, activeStationName }: SttLat
     const fetchStatus = async () => {
       try {
         const res = await safeApiFetch('/api/stt-status', { cache: 'no-store' });
-        if (res.ok) {
-          const data = await res.json();
-          setSttStatus(data);
+        if (res.ok && res.data) {
+          setSttStatus(res.data);
         }
       } catch (_) {}
 
@@ -380,7 +379,7 @@ export function SttLatencyDebugPanel({ sttConnected, activeStationName }: SttLat
               <div className="max-h-28 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/50 divide-y divide-slate-850 text-[11px] font-mono">
                 {stats?.history && stats.history.length > 0 ? (
                   stats.history.slice(0, 8).map((item, idx) => (
-                    <div key={item.id || idx} className="p-1.5 flex items-center justify-between gap-2 hover:bg-slate-800/40">
+                    <div key={`${item.id || 'metric'}-${item.timestamp}-${idx}`} className="p-1.5 flex items-center justify-between gap-2 hover:bg-slate-800/40">
                       <div className="flex items-center gap-1.5 min-w-0 truncate">
                         <span className="text-slate-500 text-[10px]">
                           {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}

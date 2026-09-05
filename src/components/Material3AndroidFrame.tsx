@@ -438,7 +438,12 @@ export const Material3AndroidFrame: React.FC<Props> = ({
   // Filter subtitles based on active tab, live clearing timestamp, history clearing timestamp, and search query
   const filteredSubtitles = useMemo(() => {
     if (activeTab === 'vocab') return [];
+    const seenIds = new Set<string>();
     return subtitles.filter((item) => {
+      if (!item || !item.id) return false;
+      if (seenIds.has(item.id)) return false;
+      seenIds.add(item.id);
+
       // 1. Live tab timestamp clear check
       if (activeTab === 'live') {
         if (liveClearedAt && item.createdAt && item.createdAt <= liveClearedAt) {
@@ -1476,7 +1481,7 @@ export const Material3AndroidFrame: React.FC<Props> = ({
 
                   return (
                     <div
-                      key={subtitle.id}
+                      key={`${subtitle.id}-${index}`}
                       className="flex flex-col gap-2.5 sm:gap-3"
                     >
                       <BilingualSubtitleCard

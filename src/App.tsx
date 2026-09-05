@@ -613,9 +613,19 @@ export default function App() {
             .filter((item: SubtitleItem) => !isHallucinationLoop(item.english) && item.english.length >= 4);
 
           if (cleanedList.length > 0) {
+            // Guarantee 100% uniqueness by subtitle id on initial load
+            const seenIds = new Set<string>();
+            const dedupedList: SubtitleItem[] = [];
+            for (const item of cleanedList) {
+              if (item && item.id && !seenIds.has(item.id)) {
+                seenIds.add(item.id);
+                dedupedList.push(item);
+              }
+            }
+
             // Ensure permanent ad attachment is assigned to older cached items according to 15:1 ratio
-            const total = cleanedList.length;
-            cleanedList.forEach((item: SubtitleItem, revIdx: number) => {
+            const total = dedupedList.length;
+            dedupedList.forEach((item: SubtitleItem, revIdx: number) => {
               const chronIdx = total - 1 - revIdx;
               if ((chronIdx + 1) >= 15 && (chronIdx + 1) % 15 === 0) {
                 item.hasAttachedAd = true;
@@ -626,7 +636,7 @@ export default function App() {
                 delete (item as any).adIndex;
               }
             });
-            return cleanedList;
+            return dedupedList;
           }
         }
       }
@@ -672,10 +682,18 @@ export default function App() {
       if (nativeSaved) {
         const parsed = JSON.parse(nativeSaved);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          const seenNative = new Set<string>();
+          const dedupedNative: SubtitleItem[] = [];
+          for (const item of parsed) {
+            if (item && item.id && !seenNative.has(item.id)) {
+              seenNative.add(item.id);
+              dedupedNative.push(item);
+            }
+          }
           setSubtitles((prev) => {
             const hasOnlyInit = prev.every((item) => item.id.startsWith('init-default-'));
-            if (hasOnlyInit) {
-              return parsed;
+            if (hasOnlyInit && dedupedNative.length > 0) {
+              return dedupedNative;
             }
             return prev;
           });
@@ -760,7 +778,8 @@ export default function App() {
               ...cleanItem,
               bookmarked: topItem.bookmarked || cleanItem.bookmarked,
             };
-            updated = [updatedTop, ...prev.slice(1)];
+            const remaining = prev.slice(1).filter((s) => s.id !== updatedTop.id);
+            updated = [updatedTop, ...remaining];
             return updated;
           }
 
@@ -801,19 +820,30 @@ export default function App() {
           cleanItem.attachedAdIndex = (Math.floor(newTotalCount / 15) - 1) % 5;
         }
 
-        // Insert new clean subtitle at the beginning
-        updated = [cleanItem, ...prev];
+        // Insert new clean subtitle at the beginning, guaranteeing no duplicate cleanItem.id
+        const filteredPrev = prev.filter((s) => s.id !== cleanItem.id);
+        updated = [cleanItem, ...filteredPrev];
+      }
+
+      // Guarantee 100% uniqueness of subtitle.id across all items
+      const uniqueSeen = new Set<string>();
+      const strictlyUnique: SubtitleItem[] = [];
+      for (const s of updated) {
+        if (s && s.id && !uniqueSeen.has(s.id)) {
+          uniqueSeen.add(s.id);
+          strictlyUnique.push(s);
+        }
       }
 
       // Preserve up to 500 history items + keep all bookmarked items indefinitely
-      if (updated.length > 500) {
-        const bookmarked = updated.filter((s) => s.bookmarked);
-        const nonBookmarked = updated.filter((s) => !s.bookmarked).slice(0, 500 - bookmarked.length);
+      if (strictlyUnique.length > 500) {
+        const bookmarked = strictlyUnique.filter((s) => s.bookmarked);
+        const nonBookmarked = strictlyUnique.filter((s) => !s.bookmarked).slice(0, 500 - bookmarked.length);
         const combined = [...bookmarked, ...nonBookmarked];
         combined.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         return combined;
       }
-      return updated;
+      return strictlyUnique;
     });
   }, []);
 

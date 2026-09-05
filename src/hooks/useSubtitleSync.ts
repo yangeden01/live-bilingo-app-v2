@@ -80,14 +80,14 @@ export function useSubtitleSync({
         english: cleanedEnglish,
       };
 
-      // De-duplicate final subtitles (keep memory size capped at 100)
-      if (sanitizedItem.isFinal) {
-        if (lastProcessedSubtitleIdRef.current.has(sanitizedItem.id)) return;
-        lastProcessedSubtitleIdRef.current.add(sanitizedItem.id);
-        if (lastProcessedSubtitleIdRef.current.size > 100) {
-          const firstKey = lastProcessedSubtitleIdRef.current.values().next().value;
-          if (firstKey) lastProcessedSubtitleIdRef.current.delete(firstKey);
-        }
+      // De-duplicate incoming subtitles across all channels (keep memory size capped at 300)
+      if (lastProcessedSubtitleIdRef.current.has(sanitizedItem.id)) {
+        return;
+      }
+      lastProcessedSubtitleIdRef.current.add(sanitizedItem.id);
+      if (lastProcessedSubtitleIdRef.current.size > 300) {
+        const firstKey = lastProcessedSubtitleIdRef.current.values().next().value;
+        if (firstKey) lastProcessedSubtitleIdRef.current.delete(firstKey);
       }
 
       if (timeAlignerRef.current && (playbackStatusRef.current === 'PLAYING' || playbackStatusRef.current === 'BUFFERING')) {

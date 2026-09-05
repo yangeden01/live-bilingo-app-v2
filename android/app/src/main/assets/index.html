@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png" />
+    <link rel="apple-touch-icon-precomposed" href="./icon-192.png" />
+    <link rel="shortcut icon" href="./icon-192.png" />
+    <link rel="manifest" href="./manifest.json" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0f19" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="雙語電台" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Live Bilingo 雙語電台 - 即時 AI 字幕翻譯</title>
+    <script defer src="./assets/index-DCwbClN5.js"></script>
+    <link rel="stylesheet" href="./assets/style-zmh88wvU.css">
+  </head>
+  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-blue-500 selection:text-white">
+    <div id="root">
+      <style>
+        @keyframes bilingo-pulse-ring {
+          0% { transform: scale(0.9); opacity: 0.8; }
+          50% { transform: scale(1.18); opacity: 0.25; }
+          100% { transform: scale(0.9); opacity: 0.8; }
+        }
+        @keyframes bilingo-rotate-glow {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes bilingo-eq-bar {
+          0%, 100% { height: 10px; }
+          50% { height: 32px; }
+        }
+        @keyframes bilingo-shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+        .bilingo-splash-container {
+          min-height: 100vh;
+          background: #0b0f19;
+          color: #f8fafc;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          padding: 24px;
+          text-align: center;
+          box-sizing: border-box;
+          user-select: none;
+        }
+        .bilingo-logo-box {
+          position: relative;
+          width: 88px;
+          height: 88px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 24px;
+        }
+        .bilingo-ring-1 {
+          position: absolute;
+          inset: -12px;
+          border-radius: 50%;
+          border: 2px dashed rgba(59, 130, 246, 0.4);
+          animation: bilingo-rotate-glow 12s linear infinite;
+        }
+        .bilingo-ring-2 {
+          position: absolute;
+          inset: -4px;
+          border-radius: 50%;
+          border: 2px solid rgba(245, 158, 11, 0.5);
+          animation: bilingo-pulse-ring 2.2s ease-in-out infinite;
+        }
+        .bilingo-logo-bg {
+          width: 72px;
+          height: 72px;
+          border-radius: 22px;
+          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #0f172a 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 12px 30px -5px rgba(37, 99, 235, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .bilingo-title {
+          font-size: 22px;
+          font-weight: 800;
+          letter-spacing: -0.02em;
+          color: #ffffff;
+          margin-bottom: 6px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          justify-content: center;
+        }
+        .bilingo-badge {
+          font-size: 11px;
+          padding: 2px 8px;
+          border-radius: 12px;
+          background: rgba(59, 130, 246, 0.25);
+          color: #60a5fa;
+          border: 1px solid rgba(59, 130, 246, 0.4);
+          font-weight: 700;
+        }
+        .bilingo-subtitle {
+          font-size: 13px;
+          color: #94a3b8;
+          margin-bottom: 28px;
+          font-weight: 500;
+        }
+        .bilingo-eq-waves {
+          display: flex;
+          align-items: flex-end;
+          gap: 5px;
+          height: 36px;
+          margin-bottom: 24px;
+        }
+        .bilingo-eq-bar {
+          width: 5px;
+          background: #3b82f6;
+          border-radius: 3px;
+        }
+        .bilingo-eq-bar:nth-child(1) { animation: bilingo-eq-bar 1.2s infinite ease-in-out; background: #3b82f6; }
+        .bilingo-eq-bar:nth-child(2) { animation: bilingo-eq-bar 0.85s infinite ease-in-out 0.15s; background: #60a5fa; }
+        .bilingo-eq-bar:nth-child(3) { animation: bilingo-eq-bar 1.35s infinite ease-in-out 0.35s; background: #f59e0b; }
+        .bilingo-eq-bar:nth-child(4) { animation: bilingo-eq-bar 0.95s infinite ease-in-out 0.25s; background: #3b82f6; }
+        .bilingo-eq-bar:nth-child(5) { animation: bilingo-eq-bar 1.15s infinite ease-in-out 0.45s; background: #10b981; }
+        .bilingo-progress-track {
+          width: 200px;
+          height: 4px;
+          background: rgba(255, 255, 255, 0.08);
+          border-radius: 999px;
+          overflow: hidden;
+          position: relative;
+        }
+        .bilingo-progress-fill {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(90deg, #3b82f6, #f59e0b, #10b981);
+          animation: bilingo-shimmer 1.6s infinite linear;
+          width: 60%;
+          border-radius: 999px;
+        }
+        .bilingo-status-text {
+          margin-top: 14px;
+          font-size: 12px;
+          color: #64748b;
+          font-weight: 500;
+          letter-spacing: 0.02em;
+        }
+      </style>
+      <div class="bilingo-splash-container">
+        <div class="bilingo-logo-box">
+          <div class="bilingo-ring-1"></div>
+          <div class="bilingo-ring-2"></div>
+          <div class="bilingo-logo-bg">
+            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>
+              <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/>
+              <circle cx="12" cy="12" r="2"/>
+              <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/>
+              <path d="M19.1 4.9c3.9 3.9 3.9 10.3 0 14.2"/>
+            </svg>
+          </div>
+        </div>
+        <div class="bilingo-title">
+          <span>Live Bilingo 雙語電台</span>
+          <span class="bilingo-badge">v2.2.3</span>
+        </div>
+        <div class="bilingo-subtitle">即時 AI 雙語字幕串流</div>
+        <div class="bilingo-eq-waves">
+          <div class="bilingo-eq-bar"></div>
+          <div class="bilingo-eq-bar"></div>
+          <div class="bilingo-eq-bar"></div>
+          <div class="bilingo-eq-bar"></div>
+          <div class="bilingo-eq-bar"></div>
+        </div>
+        <div class="bilingo-progress-track">
+          <div class="bilingo-progress-fill"></div>
+        </div>
+        <div class="bilingo-status-text">系統啟動中，請稍候...</div>
+      </div>
+    </div>
+    <script>
+      // Automatic error handling for stale module script loading failures (Web/HTTP only)
+      window.addEventListener('error', function(e) {
+        var isNativeApp = !!(window.AndroidBridge) || 
+          location.protocol === 'file:' || 
+          navigator.userAgent.includes('AndroidApp');
+
+        if (!isNativeApp && location.protocol.startsWith('http')) {
+          if (e.target && e.target.tagName === 'SCRIPT') {
+            console.warn('Resource script load error detected:', e.target.src);
+            try {
+              var storage = window.sessionStorage;
+              if (storage && storage.getItem('bilingo_reload_attempted') !== 'true') {
+                storage.setItem('bilingo_reload_attempted', 'true');
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    regs.forEach(function(r) { r.unregister(); });
+                  });
+                }
+                if (window.caches) {
+                  caches.keys().then(function(keys) {
+                    keys.forEach(function(k) { caches.delete(k); });
+                  });
+                }
+                window.location.reload();
+              }
+            } catch (err) {}
+          }
+        }
+      }, true);
+    </script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        const isNativeApp = !!(window.AndroidBridge) || 
+          location.hostname === 'appassets.android.com' || 
+          location.protocol === 'file:' || 
+          navigator.userAgent.includes('AndroidApp');
+
+        const isDev = isNativeApp || 
+          location.hostname === 'localhost' || 
+          location.hostname.includes('ais-dev') || 
+          location.hostname.includes('run.app');
+
+        if (isDev) {
+          navigator.serviceWorker.getRegistrations().then((registrations) => {
+            for (let registration of registrations) {
+              registration.unregister();
+            }
+          });
+          if (window.caches) {
+            caches.keys().then((names) => {
+              for (let name of names) caches.delete(name);
+            });
+          }
+        } else if (location.protocol.startsWith('http')) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' })
+              .then((reg) => {
+                console.log('SW Registered:', reg.scope);
+                reg.update().catch(() => {});
+              })
+              .catch((err) => console.log('SW Register error:', err));
+          });
+        }
+      }
+    </script>
+  </body>
+</html>

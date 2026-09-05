@@ -1,0 +1,6 @@
+{
+  "name": "Live Bilingo 雙語電台",
+  "description": "即時廣播與AI雙語字幕電台應用程式 v2.3.2 (內建 STT 延遲偵錯面板、Groq/Deepgram 每分鐘與當日 UTC 請求數監控)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Live Bilingo 雙語電台",
+  "description": "即時廣播與AI雙語字幕電台應用程式 v2.5.1 (支援 Groq Whisper 雙模型 Turbo/V3 4000次接棒與 Deepgram 備援，全局配額即時監控)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,36 @@
+{
+  "groqRequestsHistory": [],
+  "groqRecentRequestLogs": [],
+  "groqCurrentUtcDay": "2026-09-12",
+  "groqTodayRequests": 0,
+  "groqTotalRequestsEver": 0,
+  "groqLastHeaders": {
+    "model": "whisper-large-v3-turbo",
+    "limitRequests": "2000",
+    "remainingRequests": "2000",
+    "resetRequests": "24h0m0s",
+    "lastUpdated": 0
+  },
+  "groqModelsUsage": {
+    "whisper-large-v3-turbo": {
+      "requestsToday": 0,
+      "remainingRequests": "2000",
+      "limitRequests": "2000",
+      "resetRequests": "24h0m0s",
+      "lastUpdated": 0,
+      "accountUsed": 0
+    },
+    "whisper-large-v3": {
+      "requestsToday": 0,
+      "remainingRequests": "2000",
+      "limitRequests": "2000",
+      "resetRequests": "24h0m0s",
+      "lastUpdated": 0,
+      "accountUsed": 0
+    }
+  },
+  "deepgramRequestsHistory": [],
+  "deepgramCurrentUtcDay": "2026-09-12",
+  "deepgramTodayRequests": 0,
+  "deepgramTotalRequestsEver": 0
+}

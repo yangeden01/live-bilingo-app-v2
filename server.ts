@@ -1877,13 +1877,42 @@ function recordDeepgramRequest(durationSec: number = 3.5) {
   saveSttUsageTracker();
 }
 
+// Helper: Find valid frame sync header (AAC ADTS 0xFFF or MP3 0xFFE) to avoid leading partial-frame corruption
+function alignAudioBuffer(buffer: Buffer): Buffer {
+  if (!buffer || buffer.length < 512) return buffer;
+  // Search within the first 8KB for an ADTS sync word (12 bits: 0xFFF) or MP3 sync word (11 bits: 0xFFE)
+  const maxSearch = Math.min(buffer.length - 2, 8192);
+  for (let i = 0; i < maxSearch; i++) {
+    if (buffer[i] === 0xFF) {
+      const secondByte = buffer[i + 1];
+      // ADTS AAC: 0xFF followed by 0xF0-0xF9 (sync word is 0xFFF)
+      if ((secondByte & 0xF6) === 0xF0) {
+        return i > 0 ? buffer.subarray(i) : buffer;
+      }
+      // MP3: 0xFF followed by 0xE0-0xFF (sync word is 0xFFE)
+      if ((secondByte & 0xE0) === 0xE0) {
+        return i > 0 ? buffer.subarray(i) : buffer;
+      }
+    }
+  }
+  return buffer;
+}
+
 // Helper: Convert any incoming radio audio stream buffer (AAC/MP3/MPEG) to 16kHz Mono WAV buffer in-memory via ffmpeg
 function convertToWav(inputBuffer: Buffer): Promise<Buffer> {
   return new Promise((resolve, reject) => {
+    if (!inputBuffer || inputBuffer.length < 1000) {
+      resolve(Buffer.alloc(0));
+      return;
+    }
+
+    const alignedBuffer = alignAudioBuffer(inputBuffer);
+
     const ff = spawn('ffmpeg', [
       '-hide_banner',
       '-loglevel', 'error',
       '-err_detect', 'ignore_err',
+      '-fflags', '+discardcorrupt+nobuffer',
       '-i', 'pipe:0',
       '-ar', '16000',
       '-ac', '1',
@@ -1891,20 +1920,29 @@ function convertToWav(inputBuffer: Buffer): Promise<Buffer> {
       'pipe:1'
     ]);
     const outChunks: Buffer[] = [];
+    let stderr = '';
     ff.stdout.on('data', (c: Buffer) => outChunks.push(c));
+    ff.stderr.on('data', (d: Buffer) => {
+      stderr += d.toString();
+    });
     ff.on('close', (code: number) => {
-      // If we got converted WAV output, accept it even if trailing frame had a minor syntax warning
-      if (outChunks.length > 0) {
-        resolve(Buffer.concat(outChunks));
-      } else if (code === 0) {
-        resolve(Buffer.concat(outChunks));
+      const out = Buffer.concat(outChunks);
+      // If we got converted WAV output (at least valid WAV header + samples), accept it!
+      if (out.length > 2000) {
+        resolve(out);
+      } else if (code === 0 && out.length > 0) {
+        resolve(out);
       } else {
-        reject(new Error('ffmpeg audio conversion failed with code ' + code));
+        // Return empty buffer or clear error message without throwing fatal unhandled rejection
+        const errMsg = stderr ? stderr.trim().slice(0, 150) : `exit code ${code}`;
+        reject(new Error(`ffmpeg audio conversion failed with code ${code}: ${errMsg}`));
       }
     });
-    ff.on('error', reject);
+    ff.on('error', (err) => {
+      reject(err);
+    });
     ff.stdin.on('error', () => {});
-    ff.stdin.end(inputBuffer);
+    ff.stdin.end(alignedBuffer);
   });
 }
 
@@ -3208,7 +3246,14 @@ function startBackendStreaming(streamUrl = currentRadioStreamUrl) {
                 if (!bufferToTranscribe || bufferToTranscribe.length < 8000) {
                   return;
                 }
-                const wav = await convertToWav(bufferToTranscribe);
+                let wav: Buffer | null = null;
+                try {
+                  wav = await convertToWav(bufferToTranscribe);
+                } catch (convErr: any) {
+                  // Partial frame chunk at stream boundary - skip this slice without counting as consecutive API error
+                  console.debug('[Groq STT Info]: audio conversion skipped for partial chunk:', convErr?.message || convErr);
+                  return;
+                }
                 if (!wav || wav.length < 2000) {
                   return;
                 }

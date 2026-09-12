@@ -2621,14 +2621,37 @@ function recordDeepgramRequest(durationSec = 3.5) {
   sttUsageTracker.deepgramRequestsHistory = sttUsageTracker.deepgramRequestsHistory.filter((t) => t >= cutoff);
   saveSttUsageTracker();
 }
+function alignAudioBuffer(buffer) {
+  if (!buffer || buffer.length < 512) return buffer;
+  const maxSearch = Math.min(buffer.length - 2, 8192);
+  for (let i = 0; i < maxSearch; i++) {
+    if (buffer[i] === 255) {
+      const secondByte = buffer[i + 1];
+      if ((secondByte & 246) === 240) {
+        return i > 0 ? buffer.subarray(i) : buffer;
+      }
+      if ((secondByte & 224) === 224) {
+        return i > 0 ? buffer.subarray(i) : buffer;
+      }
+    }
+  }
+  return buffer;
+}
 function convertToWav(inputBuffer) {
   return new Promise((resolve, reject) => {
+    if (!inputBuffer || inputBuffer.length < 1e3) {
+      resolve(Buffer.alloc(0));
+      return;
+    }
+    const alignedBuffer = alignAudioBuffer(inputBuffer);
     const ff = (0, import_child_process.spawn)("ffmpeg", [
       "-hide_banner",
       "-loglevel",
       "error",
       "-err_detect",
       "ignore_err",
+      "-fflags",
+      "+discardcorrupt+nobuffer",
       "-i",
       "pipe:0",
       "-ar",
@@ -2640,20 +2663,28 @@ function convertToWav(inputBuffer) {
       "pipe:1"
     ]);
     const outChunks = [];
+    let stderr = "";
     ff.stdout.on("data", (c) => outChunks.push(c));
+    ff.stderr.on("data", (d) => {
+      stderr += d.toString();
+    });
     ff.on("close", (code) => {
-      if (outChunks.length > 0) {
-        resolve(Buffer.concat(outChunks));
-      } else if (code === 0) {
-        resolve(Buffer.concat(outChunks));
+      const out = Buffer.concat(outChunks);
+      if (out.length > 2e3) {
+        resolve(out);
+      } else if (code === 0 && out.length > 0) {
+        resolve(out);
       } else {
-        reject(new Error("ffmpeg audio conversion failed with code " + code));
+        const errMsg = stderr ? stderr.trim().slice(0, 150) : `exit code ${code}`;
+        reject(new Error(`ffmpeg audio conversion failed with code ${code}: ${errMsg}`));
       }
     });
-    ff.on("error", reject);
+    ff.on("error", (err) => {
+      reject(err);
+    });
     ff.stdin.on("error", () => {
     });
-    ff.stdin.end(inputBuffer);
+    ff.stdin.end(alignedBuffer);
   });
 }
 async function transcribeWithGroq(wavBuffer, prompt = "", preferredModel) {
@@ -3735,7 +3766,13 @@ function startBackendStreaming(streamUrl = currentRadioStreamUrl) {
                 if (!bufferToTranscribe || bufferToTranscribe.length < 8e3) {
                   return;
                 }
-                const wav = await convertToWav(bufferToTranscribe);
+                let wav = null;
+                try {
+                  wav = await convertToWav(bufferToTranscribe);
+                } catch (convErr) {
+                  console.debug("[Groq STT Info]: audio conversion skipped for partial chunk:", convErr?.message || convErr);
+                  return;
+                }
                 if (!wav || wav.length < 2e3) {
                   return;
                 }

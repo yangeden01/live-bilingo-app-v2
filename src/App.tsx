@@ -474,7 +474,21 @@ export default function App() {
     try {
       setPersistentItem('radio_reading_mode', readingMode);
     } catch (e) {}
+  }, [readingMode]);
 
+  useEffect(() => {
+    try {
+      setPersistentItem('radio_chinese_variant', chineseVariant);
+    } catch (e) {}
+  }, [chineseVariant]);
+
+  useEffect(() => {
+    try {
+      setPersistentItem('radio_subtitle_font_size', subtitleFontSize);
+    } catch (e) {}
+  }, [subtitleFontSize]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -1508,9 +1522,12 @@ export default function App() {
               <YouTubeBilingualView
                 onOpenDictionary={handleOpenDictionary}
                 readingMode={readingMode}
+                onReadingModeChange={setReadingMode}
                 effectiveTheme={effectiveTheme}
                 chineseVariant={chineseVariant}
+                onChineseVariantChange={setChineseVariant}
                 fontSize={subtitleFontSize}
+                onFontSizeChange={setSubtitleFontSize}
                 onPlaybackStateChange={setYoutubePlaybackState}
               />
             </div>

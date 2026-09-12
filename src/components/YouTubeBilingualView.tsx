@@ -23,13 +23,17 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { ReadingModeAndFontToolbar } from './ReadingModeAndFontToolbar';
 
 interface Props {
   onOpenDictionary?: (word?: string) => void;
   readingMode?: ReadingMode;
+  onReadingModeChange?: (mode: ReadingMode) => void;
   effectiveTheme?: 'dark' | 'light' | 'paper';
   chineseVariant?: ChineseVariant;
+  onChineseVariantChange?: (variant: ChineseVariant) => void;
   fontSize?: SubtitleFontSize;
+  onFontSizeChange?: (size: SubtitleFontSize) => void;
   onPlaybackStateChange?: (state: 'playing' | 'paused' | 'buffering' | 'idle') => void;
 }
 
@@ -81,10 +85,13 @@ const getSavedProgressForVideo = (vid: string): number => {
 
 export const YouTubeBilingualView: React.FC<Props> = ({
   onOpenDictionary,
-  readingMode = 'dark',
+  readingMode = 'system',
+  onReadingModeChange,
   effectiveTheme = 'dark',
   chineseVariant = 'traditional',
+  onChineseVariantChange,
   fontSize = 'medium',
+  onFontSizeChange,
   onPlaybackStateChange,
 }) => {
   // Pre-fill YouTube URL and video ID from persistent storage or default test video
@@ -101,6 +108,70 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     }
     return VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.id;
   });
+
+  const currentTheme = effectiveTheme || (readingMode === 'paper' ? 'paper' : readingMode === 'light' ? 'light' : 'dark');
+
+  const cardBgClass =
+    currentTheme === 'paper'
+      ? 'bg-[#FAF4E8] text-[#3B2E1E] border-[#E2D2B0] shadow-xl shadow-amber-900/5'
+      : currentTheme === 'light'
+      ? 'bg-white/95 text-slate-900 border-slate-200 shadow-xl shadow-slate-200/60'
+      : 'bg-slate-900/90 text-white border-slate-800/80 shadow-xl';
+
+  const inputBgClass =
+    currentTheme === 'paper'
+      ? 'bg-[#F5ECD7] border-[#D8C49E] text-[#3B2E1E] placeholder-[#8C765C] focus:border-amber-600'
+      : currentTheme === 'light'
+      ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-rose-500'
+      : 'bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-rose-500';
+
+  const testBtnClass =
+    currentTheme === 'paper'
+      ? 'bg-[#EFE5CE] hover:bg-[#E5D9BE] active:bg-[#DBCFB3] text-emerald-800 border-[#CDB58A]'
+      : currentTheme === 'light'
+      ? 'bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-800 border-emerald-200'
+      : 'bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/50 shadow-sm';
+
+  const verifiedChipClass =
+    activeVideoId === VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.id
+      ? currentTheme === 'paper'
+        ? 'bg-emerald-600/20 text-emerald-900 border border-emerald-600/40 shadow-sm'
+        : currentTheme === 'light'
+        ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-sm'
+        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+      : currentTheme === 'paper'
+      ? 'bg-[#EFE5CE] text-emerald-900 hover:bg-[#E5D9BE] border border-[#D8C49E]'
+      : currentTheme === 'light'
+      ? 'bg-slate-100 text-emerald-800 hover:bg-slate-200 border border-slate-200'
+      : 'bg-emerald-950/40 text-emerald-400 hover:bg-emerald-900/50 border border-emerald-500/30';
+
+  const statusCardBgClass =
+    currentTheme === 'paper'
+      ? 'bg-[#FAF4E8]/90 border-[#E2D2B0] text-[#3B2E1E]'
+      : currentTheme === 'light'
+      ? 'bg-white border-slate-200 text-slate-900 shadow-sm'
+      : 'bg-slate-900/60 border-slate-800 text-white';
+
+  const statusTitleClass =
+    currentTheme === 'paper'
+      ? 'text-[#3B2E1E]'
+      : currentTheme === 'light'
+      ? 'text-slate-900'
+      : 'text-white';
+
+  const statusDescClass =
+    currentTheme === 'paper'
+      ? 'text-[#6E5B42]'
+      : currentTheme === 'light'
+      ? 'text-slate-600'
+      : 'text-slate-400';
+
+  const playerAnchorBg =
+    currentTheme === 'paper'
+      ? 'bg-[#F4EBD7]'
+      : currentTheme === 'light'
+      ? 'bg-slate-100'
+      : 'bg-slate-950';
   const [initialTimeSeconds, setInitialTimeSeconds] = useState<number>(() => {
     const initialVid = getPersistentItem('youtube_last_video_id') || VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.id;
     return getSavedProgressForVideo(initialVid);
@@ -449,7 +520,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
   return (
     <div className="space-y-6">
       {/* Top YouTube URL Input & Search Bar */}
-      <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-xl space-y-3">
+      <div className={`backdrop-blur-md rounded-2xl p-4 sm:p-5 border transition-colors duration-200 shadow-xl space-y-3 ${cardBgClass}`}>
         <form onSubmit={handleLoadVideo} className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
             <Youtube className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-500 pointer-events-none" />
@@ -459,9 +530,9 @@ export const YouTubeBilingualView: React.FC<Props> = ({
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
               placeholder="貼上 YouTube 影片網址 (例如: https://youtu.be/... 或 watch?v=...)"
-              className={`w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 ${
+              className={`w-full rounded-xl pl-10 ${
                 urlInput ? 'pr-12' : 'pr-4'
-              } py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors`}
+              } py-2.5 text-xs sm:text-sm border focus:outline-none transition-colors ${inputBgClass}`}
             />
             {urlInput && (
               <button
@@ -470,7 +541,13 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                 onClick={handleClearUrlInput}
                 aria-label="清除網址"
                 title="清除網址"
-                className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 active:bg-slate-700 transition-colors cursor-pointer"
+                className={`absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
+                  currentTheme === 'paper'
+                    ? 'text-[#7A6853] hover:text-[#3B2E1E] hover:bg-[#EFE5CE]'
+                    : currentTheme === 'light'
+                    ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800 active:bg-slate-700'
+                }`}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -483,7 +560,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
               onClick={handleLoadTestVideo}
               aria-label="載入字幕測試影片"
               title="載入已在後端環境 100% 驗證通過的英文字幕測試影片"
-              className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/50 shadow-sm transition-all shrink-0 cursor-pointer whitespace-nowrap"
+              className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border shadow-sm transition-all shrink-0 cursor-pointer whitespace-nowrap ${testBtnClass}`}
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               <span>載入字幕測試影片</span>
@@ -502,7 +579,15 @@ export const YouTubeBilingualView: React.FC<Props> = ({
 
         {/* Sample preset recommendations */}
         <div className="flex items-center gap-2 overflow-x-auto pt-1 pb-1 scrollbar-none text-xs">
-          <span className="text-slate-400 shrink-0 flex items-center gap-1 font-medium">
+          <span
+            className={`shrink-0 flex items-center gap-1 font-medium ${
+              currentTheme === 'paper'
+                ? 'text-[#7A6853]'
+                : currentTheme === 'light'
+                ? 'text-slate-500'
+                : 'text-slate-400'
+            }`}
+          >
             <Play className="w-3 h-3 text-rose-400" />
             推薦測試:
           </span>
@@ -510,11 +595,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
             id="verified-caption-test-chip"
             type="button"
             onClick={handleLoadTestVideo}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
-              activeVideoId === VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.id
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                : 'bg-emerald-950/40 text-emerald-400 hover:bg-emerald-900/50 border border-emerald-500/30'
-            }`}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${verifiedChipClass}`}
           >
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
             <span>【已驗證可提取】{VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.title}</span>
@@ -529,23 +610,43 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                 setPersistentItem('youtube_last_url', sample.url);
                 setPersistentItem('youtube_last_video_id', sample.id);
               }}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all shrink-0 cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all shrink-0 cursor-pointer border ${
                 activeVideoId === sample.id
-                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/50'
+                  ? currentTheme === 'paper'
+                    ? 'bg-rose-500/20 text-rose-900 border-rose-500/40 font-bold'
+                    : currentTheme === 'light'
+                    ? 'bg-rose-50 text-rose-700 border-rose-300 font-bold'
+                    : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                  : currentTheme === 'paper'
+                  ? 'bg-[#EFE5CE] text-[#6E5B42] hover:bg-[#E5D9BE] border-[#D8C49E]'
+                  : currentTheme === 'light'
+                  ? 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
+                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border-slate-700/50'
               }`}
             >
               {sample.title}
             </button>
           ))}
         </div>
+
+        {/* Bottom Utility Bar: Reading Mode, Chinese Variant & Subtitle Font Size Controls */}
+        <ReadingModeAndFontToolbar
+          readingMode={readingMode}
+          onReadingModeChange={onReadingModeChange}
+          effectiveTheme={effectiveTheme}
+          chineseVariant={chineseVariant}
+          onChineseVariantChange={onChineseVariantChange}
+          fontSize={fontSize}
+          onFontSizeChange={onFontSizeChange}
+          idPrefix="youtube"
+        />
       </div>
 
       {/* Main Learning Interface: Video Player & Subtitles Grid */}
       <div id="youtube-player-section" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Player (Clean fixed/sticky reading mode) */}
         <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-20">
-          <div id="youtube-player-anchor" className="sticky top-[56px] z-20 bg-slate-950 sm:static pb-2 sm:pb-0">
+          <div id="youtube-player-anchor" className={`sticky top-[56px] z-20 sm:static pb-2 sm:pb-0 transition-colors duration-200 ${playerAnchorBg}`}>
             <YouTubeBilingualPlayer
               ref={playerRef}
               videoId={activeVideoId}
@@ -562,13 +663,13 @@ export const YouTubeBilingualView: React.FC<Props> = ({
         <div className="lg:col-span-7 space-y-4">
           {/* Subtitle Idle / Ready to Load State */}
           {status === 'idle' && subtitles.length === 0 && (
-            <div className="bg-slate-900/60 rounded-2xl p-10 border border-slate-800 flex flex-col items-center justify-center text-center space-y-3">
+            <div className={`rounded-2xl p-10 border flex flex-col items-center justify-center text-center space-y-3 transition-colors duration-200 ${statusCardBgClass}`}>
               <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <div className="max-w-md">
-                <h4 className="text-sm font-semibold text-white">點擊「載入字幕測試影片」立即驗證</h4>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                <h4 className={`text-sm font-semibold ${statusTitleClass}`}>點擊「載入字幕測試影片」立即驗證</h4>
+                <p className={`text-xs mt-1 leading-relaxed ${statusDescClass}`}>
                   系統已預填後端環境 100% 驗證通過的測試影片。點擊按鈕即可透過真實生產管線取得英文字幕並進行 Gemini 雙語對照學習。
                 </p>
               </div>
@@ -586,22 +687,22 @@ export const YouTubeBilingualView: React.FC<Props> = ({
 
           {/* Subtitle Loading State */}
           {status === 'loading' && (
-            <div className="bg-slate-900/60 rounded-2xl p-12 border border-slate-800 flex flex-col items-center justify-center text-center space-y-3">
+            <div className={`rounded-2xl p-12 border flex flex-col items-center justify-center text-center space-y-3 transition-colors duration-200 ${statusCardBgClass}`}>
               <RotateCw className="w-8 h-8 text-blue-400 animate-spin" />
               <div>
-                <h4 className="text-sm font-semibold text-white">正在取得 YouTube 原始字幕...</h4>
-                <p className="text-xs text-slate-400 mt-1">解析英文字幕軌道並提取時間軸標記</p>
+                <h4 className={`text-sm font-semibold ${statusTitleClass}`}>正在取得 YouTube 原始字幕...</h4>
+                <p className={`text-xs mt-1 ${statusDescClass}`}>解析英文字幕軌道並提取時間軸標記</p>
               </div>
             </div>
           )}
 
           {/* Subtitle Translating State */}
           {status === 'translating' && subtitles.length === 0 && (
-            <div className="bg-slate-900/60 rounded-2xl p-12 border border-slate-800 flex flex-col items-center justify-center text-center space-y-3">
+            <div className={`rounded-2xl p-12 border flex flex-col items-center justify-center text-center space-y-3 transition-colors duration-200 ${statusCardBgClass}`}>
               <RotateCw className="w-8 h-8 text-indigo-400 animate-spin" />
               <div>
-                <h4 className="text-sm font-semibold text-white">Gemini 批次翻譯首批字幕中...</h4>
-                <p className="text-xs text-slate-400 mt-1">完成第一批段落後即可立刻開始影音學習</p>
+                <h4 className={`text-sm font-semibold ${statusTitleClass}`}>Gemini 批次翻譯首批字幕中...</h4>
+                <p className={`text-xs mt-1 ${statusDescClass}`}>完成第一批段落後即可立刻開始影音學習</p>
               </div>
             </div>
           )}

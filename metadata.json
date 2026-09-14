@@ -1,0 +1,6 @@
+{
+  "name": "Live Bilingo 雙語電台",
+  "description": "即時廣播與AI雙語字幕電台應用程式 v2.5.3 (支援即時美語新聞48小時探索、最新排序、Android原生新聞橋接與YouTube雙語影音對照)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

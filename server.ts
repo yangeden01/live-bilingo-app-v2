@@ -408,7 +408,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     translationEngine: 'local-zero-quota',
-    radioStreamUrl: 'https://nhpr.streamguys1.com/nhpr',
+    radioStreamUrl: 'https://nhpr.streamguys1.com/nhpr.mp3',
     deepgramConfigured: true,
   });
 });
@@ -440,6 +440,10 @@ app.post('/api/translate', async (req, res) => {
 });
 
 // Helper for fallback translation when Gemini is in cooldown or API key is unconfigured
+function getFallbackSummary(): string {
+  return '【新聞廣播精譯】舊金山與全美公共廣播電台新聞即時摘要報導。';
+}
+
 function mockTranslateToTraditionalChinese(englishText: string): string {
   if (/transit|bart|muni|caltrain|fare/i.test(englishText)) {
     return '您正在收聽 Live Bilingo 雙語電台。今日灣區頭條新聞：交通局官員正式宣佈，將於下個月起整合 BART、Muni 與 Caltrain 的票證系統，為跨區通勤族提供更加無縫的公共運輸體驗。';
@@ -470,26 +474,31 @@ app.get('/api/deepgram-config', (req, res) => {
   res.json({
     wsUrl: 'wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&smart_format=true&interim_results=true',
     authHeader: 'Token 26c44e288a84756af4f80d41436af0bf7cc10715',
-    defaultStreamUrl: 'https://nhpr.streamguys1.com/nhpr',
+    defaultStreamUrl: 'https://nhpr.streamguys1.com/nhpr.mp3',
     paragraphDurationSeconds: 10,
   });
 });
 
 function resolveTargetStreamUrl(inputUrl: string): string {
   if (!inputUrl) return 'https://npr-ice.streamguys1.com/live.mp3';
-  if (inputUrl.startsWith('http://') || inputUrl.startsWith('https://')) {
-    return inputUrl;
-  }
-  if (inputUrl.includes('/api/radio-stream-proxy')) {
+  let target = inputUrl.trim();
+  if (target.includes('/api/radio-stream-proxy')) {
     try {
-      const dummyUrl = new URL(inputUrl, 'http://localhost:3000');
+      const dummyUrl = new URL(target, 'http://localhost:3000');
       const targetParam = dummyUrl.searchParams.get('url');
       if (targetParam && (targetParam.startsWith('http://') || targetParam.startsWith('https://'))) {
-        return targetParam;
+        target = targetParam;
       }
     } catch (e) {
       // ignore
     }
+  }
+  // Automatic normalization for NHPR AAC stream to MP3 stream for 100% Groq Whisper compatibility
+  if (target.toLowerCase().startsWith('https://nhpr.streamguys1.com/nhpr') && !target.toLowerCase().includes('.mp3')) {
+    target = 'https://nhpr.streamguys1.com/nhpr.mp3';
+  }
+  if (target.startsWith('http://') || target.startsWith('https://')) {
+    return target;
   }
   return 'https://npr-ice.streamguys1.com/live.mp3';
 }
@@ -862,19 +871,19 @@ app.post('/api/repair-stations', async (req, res) => {
 
   const KNOWN_BACKUPS: Record<string, string[]> = {
     'us-west-public-news': [
-      'https://nhpr.streamguys1.com/nhpr',
+      'https://nhpr.streamguys1.com/nhpr.mp3',
       'https://npr-ice.streamguys1.com/live.mp3',
     ],
     'us-east-public-news': [
-      'https://nhpr.streamguys1.com/nhpr',
+      'https://nhpr.streamguys1.com/nhpr.mp3',
       'https://npr-ice.streamguys1.com/live.mp3',
     ],
     'us-finance-news-talk': [
       'https://stream.revma.ihrhls.com/zc4732',
-      'https://nhpr.streamguys1.com/nhpr',
+      'https://nhpr.streamguys1.com/nhpr.mp3',
     ],
     'us-national-public-talk': [
-      'https://nhpr.streamguys1.com/nhpr',
+      'https://nhpr.streamguys1.com/nhpr.mp3',
       'https://npr-ice.streamguys1.com/live.mp3',
     ],
     'uk-global-english-news': [
@@ -1352,7 +1361,7 @@ let deepgramWs: WebSocket | null = null;
 let triggerDeepgramFallback: (() => void) | null = null;
 let radioReq: http.ClientRequest | null = null;
 let isStreamingActive = false;
-let currentRadioStreamUrl = 'https://nhpr.streamguys1.com/nhpr';
+let currentRadioStreamUrl = 'https://nhpr.streamguys1.com/nhpr.mp3';
 let currentRadioStationName = 'NHPR Public Radio News';
 let currentStreamingSessionId = 0;
 let watchdogInterval: NodeJS.Timeout | null = null;
@@ -3322,7 +3331,7 @@ function startBackendStreaming(streamUrl = currentRadioStreamUrl) {
   try {
     parsedUrl = new URL(currentRadioStreamUrl);
   } catch (e) {
-    parsedUrl = new URL('https://nhpr.streamguys1.com/nhpr');
+    parsedUrl = new URL('https://nhpr.streamguys1.com/nhpr.mp3');
   }
 
   const requester = parsedUrl.protocol === 'http:' ? http : https;
@@ -3365,8 +3374,8 @@ function startBackendStreaming(streamUrl = currentRadioStreamUrl) {
     // Handle error status codes (e.g. 404 stream not found)
     if ((radioRes.statusCode || 0) >= 400) {
       console.warn(`Radio stream ${currentRadioStreamUrl} returned status ${radioRes.statusCode}. Falling back to default radio stream.`);
-      if (currentRadioStreamUrl !== 'https://nhpr.streamguys1.com/nhpr') {
-        startBackendStreaming('https://nhpr.streamguys1.com/nhpr');
+      if (currentRadioStreamUrl !== 'https://nhpr.streamguys1.com/nhpr.mp3') {
+        startBackendStreaming('https://nhpr.streamguys1.com/nhpr.mp3');
       }
       return;
     }

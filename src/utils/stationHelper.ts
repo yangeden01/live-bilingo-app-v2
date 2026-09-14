@@ -15,6 +15,10 @@ export function normalizeStationUrl(url?: string | null): string {
       }
     } catch (_) {}
   }
+  // Automatic normalization for NHPR AAC stream to MP3 stream
+  if (cleaned.toLowerCase().startsWith('https://nhpr.streamguys1.com/nhpr') && !cleaned.toLowerCase().includes('.mp3')) {
+    cleaned = 'https://nhpr.streamguys1.com/nhpr.mp3';
+  }
   // Strip trailing slash and lowercase for protocol/host comparison
   return cleaned.replace(/\/+$/, '').toLowerCase();
 }

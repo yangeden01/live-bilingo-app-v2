@@ -71,7 +71,7 @@ async function runSimulator() {
     await makeRequest('/api/subtitle-stream-wakeup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ streamUrl: 'https://nhpr.streamguys1.com/nhpr' }),
+      body: JSON.stringify({ streamUrl: 'https://nhpr.streamguys1.com/nhpr.mp3' }),
     });
     await makeRequest('/api/clear-subtitles-history', { method: 'POST' });
 
@@ -81,7 +81,7 @@ async function runSimulator() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        url: 'https://nhpr.streamguys1.com/nhpr',
+        url: 'https://nhpr.streamguys1.com/nhpr.mp3',
         name: 'NHPR Public Radio News',
         forceRestart: true,
       }),
@@ -258,7 +258,7 @@ async function runSimulator() {
     const wakeupRes = await makeRequest('/api/subtitle-stream-wakeup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ streamUrl: 'https://nhpr.streamguys1.com/nhpr' }),
+      body: JSON.stringify({ streamUrl: 'https://nhpr.streamguys1.com/nhpr.mp3' }),
     });
     if (wakeupRes.statusCode !== 200) {
       throw new Error(`Subtitle stream wakeup endpoint failed with status ${wakeupRes.statusCode}`);
@@ -344,7 +344,7 @@ async function runSimulator() {
 
     // Step 6: Multi-Station Subtitle Isolation Quality Gate
     console.log('\n[Step 6/6] Testing Multi-Station Subtitle Isolation Quality Gate...');
-    const stationA = 'https://nhpr.streamguys1.com/nhpr';
+    const stationA = 'https://nhpr.streamguys1.com/nhpr.mp3';
     const stationB = 'https://streams.kqed.org/kqedradio.mp3';
 
     const testSubtitleStationA = {

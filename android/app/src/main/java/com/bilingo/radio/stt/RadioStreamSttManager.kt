@@ -751,19 +751,24 @@ class RadioStreamSttManager(
 
     private fun resolveTargetStreamUrl(rawUrl: String): String {
         if (rawUrl.isBlank()) return ""
-        if (rawUrl.contains("radio-stream-proxy") && rawUrl.contains("url=")) {
+        var target = rawUrl.trim()
+        if (target.contains("radio-stream-proxy") && target.contains("url=")) {
             try {
-                val uri = android.net.Uri.parse(rawUrl)
+                val uri = android.net.Uri.parse(target)
                 val extracted = uri.getQueryParameter("url")
                 if (!extracted.isNullOrBlank()) {
-                    return java.net.URLDecoder.decode(extracted, "UTF-8")
+                    target = java.net.URLDecoder.decode(extracted, "UTF-8")
                 }
             } catch (_: Exception) {}
         }
-        if (rawUrl.startsWith("/")) {
+        if (target.startsWith("/")) {
             return ""
         }
-        return rawUrl
+        // Automatic normalization for NHPR AAC stream to MP3 stream for 100% Groq Whisper compatibility
+        if (target.startsWith("https://nhpr.streamguys1.com/nhpr", ignoreCase = true) && !target.contains(".mp3", ignoreCase = true)) {
+            target = "https://nhpr.streamguys1.com/nhpr.mp3"
+        }
+        return target
     }
 
     fun start(streamUrl: String, forceRestart: Boolean = false) {

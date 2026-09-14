@@ -43,7 +43,7 @@ const DEFAULT_STATIONS: RadioStation[] = [
     freq: '新英格蘭生活時事',
     location: '新罕布夏康科德 (美東北)',
     category: '美國東北公共時事與生活英語 (US Northeast Talk)',
-    streamUrl: 'https://nhpr.streamguys1.com/nhpr',
+    streamUrl: 'https://nhpr.streamguys1.com/nhpr.mp3',
   },
   {
     id: 'us-national-public-talk',
@@ -390,8 +390,13 @@ export default function App() {
       const saved = getPersistentItem('live_bilingo_stations_v4');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length === 5 && parsed.some((p: any) => p.id === 'us-west-public-talk')) {
-          return parsed;
+        if (Array.isArray(parsed) && parsed.length >= 5 && parsed.some((p: any) => p.id === 'us-west-public-talk')) {
+          return parsed.map((s: RadioStation) => {
+            if (s.streamUrl === 'https://nhpr.streamguys1.com/nhpr') {
+              return { ...s, streamUrl: 'https://nhpr.streamguys1.com/nhpr.mp3' };
+            }
+            return s;
+          });
         }
       }
     } catch (e) {}
@@ -405,7 +410,12 @@ export default function App() {
       const stationList: RadioStation[] = savedStations ? JSON.parse(savedStations) : DEFAULT_STATIONS;
       if (savedId) {
         const found = stationList.find((s) => s.id === savedId);
-        if (found) return found;
+        if (found) {
+          if (found.streamUrl === 'https://nhpr.streamguys1.com/nhpr') {
+            return { ...found, streamUrl: 'https://nhpr.streamguys1.com/nhpr.mp3' };
+          }
+          return found;
+        }
       }
     } catch (e) {}
     return DEFAULT_STATIONS[0];

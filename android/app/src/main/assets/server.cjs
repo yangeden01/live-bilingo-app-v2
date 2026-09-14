@@ -1739,7 +1739,7 @@ app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
     translationEngine: "local-zero-quota",
-    radioStreamUrl: "https://nhpr.streamguys1.com/nhpr",
+    radioStreamUrl: "https://nhpr.streamguys1.com/nhpr.mp3",
     deepgramConfigured: true
   });
 });
@@ -1793,24 +1793,28 @@ app.get("/api/deepgram-config", (req, res) => {
   res.json({
     wsUrl: "wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&smart_format=true&interim_results=true",
     authHeader: "Token 26c44e288a84756af4f80d41436af0bf7cc10715",
-    defaultStreamUrl: "https://nhpr.streamguys1.com/nhpr",
+    defaultStreamUrl: "https://nhpr.streamguys1.com/nhpr.mp3",
     paragraphDurationSeconds: 10
   });
 });
 function resolveTargetStreamUrl(inputUrl) {
   if (!inputUrl) return "https://npr-ice.streamguys1.com/live.mp3";
-  if (inputUrl.startsWith("http://") || inputUrl.startsWith("https://")) {
-    return inputUrl;
-  }
-  if (inputUrl.includes("/api/radio-stream-proxy")) {
+  let target = inputUrl.trim();
+  if (target.includes("/api/radio-stream-proxy")) {
     try {
-      const dummyUrl = new URL(inputUrl, "http://localhost:3000");
+      const dummyUrl = new URL(target, "http://localhost:3000");
       const targetParam = dummyUrl.searchParams.get("url");
       if (targetParam && (targetParam.startsWith("http://") || targetParam.startsWith("https://"))) {
-        return targetParam;
+        target = targetParam;
       }
     } catch (e) {
     }
+  }
+  if (target.toLowerCase().startsWith("https://nhpr.streamguys1.com/nhpr") && !target.toLowerCase().includes(".mp3")) {
+    target = "https://nhpr.streamguys1.com/nhpr.mp3";
+  }
+  if (target.startsWith("http://") || target.startsWith("https://")) {
+    return target;
   }
   return "https://npr-ice.streamguys1.com/live.mp3";
 }
@@ -2126,19 +2130,19 @@ app.post("/api/repair-stations", async (req, res) => {
   }
   const KNOWN_BACKUPS = {
     "us-west-public-news": [
-      "https://nhpr.streamguys1.com/nhpr",
+      "https://nhpr.streamguys1.com/nhpr.mp3",
       "https://npr-ice.streamguys1.com/live.mp3"
     ],
     "us-east-public-news": [
-      "https://nhpr.streamguys1.com/nhpr",
+      "https://nhpr.streamguys1.com/nhpr.mp3",
       "https://npr-ice.streamguys1.com/live.mp3"
     ],
     "us-finance-news-talk": [
       "https://stream.revma.ihrhls.com/zc4732",
-      "https://nhpr.streamguys1.com/nhpr"
+      "https://nhpr.streamguys1.com/nhpr.mp3"
     ],
     "us-national-public-talk": [
-      "https://nhpr.streamguys1.com/nhpr",
+      "https://nhpr.streamguys1.com/nhpr.mp3",
       "https://npr-ice.streamguys1.com/live.mp3"
     ],
     "uk-global-english-news": [
@@ -2531,7 +2535,7 @@ var deepgramWs = null;
 var triggerDeepgramFallback = null;
 var radioReq = null;
 var isStreamingActive = false;
-var currentRadioStreamUrl = "https://nhpr.streamguys1.com/nhpr";
+var currentRadioStreamUrl = "https://nhpr.streamguys1.com/nhpr.mp3";
 var currentRadioStationName = "NHPR Public Radio News";
 var currentStreamingSessionId = 0;
 var watchdogInterval = null;
@@ -4074,7 +4078,7 @@ function startBackendStreaming(streamUrl = currentRadioStreamUrl) {
   try {
     parsedUrl = new URL(currentRadioStreamUrl);
   } catch (e) {
-    parsedUrl = new URL("https://nhpr.streamguys1.com/nhpr");
+    parsedUrl = new URL("https://nhpr.streamguys1.com/nhpr.mp3");
   }
   const requester = parsedUrl.protocol === "http:" ? import_http.default : import_https.default;
   const requestOptions = {
@@ -4114,8 +4118,8 @@ function startBackendStreaming(streamUrl = currentRadioStreamUrl) {
     }
     if ((radioRes.statusCode || 0) >= 400) {
       console.warn(`Radio stream ${currentRadioStreamUrl} returned status ${radioRes.statusCode}. Falling back to default radio stream.`);
-      if (currentRadioStreamUrl !== "https://nhpr.streamguys1.com/nhpr") {
-        startBackendStreaming("https://nhpr.streamguys1.com/nhpr");
+      if (currentRadioStreamUrl !== "https://nhpr.streamguys1.com/nhpr.mp3") {
+        startBackendStreaming("https://nhpr.streamguys1.com/nhpr.mp3");
       }
       return;
     }

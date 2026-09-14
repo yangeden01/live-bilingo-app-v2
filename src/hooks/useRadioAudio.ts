@@ -58,7 +58,7 @@ export function useRadioAudio({
 
   // Extract or proxy stream URL cleanly with direct live stream & Decoupled Time Aligner
   const getProxiedStreamUrl = useCallback((rawUrl: string): string => {
-    if (!rawUrl) return 'https://nhpr.streamguys1.com/nhpr';
+    if (!rawUrl) return 'https://nhpr.streamguys1.com/nhpr.mp3';
 
     let cleanTarget = rawUrl;
     if ((rawUrl.includes('/api/radio-stream-proxy') || rawUrl.includes('/api/radio-stream-delayed')) && rawUrl.includes('url=')) {
@@ -71,6 +71,10 @@ export function useRadioAudio({
           }
         }
       } catch (e) {}
+    }
+
+    if (cleanTarget.toLowerCase().startsWith('https://nhpr.streamguys1.com/nhpr') && !cleanTarget.toLowerCase().includes('.mp3')) {
+      cleanTarget = 'https://nhpr.streamguys1.com/nhpr.mp3';
     }
 
     if (cleanTarget.startsWith('http://') || cleanTarget.startsWith('https://')) {

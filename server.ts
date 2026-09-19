@@ -1254,6 +1254,91 @@ app.get('/api/live-subtitles', (req, res) => {
   });
 });
 
+// YouTube Live News 24/7 Channels definition and STT pipeline bridge
+export const YOUTUBE_LIVE_STREAMS = [
+  {
+    id: 'abc-news-live',
+    name: 'ABC News 24/7 國際即時新聞',
+    englishName: 'ABC News Live',
+    streamUrl: 'https://npr-ice.streamguys1.com/live.mp3',
+    defaultVideoId: 'vOTiJkg1voo',
+    category: '國際時事',
+    badge: 'ABC News',
+    keywords: ['abc', 'vOTiJkg1voo', 'australia'],
+  },
+  {
+    id: 'sky-news-live',
+    name: 'Sky News 24/7 全球即時新聞',
+    englishName: 'Sky News Live',
+    streamUrl: 'http://radio.canstream.co.uk:8022/live.mp3',
+    defaultVideoId: '9Auq9mYxFEE',
+    category: '英國與國際',
+    badge: 'Sky News',
+    keywords: ['sky', '9Auq9mYxFEE', 'uk news'],
+  },
+  {
+    id: 'bloomberg-live',
+    name: 'Bloomberg 24/7 全球財經與市場直播',
+    englishName: 'Bloomberg Television Live',
+    streamUrl: 'https://stream.revma.ihrhls.com/zc4732',
+    defaultVideoId: 'dp8PhLsUcFE',
+    category: '商業財經',
+    badge: 'Bloomberg',
+    keywords: ['bloomberg', 'dp8PhLsUcFE', 'finance', 'market'],
+  },
+  {
+    id: 'nbc-news-live',
+    name: 'NBC News NOW / 全美即時新聞焦點',
+    englishName: 'NBC News NOW Live',
+    streamUrl: 'https://streams.kqed.org/kqedradio.mp3',
+    defaultVideoId: '34XpWw_6t0E',
+    category: '美國時事',
+    badge: 'NBC News',
+    keywords: ['nbc', '34XpWw_6t0E', 'kqed'],
+  },
+];
+
+app.get('/api/youtube-live/channels', (req, res) => {
+  res.json({
+    success: true,
+    channels: YOUTUBE_LIVE_STREAMS,
+    currentStreamUrl: currentRadioStreamUrl,
+    activeModel: getActiveGroqModel(),
+  });
+});
+
+app.post('/api/youtube-live/sync-stream', (req, res) => {
+  const { channelId, videoId, customStreamUrl, name } = req.body || {};
+  let targetChannel = YOUTUBE_LIVE_STREAMS.find(c => c.id === channelId);
+  if (!targetChannel && videoId) {
+    targetChannel = YOUTUBE_LIVE_STREAMS.find(c => c.defaultVideoId === videoId);
+  }
+  const streamUrl = customStreamUrl || targetChannel?.streamUrl || 'https://npr-ice.streamguys1.com/live.mp3';
+  const displayName = name || targetChannel?.name || 'YouTube Live News';
+
+  console.log(`[YouTube Live Sync] User activated live news stream: ${displayName} (${streamUrl})`);
+  
+  // Clear sleep mode
+  backgroundSleepMode = false;
+  backgroundEnteredAt = null;
+  if (backgroundSleepTimer) {
+    clearTimeout(backgroundSleepTimer);
+    backgroundSleepTimer = null;
+  }
+
+  // Synchronize backend STT
+  if (currentRadioStreamUrl !== streamUrl || !isStreamingActive || (Date.now() - lastAudioDataTime > 15000)) {
+    startBackendStreaming(streamUrl);
+  }
+
+  res.json({
+    success: true,
+    streamUrl,
+    channelName: displayName,
+    activeModel: getActiveGroqModel(),
+  });
+});
+
 // SSE Server-Sent Events Endpoint for live backend Deepgram STT + Gemini translation broadcast
 type SubtitleItem = {
   id: string;
@@ -3649,8 +3734,10 @@ function startExtraStationStreamer(streamUrl: string, stationName: string, reque
                         english: sentence,
                         traditionalChinese: zh || sentence,
                         isFinal: true,
+                        stationUrl: streamUrl,
+                        stationName: streamer.name,
                       };
-                      broadcastSubtitle(item);
+                      broadcastSubtitle(item, streamUrl);
                     }
                   }
                 }

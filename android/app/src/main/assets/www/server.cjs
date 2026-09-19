@@ -4,6 +4,10 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
@@ -24,6 +28,9 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 
 // server.ts
 var server_exports = {};
+__export(server_exports, {
+  YOUTUBE_LIVE_STREAMS: () => YOUTUBE_LIVE_STREAMS
+});
 module.exports = __toCommonJS(server_exports);
 var import_config = require("dotenv/config");
 var import_express = __toESM(require("express"), 1);
@@ -2643,6 +2650,81 @@ app.get("/api/live-subtitles", (req, res) => {
     serverTime: Date.now()
   });
 });
+var YOUTUBE_LIVE_STREAMS = [
+  {
+    id: "abc-news-live",
+    name: "ABC News 24/7 \u570B\u969B\u5373\u6642\u65B0\u805E",
+    englishName: "ABC News Live",
+    streamUrl: "https://npr-ice.streamguys1.com/live.mp3",
+    defaultVideoId: "vOTiJkg1voo",
+    category: "\u570B\u969B\u6642\u4E8B",
+    badge: "ABC News",
+    keywords: ["abc", "vOTiJkg1voo", "australia"]
+  },
+  {
+    id: "sky-news-live",
+    name: "Sky News 24/7 \u5168\u7403\u5373\u6642\u65B0\u805E",
+    englishName: "Sky News Live",
+    streamUrl: "http://radio.canstream.co.uk:8022/live.mp3",
+    defaultVideoId: "9Auq9mYxFEE",
+    category: "\u82F1\u570B\u8207\u570B\u969B",
+    badge: "Sky News",
+    keywords: ["sky", "9Auq9mYxFEE", "uk news"]
+  },
+  {
+    id: "bloomberg-live",
+    name: "Bloomberg 24/7 \u5168\u7403\u8CA1\u7D93\u8207\u5E02\u5834\u76F4\u64AD",
+    englishName: "Bloomberg Television Live",
+    streamUrl: "https://stream.revma.ihrhls.com/zc4732",
+    defaultVideoId: "dp8PhLsUcFE",
+    category: "\u5546\u696D\u8CA1\u7D93",
+    badge: "Bloomberg",
+    keywords: ["bloomberg", "dp8PhLsUcFE", "finance", "market"]
+  },
+  {
+    id: "nbc-news-live",
+    name: "NBC News NOW / \u5168\u7F8E\u5373\u6642\u65B0\u805E\u7126\u9EDE",
+    englishName: "NBC News NOW Live",
+    streamUrl: "https://streams.kqed.org/kqedradio.mp3",
+    defaultVideoId: "34XpWw_6t0E",
+    category: "\u7F8E\u570B\u6642\u4E8B",
+    badge: "NBC News",
+    keywords: ["nbc", "34XpWw_6t0E", "kqed"]
+  }
+];
+app.get("/api/youtube-live/channels", (req, res) => {
+  res.json({
+    success: true,
+    channels: YOUTUBE_LIVE_STREAMS,
+    currentStreamUrl: currentRadioStreamUrl,
+    activeModel: getActiveGroqModel()
+  });
+});
+app.post("/api/youtube-live/sync-stream", (req, res) => {
+  const { channelId, videoId, customStreamUrl, name } = req.body || {};
+  let targetChannel = YOUTUBE_LIVE_STREAMS.find((c) => c.id === channelId);
+  if (!targetChannel && videoId) {
+    targetChannel = YOUTUBE_LIVE_STREAMS.find((c) => c.defaultVideoId === videoId);
+  }
+  const streamUrl = customStreamUrl || targetChannel?.streamUrl || "https://npr-ice.streamguys1.com/live.mp3";
+  const displayName = name || targetChannel?.name || "YouTube Live News";
+  console.log(`[YouTube Live Sync] User activated live news stream: ${displayName} (${streamUrl})`);
+  backgroundSleepMode = false;
+  backgroundEnteredAt = null;
+  if (backgroundSleepTimer) {
+    clearTimeout(backgroundSleepTimer);
+    backgroundSleepTimer = null;
+  }
+  if (currentRadioStreamUrl !== streamUrl || !isStreamingActive || Date.now() - lastAudioDataTime > 15e3) {
+    startBackendStreaming(streamUrl);
+  }
+  res.json({
+    success: true,
+    streamUrl,
+    channelName: displayName,
+    activeModel: getActiveGroqModel()
+  });
+});
 var sseClients = /* @__PURE__ */ new Set();
 var sseClientStations = /* @__PURE__ */ new Map();
 var wsClients = /* @__PURE__ */ new Set();
@@ -4525,9 +4607,11 @@ function startExtraStationStreamer(streamUrl, stationName, requestedModel) {
                         createdAt: Date.now(),
                         english: sentence,
                         traditionalChinese: zh || sentence,
-                        isFinal: true
+                        isFinal: true,
+                        stationUrl: streamUrl,
+                        stationName: streamer.name
                       };
-                      broadcastSubtitle(item);
+                      broadcastSubtitle(item, streamUrl);
                     }
                   }
                 }
@@ -4797,4 +4881,8 @@ async function startServer() {
   });
 }
 startServer();
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  YOUTUBE_LIVE_STREAMS
+});
 //# sourceMappingURL=server.cjs.map

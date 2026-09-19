@@ -214,12 +214,20 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
             rel: 0,
             modestbranding: 1,
             enablejsapi: 1,
+            cc_load_policy: 1,
+            cc_lang_pref: 'en',
+            hl: 'en',
             origin: typeof window !== 'undefined' ? window.location.origin : undefined,
           },
           events: {
             onReady: (event: any) => {
               if (!isMounted) return;
               setIsReady(true);
+              try {
+                if (typeof event.target.loadModule === 'function') {
+                  event.target.loadModule('captions');
+                }
+              } catch (_) {}
               const dur = event.target.getDuration();
               if (dur > 0) {
                 setDuration(dur);

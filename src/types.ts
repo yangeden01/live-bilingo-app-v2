@@ -90,6 +90,16 @@ export interface CachedYouTubeData {
   updatedAt: number;
 }
 
+export interface YouTubeSavedUrl {
+  id: string;
+  videoId: string;
+  url: string;
+  title: string;
+  channelName?: string;
+  savedAt: number;
+  isLive?: boolean;
+}
+
 export type YouTubeErrorCode =
   | 'INVALID_YOUTUBE_URL'
   | 'VIDEO_UNAVAILABLE'

@@ -3,9 +3,16 @@ import { YouTubeBilingualPlayer, YouTubePlayerRef } from './YouTubeBilingualPlay
 import { BilingualSubtitleCard } from './BilingualSubtitleCard';
 import { useYouTubeSubtitles } from '../hooks/useYouTubeSubtitles';
 import { extractYouTubeVideoId } from '../utils/youtubeUrl';
-import { YouTubeSubtitleItem, SubtitleItem, ReadingMode, ChineseVariant, SubtitleFontSize, YouTubeNewsVideo } from '../types';
+import { YouTubeSubtitleItem, SubtitleItem, ReadingMode, ChineseVariant, SubtitleFontSize, YouTubeNewsVideo, YouTubeSavedUrl } from '../types';
 import { getPersistentItem, setPersistentItem } from '../utils/persistentStorage';
 import { vibrateDetentTick } from '../utils/haptics';
+import {
+  getSavedYouTubeUrls,
+  saveYouTubeUrl,
+  removeSavedYouTubeUrl,
+  isYouTubeUrlSaved,
+  updateSavedYouTubeUrlTitle,
+} from '../utils/youtubeFavorites';
 import {
   Youtube,
   RotateCw,
@@ -16,6 +23,7 @@ import {
   ArrowDown,
   CheckCircle2,
   Bookmark,
+  BookmarkCheck,
   Clock,
   HelpCircle,
   Trash2,
@@ -23,9 +31,12 @@ import {
   ChevronDown,
   History,
   Newspaper,
+  Star,
 } from 'lucide-react';
 import { ReadingModeAndFontToolbar } from './ReadingModeAndFontToolbar';
 import { YouTubeNewsDiscoveryModal } from './YouTubeNewsDiscoveryModal';
+import { YouTubeSavedUrlsModal } from './YouTubeSavedUrlsModal';
+import { YouTubeLiveStreamCard } from './YouTubeLiveStreamCard';
 
 interface Props {
   onOpenDictionary?: (word?: string) => void;
@@ -236,6 +247,11 @@ export const YouTubeBilingualView: React.FC<Props> = ({
   const [showNewsModal, setShowNewsModal] = useState<boolean>(false);
   const historyDropdownRef = useRef<HTMLDivElement | null>(null);
 
+  // Saved / Favorite URLs state and modal
+  const [savedUrls, setSavedUrls] = useState<YouTubeSavedUrl[]>(() => getSavedYouTubeUrls());
+  const [showSavedUrlsModal, setShowSavedUrlsModal] = useState<boolean>(false);
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+
   const playerRef = useRef<YouTubePlayerRef | null>(null);
   const subtitleContainerRef = useRef<HTMLDivElement | null>(null);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
@@ -419,8 +435,83 @@ export const YouTubeBilingualView: React.FC<Props> = ({
         }
         return prev;
       });
+
+      // Also update title in Saved Favorites
+      setSavedUrls(updateSavedYouTubeUrlTitle(activeVideoId, title));
     }
   }, [activeVideoId, title]);
+
+  // Check if current active video is saved in favorites
+  const isCurrentVideoSaved = useMemo(() => {
+    return isYouTubeUrlSaved(activeVideoId);
+  }, [activeVideoId, savedUrls]);
+
+  // Toggle saving current video URL to favorites
+  const handleToggleSaveCurrentUrl = useCallback(() => {
+    if (!activeVideoId) return;
+    const urlToSave = urlInput.trim() || `https://www.youtube.com/watch?v=${activeVideoId}`;
+    if (isCurrentVideoSaved) {
+      const updated = removeSavedYouTubeUrl(activeVideoId);
+      setSavedUrls(updated);
+      setSaveToast('已從喜愛網址清單移除');
+      vibrateDetentTick();
+      setTimeout(() => setSaveToast(null), 2500);
+    } else {
+      const isLive = urlToSave.includes('/live/') || (title && title.toLowerCase().includes('live')) || activeVideoId === 'vOTiJkg1voo';
+      const updated = saveYouTubeUrl({
+        videoId: activeVideoId,
+        url: urlToSave,
+        title: title || (activeVideoId === VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.id ? VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.title : undefined),
+        isLive,
+      });
+      setSavedUrls(updated);
+      setSaveToast('已儲存至喜歡的網址 ⭐');
+      vibrateDetentTick();
+      setTimeout(() => setSaveToast(null), 2500);
+    }
+  }, [activeVideoId, urlInput, isCurrentVideoSaved, title]);
+
+  // Select a saved URL from the Saved URLs modal
+  const handleSelectSavedUrl = useCallback((urlToPlay: string, vid: string, savedTitle?: string) => {
+    setUrlInput(urlToPlay);
+    setUrlInputError(null);
+    setActiveVideoId(vid);
+    setPersistentItem('youtube_last_url', urlToPlay);
+    setPersistentItem('youtube_last_video_id', vid);
+    saveUrlToHistory(urlToPlay, vid, savedTitle);
+    setShowSavedUrlsModal(false);
+    setPlayerState('paused');
+    onPlaybackStateChange?.('paused');
+  }, [saveUrlToHistory, onPlaybackStateChange]);
+
+  // Save URL directly from modal or custom input
+  const handleSaveUrlFromModal = useCallback((item: { videoId: string; url: string; title?: string; isLive?: boolean }) => {
+    const updated = saveYouTubeUrl(item);
+    setSavedUrls(updated);
+    setSaveToast('已儲存至喜歡的網址 ⭐');
+    vibrateDetentTick();
+    setTimeout(() => setSaveToast(null), 2500);
+  }, []);
+
+  // Delete saved URL
+  const handleDeleteSavedUrl = useCallback((id: string) => {
+    const updated = removeSavedYouTubeUrl(id);
+    setSavedUrls(updated);
+    vibrateDetentTick();
+  }, []);
+
+  // Detect whether current video is a Live Stream
+  const isCurrentLiveVideo = useMemo(() => {
+    if (!activeVideoId) return false;
+    const u = (urlInput || '').toLowerCase();
+    const t = (title || '').toLowerCase();
+    return (
+      u.includes('/live/') ||
+      u.includes('live') ||
+      t.includes('live') ||
+      activeVideoId === 'vOTiJkg1voo'
+    );
+  }, [activeVideoId, urlInput, title]);
 
   // Load the verified caption test video through the exact standard production pipeline
   const handleLoadTestVideo = () => {
@@ -870,6 +961,33 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                               )}
                               <button
                                 type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const alreadySaved = isYouTubeUrlSaved(item.videoId);
+                                  if (alreadySaved) {
+                                    handleDeleteSavedUrl(item.videoId);
+                                    setSaveToast('已從喜愛網址清單移除');
+                                  } else {
+                                    handleSaveUrlFromModal({
+                                      videoId: item.videoId,
+                                      url: item.url,
+                                      title: item.title,
+                                      isLive: item.url.includes('/live/') || item.videoId === 'vOTiJkg1voo',
+                                    });
+                                  }
+                                  setTimeout(() => setSaveToast(null), 2500);
+                                }}
+                                title={isYouTubeUrlSaved(item.videoId) ? '從喜愛網址移除' : '儲存至喜歡的網址'}
+                                className={`p-1 rounded transition-colors ${
+                                  isYouTubeUrlSaved(item.videoId)
+                                    ? 'text-amber-500 hover:bg-amber-500/10'
+                                    : 'opacity-50 hover:opacity-100 hover:text-amber-500'
+                                }`}
+                              >
+                                <Star className={`w-3.5 h-3.5 ${isYouTubeUrlSaved(item.videoId) ? 'fill-amber-500' : ''}`} />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={(e) => handleDeleteHistoryItem(e, item.videoId)}
                                 title="刪除此歷史紀錄"
                                 className={`p-1 rounded opacity-60 hover:opacity-100 transition-opacity ${
@@ -891,7 +1009,42 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                 </div>
               )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Save Current URL / Bookmark Button */}
+            {activeVideoId && (
+              <button
+                type="button"
+                id="youtube-save-current-url-btn"
+                onClick={handleToggleSaveCurrentUrl}
+                aria-label={isCurrentVideoSaved ? '已收藏此網址' : '儲存此網址至喜歡'}
+                title={isCurrentVideoSaved ? '點擊從喜歡的網址移除' : '儲存目前播放網址至喜歡的清單'}
+                className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border shadow-sm transition-all shrink-0 cursor-pointer whitespace-nowrap ${
+                  isCurrentVideoSaved
+                    ? 'bg-amber-500/15 text-amber-500 border-amber-500/40 hover:bg-amber-500/25'
+                    : testBtnClass
+                }`}
+              >
+                <Star className={`w-4 h-4 ${isCurrentVideoSaved ? 'fill-amber-500 text-amber-500' : 'text-amber-500'}`} />
+                <span>{isCurrentVideoSaved ? '已收藏網址' : '儲存網址'}</span>
+              </button>
+            )}
+
+            {/* Saved URLs Modal Button */}
+            <button
+              type="button"
+              id="youtube-saved-urls-modal-btn"
+              onClick={() => setShowSavedUrlsModal(true)}
+              aria-label="喜歡的網址"
+              title="查看與管理已儲存的 YouTube 喜歡網址"
+              className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border shadow-sm transition-all shrink-0 cursor-pointer whitespace-nowrap ${testBtnClass}`}
+            >
+              <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+              <span>喜歡的網址</span>
+              <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-500 font-bold">
+                {savedUrls.length}
+              </span>
+            </button>
+
             <button
               type="button"
               id="youtube-live-news-btn"
@@ -914,6 +1067,14 @@ export const YouTubeBilingualView: React.FC<Props> = ({
             </button>
           </div>
         </form>
+
+        {/* Save Toast Feedback */}
+        {saveToast && (
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 text-xs font-semibold animate-in fade-in slide-in-from-top duration-150">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{saveToast}</span>
+          </div>
+        )}
 
         {urlInputError && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs animate-in fade-in">
@@ -1013,8 +1174,22 @@ export const YouTubeBilingualView: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Error State (Handled cleanly without ASR fallback) */}
-          {status === 'error' && error && (
+          {/* Live Stream Mode Card (When watching YouTube Live stream where CC is rendered live on video) */}
+          {isCurrentLiveVideo && subtitles.length === 0 && (
+            <YouTubeLiveStreamCard
+              videoId={activeVideoId || ''}
+              url={urlInput || `https://www.youtube.com/watch?v=${activeVideoId}`}
+              title={title || 'ABC News (Australia) 24/7 即時新聞直播'}
+              isSaved={isCurrentVideoSaved}
+              onToggleSave={handleToggleSaveCurrentUrl}
+              onOpenDictionary={onOpenDictionary}
+              onOpenNewsModal={() => setShowNewsModal(true)}
+              currentTheme={currentTheme}
+            />
+          )}
+
+          {/* Error State for non-live videos (Handled cleanly without ASR fallback) */}
+          {!isCurrentLiveVideo && status === 'error' && error && (
             <div className="bg-rose-950/20 border border-rose-800/40 rounded-2xl p-6 text-center space-y-3">
               <AlertCircle className="w-8 h-8 text-rose-400 mx-auto" />
               <div>
@@ -1150,6 +1325,18 @@ export const YouTubeBilingualView: React.FC<Props> = ({
         onClose={() => setShowNewsModal(false)}
         onSelectVideo={handleSelectNewsVideo}
         effectiveTheme={effectiveTheme}
+      />
+
+      {/* YouTube Saved URLs / Favorites Manager Modal */}
+      <YouTubeSavedUrlsModal
+        isOpen={showSavedUrlsModal}
+        onClose={() => setShowSavedUrlsModal(false)}
+        savedUrls={savedUrls}
+        activeVideoId={activeVideoId}
+        onSelectUrl={handleSelectSavedUrl}
+        onSaveUrl={handleSaveUrlFromModal}
+        onDeleteUrl={handleDeleteSavedUrl}
+        currentTheme={currentTheme}
       />
     </div>
   );

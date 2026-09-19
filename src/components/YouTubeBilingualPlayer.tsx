@@ -18,6 +18,7 @@ interface Props {
   initialTimeSeconds?: number;
   hideActionControls?: boolean;
   isLoopEnabled?: boolean;
+  isLive?: boolean;
   ref?: React.Ref<YouTubePlayerRef>;
 }
 
@@ -37,6 +38,7 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
   initialTimeSeconds = 0,
   hideActionControls = false,
   isLoopEnabled = false,
+  isLive = false,
   ref,
 }) => {
   const containerId = useRef(`yt-player-${Math.random().toString(36).substring(2, 9)}`).current;
@@ -430,78 +432,80 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Embedded Player Control Bar */}
-      <div className={`px-4 ${hideActionControls ? 'py-2' : 'py-3'} bg-slate-900 border-t border-slate-800/80 flex flex-col gap-2`}>
-        {/* Progress seek slider */}
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] font-mono text-slate-400 w-10 text-right shrink-0">
-            {formatTime(currentTime)}
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={duration || 100}
-            step={0.1}
-            value={currentTime}
-            onChange={handleSeek}
-            disabled={!isReady || duration <= 0}
-            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500 focus:outline-none"
-          />
-          <span className="text-[11px] font-mono text-slate-400 w-10 text-left shrink-0">
-            {formatTime(duration)}
-          </span>
-        </div>
-
-        {/* Action Controls (Hidden in reading mode to maximize subtitle area) */}
-        {!hideActionControls && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={togglePlayPause}
-                disabled={!isReady}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  isPlaying
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
-                    : 'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20'
-                }`}
-              >
-                {isPlaying ? (
-                  <>
-                    <Pause className="w-3.5 h-3.5 fill-current" />
-                    <span>暫停</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                    <span>播放</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                onClick={() => {
-                  if (playerRef.current) {
-                    const newTime = Math.max(0, currentTime - 5);
-                    playerRef.current.seekTo(newTime, true);
-                    setCurrentTime(newTime);
-                    onTimeUpdateRef.current?.(newTime);
-                  }
-                }}
-                className="px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer"
-                title="後退 5 秒"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>-5s</span>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <Volume2 className="w-3.5 h-3.5 text-blue-400" />
-              <span className="hidden sm:inline">雙語學習同步模式</span>
-            </div>
+      {/* Embedded Player Control Bar (Hidden completely in live streaming mode) */}
+      {!isLive && (
+        <div className={`px-4 ${hideActionControls ? 'py-2' : 'py-3'} bg-slate-900 border-t border-slate-800/80 flex flex-col gap-2`}>
+          {/* Progress seek slider */}
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] font-mono text-slate-400 w-10 text-right shrink-0">
+              {formatTime(currentTime)}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={duration || 100}
+              step={0.1}
+              value={currentTime}
+              onChange={handleSeek}
+              disabled={!isReady || duration <= 0}
+              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500 focus:outline-none"
+            />
+            <span className="text-[11px] font-mono text-slate-400 w-10 text-left shrink-0">
+              {formatTime(duration)}
+            </span>
           </div>
-        )}
-      </div>
+
+          {/* Action Controls (Hidden in reading mode to maximize subtitle area) */}
+          {!hideActionControls && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={togglePlayPause}
+                  disabled={!isReady}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    isPlaying
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
+                      : 'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20'
+                  }`}
+                >
+                  {isPlaying ? (
+                    <>
+                      <Pause className="w-3.5 h-3.5 fill-current" />
+                      <span>暫停</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>播放</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (playerRef.current) {
+                      const newTime = Math.max(0, currentTime - 5);
+                      playerRef.current.seekTo(newTime, true);
+                      setCurrentTime(newTime);
+                      onTimeUpdateRef.current?.(newTime);
+                    }
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer"
+                  title="後退 5 秒"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>-5s</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <Volume2 className="w-3.5 h-3.5 text-blue-400" />
+                <span className="hidden sm:inline">雙語學習同步模式</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -2624,7 +2624,14 @@ app.get("/api/version", (req, res) => {
 });
 function normalizeStationUrl(url) {
   if (!url) return "";
-  return url.trim().toLowerCase().replace(/^https?:\/\//i, "").replace(/\/+$/, "").split("?")[0];
+  let cleaned = url.trim().toLowerCase().replace(/^https?:\/\//i, "").replace(/\/+$/, "").split("?")[0];
+  if (cleaned.includes("revma.ihrhls.com/zc4732")) {
+    return "stream.revma.ihrhls.com/zc4732";
+  }
+  if (cleaned.includes("nhpr.streamguys1.com/nhpr")) {
+    return "nhpr.streamguys1.com/nhpr.mp3";
+  }
+  return cleaned;
 }
 function isSameStationUrl(urlA, urlB) {
   if (!urlA || !urlB) return false;
@@ -2715,8 +2722,9 @@ app.post("/api/youtube-live/sync-stream", (req, res) => {
     clearTimeout(backgroundSleepTimer);
     backgroundSleepTimer = null;
   }
-  if (currentRadioStreamUrl !== streamUrl || !isStreamingActive || Date.now() - lastAudioDataTime > 15e3) {
-    startBackendStreaming(streamUrl);
+  currentRadioStationName = displayName;
+  if (!isSameStationUrl(currentRadioLogicalStationUrl, streamUrl) || !isStreamingActive || Date.now() - lastAudioDataTime > 15e3) {
+    startBackendStreaming(streamUrl, streamUrl);
   }
   res.json({
     success: true,
@@ -2799,6 +2807,7 @@ var triggerDeepgramFallback = null;
 var radioReq = null;
 var isStreamingActive = false;
 var currentRadioStreamUrl = "https://npr-ice.streamguys1.com/live.mp3";
+var currentRadioLogicalStationUrl = "https://npr-ice.streamguys1.com/live.mp3";
 var currentRadioStationName = "NPR Program Stream News";
 var currentStreamingSessionId = 0;
 var watchdogInterval = null;
@@ -3786,7 +3795,7 @@ app.get("/api/live-subtitles-stream", (req, res) => {
 });
 function broadcastSubtitle(item, originStationUrl) {
   if (!item.stationUrl) {
-    item.stationUrl = originStationUrl || currentRadioStreamUrl;
+    item.stationUrl = originStationUrl || currentRadioLogicalStationUrl || currentRadioStreamUrl;
   }
   if (!item.stationName) {
     item.stationName = currentRadioStationName;
@@ -4294,18 +4303,19 @@ function handleSpeechTranscriptChunk(transcript) {
     }, 3500);
   }
 }
-function startBackendStreaming(streamUrl = currentRadioStreamUrl) {
+function startBackendStreaming(streamUrl = currentRadioStreamUrl, logicalOriginUrl) {
   const realStreamUrl = resolveTargetStreamUrl(streamUrl);
   stopBackendStreaming();
   const activeSessionId = ++currentStreamingSessionId;
   currentRadioStreamUrl = realStreamUrl;
+  currentRadioLogicalStationUrl = logicalOriginUrl || streamUrl;
   isStreamingActive = true;
   lastAudioDataTime = Date.now();
   lastTranscriptTime = Date.now();
   groqAudioAccumulator = Buffer.alloc(0);
   isGroqTranscribing = false;
   const engineName = GROQ_TOKEN ? "Groq Whisper Large V3 Turbo ($0.04/hr)" : "Deepgram Nova-2";
-  console.log(`[STT Engine] Initializing session #${activeSessionId} via ${engineName} for stream: ${currentRadioStreamUrl}`);
+  console.log(`[STT Engine] Initializing session #${activeSessionId} via ${engineName} for stream: ${currentRadioStreamUrl} (logical: ${currentRadioLogicalStationUrl})`);
   watchdogInterval = setInterval(() => {
     if (activeSessionId !== currentStreamingSessionId) {
       clearInterval(watchdogInterval);
@@ -4318,7 +4328,7 @@ function startBackendStreaming(streamUrl = currentRadioStreamUrl) {
       if (pendingTranscriptBuffer && pendingTranscriptBuffer.trim()) {
         flushTranscriptParagraph(true);
       }
-      startBackendStreaming(currentRadioStreamUrl);
+      startBackendStreaming(currentRadioStreamUrl, currentRadioLogicalStationUrl);
     }
   }, 4e3);
   function initDeepgramWs() {
@@ -4404,8 +4414,8 @@ function startBackendStreaming(streamUrl = currentRadioStreamUrl) {
     }
     if ([301, 302, 303, 307, 308].includes(radioRes.statusCode || 0) && radioRes.headers.location) {
       const redirectUrl = new URL(radioRes.headers.location, currentRadioStreamUrl).toString();
-      console.log(`Redirecting radio audio source to ${redirectUrl}`);
-      startBackendStreaming(redirectUrl);
+      console.log(`Redirecting radio audio source to ${redirectUrl} (preserving logical station: ${currentRadioLogicalStationUrl})`);
+      startBackendStreaming(redirectUrl, currentRadioLogicalStationUrl);
       return;
     }
     if ((radioRes.statusCode || 0) >= 400) {

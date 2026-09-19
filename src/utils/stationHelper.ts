@@ -15,12 +15,16 @@ export function normalizeStationUrl(url?: string | null): string {
       }
     } catch (_) {}
   }
+  // Automatic normalization for Bloomberg Revma stream
+  if (cleaned.toLowerCase().includes('revma.ihrhls.com/zc4732')) {
+    return 'https://stream.revma.ihrhls.com/zc4732';
+  }
   // Automatic normalization for NHPR AAC stream to MP3 stream
   if (cleaned.toLowerCase().startsWith('https://nhpr.streamguys1.com/nhpr') && !cleaned.toLowerCase().includes('.mp3')) {
     cleaned = 'https://nhpr.streamguys1.com/nhpr.mp3';
   }
-  // Strip trailing slash and lowercase for protocol/host comparison
-  return cleaned.replace(/\/+$/, '').toLowerCase();
+  // Strip protocol, trailing slash, query params, and lowercase for protocol/host comparison
+  return cleaned.trim().toLowerCase().replace(/^https?:\/\//i, '').replace(/\/+$/, '').split('?')[0];
 }
 
 /**

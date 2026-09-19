@@ -14,7 +14,7 @@ export const YOUTUBE_LIVE_NEWS_CHANNELS: YouTubeLiveNewsChannel[] = [
     id: 'abc-news-live',
     name: 'ABC News 24/7 國際即時新聞',
     englishName: 'ABC News Live',
-    streamUrl: 'https://npr-ice.streamguys1.com/live.mp3',
+    streamUrl: 'http://abc.streamguys1.com/live/newsradio/icecast.audio',
     defaultVideoId: 'vOTiJkg1voo',
     category: '國際時事',
     badge: 'ABC News',

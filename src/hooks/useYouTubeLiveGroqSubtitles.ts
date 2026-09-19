@@ -175,6 +175,7 @@ export function useYouTubeLiveGroqSubtitles({
 
     const notifyBackend = async () => {
       try {
+        // 1. Notify YouTube live sync endpoint
         const syncUrl = getApiUrl('/api/youtube-live/sync-stream');
         const res = await safeApiFetch<any>(syncUrl, {
           method: 'POST',
@@ -192,12 +193,53 @@ export function useYouTubeLiveGroqSubtitles({
               : 'Groq Whisper Large V3'
           );
         }
+
+        // 2. Ensure backend radio playback state is active (unpauses STT engine)
+        safeApiFetch(getApiUrl('/api/radio-playback-state'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            isPlaying: true,
+            streamUrl: activeChannel.streamUrl,
+          }),
+        }).catch(() => {});
       } catch (err) {
         console.warn('[YouTubeLiveGroq] Failed to sync stream with backend:', err);
       }
     };
 
     notifyBackend();
+
+    // Immediately fetch existing recent subtitles so screen is not blank
+    const fetchRecentSubtitles = async () => {
+      try {
+        const pollUrl = getApiUrl(
+          `/api/live-subtitles?stationUrl=${encodeURIComponent(activeChannel.streamUrl)}&since=0`
+        );
+        const res = await safeApiFetch<any>(pollUrl);
+        if (res?.data?.subtitles && Array.isArray(res.data.subtitles) && res.data.subtitles.length > 0) {
+          if (!isCancelled) setIsConnected(true);
+          res.data.subtitles.forEach((sub: SubtitleItem) => handleIncomingSubtitle(sub));
+        }
+      } catch (_) {}
+    };
+    fetchRecentSubtitles();
+
+    // Concurrently run REST polling every 2.5s as rock-solid guarantee
+    if (pollingTimerRef.current) clearInterval(pollingTimerRef.current);
+    pollingTimerRef.current = setInterval(async () => {
+      if (isCancelled || !enabled) return;
+      try {
+        const pollUrl = getApiUrl(
+          `/api/live-subtitles?stationUrl=${encodeURIComponent(activeChannel.streamUrl)}&since=${Date.now() - 25000}`
+        );
+        const res = await safeApiFetch<any>(pollUrl);
+        if (res?.data?.subtitles && Array.isArray(res.data.subtitles)) {
+          if (res.data.subtitles.length > 0) setIsConnected(true);
+          res.data.subtitles.forEach((sub: SubtitleItem) => handleIncomingSubtitle(sub));
+        }
+      } catch (_) {}
+    }, 2500);
 
     // Setup SSE connection
     const sseUrl = getApiUrl(
@@ -235,32 +277,10 @@ export function useYouTubeLiveGroqSubtitles({
 
       es.onerror = () => {
         if (isCancelled) return;
-        setIsConnected(false);
-        // Fallback to REST polling if SSE closes
-        if (!pollingTimerRef.current) {
-          startPollingFallback();
-        }
+        // Don't mark offline if REST polling is keeping it connected
       };
     } catch (e) {
-      startPollingFallback();
-    }
-
-    // Polling fallback mechanism
-    function startPollingFallback() {
-      if (pollingTimerRef.current) clearInterval(pollingTimerRef.current);
-      pollingTimerRef.current = setInterval(async () => {
-        if (isCancelled || !enabled) return;
-        try {
-          const pollUrl = getApiUrl(
-            `/api/live-subtitles?stationUrl=${encodeURIComponent(activeChannel.streamUrl)}&since=${Date.now() - 15000}`
-          );
-          const res = await safeApiFetch<any>(pollUrl);
-          if (res?.data?.subtitles && Array.isArray(res.data.subtitles)) {
-            setIsConnected(true);
-            res.data.subtitles.forEach((sub: SubtitleItem) => handleIncomingSubtitle(sub));
-          }
-        } catch (_) {}
-      }, 3500);
+      // SSE unsupported or blocked, fallback polling already running
     }
 
     return () => {

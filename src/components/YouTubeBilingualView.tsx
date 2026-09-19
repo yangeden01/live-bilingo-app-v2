@@ -1202,36 +1202,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
 
           {/* Live Stream Mode Card (Groq Whisper AI Live Bilingual Subtitles or Raw CC info) */}
           {isCurrentLiveVideo && subtitles.length === 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowLiveRawCcCard(false)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                      !showLiveRawCcCard
-                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
-                        : 'bg-slate-800/80 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Groq AI 即時雙語辨識
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowLiveRawCcCard(true)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                      showLiveRawCcCard
-                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
-                        : 'bg-slate-800/80 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <Tv className="w-3.5 h-3.5" />
-                    YouTube 原生 CC 說明
-                  </button>
-                </div>
-              </div>
-
+            <div className="space-y-2">
               {!showLiveRawCcCard ? (
                 <YouTubeLiveGroqSubtitlesCard
                   videoId={activeVideoId || ''}
@@ -1255,16 +1226,28 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                   onShowRawCcCard={() => setShowLiveRawCcCard(true)}
                 />
               ) : (
-                <YouTubeLiveStreamCard
-                  videoId={activeVideoId || ''}
-                  url={urlInput || `https://www.youtube.com/watch?v=${activeVideoId}`}
-                  title={title || 'ABC News (Australia) 24/7 即時新聞直播'}
-                  isSaved={isCurrentVideoSaved}
-                  onToggleSave={handleToggleSaveCurrentUrl}
-                  onOpenDictionary={onOpenDictionary}
-                  onOpenNewsModal={() => setShowNewsModal(true)}
-                  currentTheme={currentTheme}
-                />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowLiveRawCcCard(false)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      返回 Groq AI 即時雙語字幕
+                    </button>
+                  </div>
+                  <YouTubeLiveStreamCard
+                    videoId={activeVideoId || ''}
+                    url={urlInput || `https://www.youtube.com/watch?v=${activeVideoId}`}
+                    title={title || 'ABC News (Australia) 24/7 即時新聞直播'}
+                    isSaved={isCurrentVideoSaved}
+                    onToggleSave={handleToggleSaveCurrentUrl}
+                    onOpenDictionary={onOpenDictionary}
+                    onOpenNewsModal={() => setShowNewsModal(true)}
+                    currentTheme={currentTheme}
+                  />
+                </div>
               )}
             </div>
           )}

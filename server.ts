@@ -1216,7 +1216,14 @@ app.get('/api/version', (req, res) => {
 
 function normalizeStationUrl(url?: string | null): string {
   if (!url) return '';
-  return url.trim().toLowerCase().replace(/^https?:\/\//i, '').replace(/\/+$/, '').split('?')[0];
+  let cleaned = url.trim().toLowerCase().replace(/^https?:\/\//i, '').replace(/\/+$/, '').split('?')[0];
+  if (cleaned.includes('revma.ihrhls.com/zc4732')) {
+    return 'stream.revma.ihrhls.com/zc4732';
+  }
+  if (cleaned.includes('nhpr.streamguys1.com/nhpr')) {
+    return 'nhpr.streamguys1.com/nhpr.mp3';
+  }
+  return cleaned;
 }
 
 function isSameStationUrl(urlA?: string | null, urlB?: string | null): boolean {
@@ -1327,8 +1334,9 @@ app.post('/api/youtube-live/sync-stream', (req, res) => {
   }
 
   // Synchronize backend STT
-  if (currentRadioStreamUrl !== streamUrl || !isStreamingActive || (Date.now() - lastAudioDataTime > 15000)) {
-    startBackendStreaming(streamUrl);
+  currentRadioStationName = displayName;
+  if (!isSameStationUrl(currentRadioLogicalStationUrl, streamUrl) || !isStreamingActive || (Date.now() - lastAudioDataTime > 15000)) {
+    startBackendStreaming(streamUrl, streamUrl);
   }
 
   res.json({
@@ -1447,6 +1455,7 @@ let triggerDeepgramFallback: (() => void) | null = null;
 let radioReq: http.ClientRequest | null = null;
 let isStreamingActive = false;
 let currentRadioStreamUrl = 'https://npr-ice.streamguys1.com/live.mp3';
+let currentRadioLogicalStationUrl = 'https://npr-ice.streamguys1.com/live.mp3';
 let currentRadioStationName = 'NPR Program Stream News';
 let currentStreamingSessionId = 0;
 let watchdogInterval: NodeJS.Timeout | null = null;
@@ -2734,7 +2743,7 @@ app.get('/api/live-subtitles-stream', (req, res) => {
 function broadcastSubtitle(item: SubtitleItem, originStationUrl?: string) {
   // Ensure subtitle is tagged with its source station
   if (!item.stationUrl) {
-    item.stationUrl = originStationUrl || currentRadioStreamUrl;
+    item.stationUrl = originStationUrl || currentRadioLogicalStationUrl || currentRadioStreamUrl;
   }
   if (!item.stationName) {
     item.stationName = currentRadioStationName;
@@ -3361,12 +3370,13 @@ function handleSpeechTranscriptChunk(transcript: string) {
   }
 }
 
-function startBackendStreaming(streamUrl = currentRadioStreamUrl) {
+function startBackendStreaming(streamUrl = currentRadioStreamUrl, logicalOriginUrl?: string) {
   const realStreamUrl = resolveTargetStreamUrl(streamUrl);
   stopBackendStreaming();
 
   const activeSessionId = ++currentStreamingSessionId;
   currentRadioStreamUrl = realStreamUrl;
+  currentRadioLogicalStationUrl = logicalOriginUrl || streamUrl;
   isStreamingActive = true;
   lastAudioDataTime = Date.now();
   lastTranscriptTime = Date.now();
@@ -3374,7 +3384,7 @@ function startBackendStreaming(streamUrl = currentRadioStreamUrl) {
   isGroqTranscribing = false;
 
   const engineName = GROQ_TOKEN ? 'Groq Whisper Large V3 Turbo ($0.04/hr)' : 'Deepgram Nova-2';
-  console.log(`[STT Engine] Initializing session #${activeSessionId} via ${engineName} for stream: ${currentRadioStreamUrl}`);
+  console.log(`[STT Engine] Initializing session #${activeSessionId} via ${engineName} for stream: ${currentRadioStreamUrl} (logical: ${currentRadioLogicalStationUrl})`);
 
   // Watchdog interval to recover automatically if audio stream dies (>15s no bytes), transcripts stall (>25s), or WebSocket closes
   watchdogInterval = setInterval(() => {
@@ -3391,7 +3401,7 @@ function startBackendStreaming(streamUrl = currentRadioStreamUrl) {
       if (pendingTranscriptBuffer && pendingTranscriptBuffer.trim()) {
         flushTranscriptParagraph(true);
       }
-      startBackendStreaming(currentRadioStreamUrl);
+      startBackendStreaming(currentRadioStreamUrl, currentRadioLogicalStationUrl);
     }
   }, 4000);
 
@@ -3485,8 +3495,8 @@ function startBackendStreaming(streamUrl = currentRadioStreamUrl) {
     // Handle redirects
     if ([301, 302, 303, 307, 308].includes(radioRes.statusCode || 0) && radioRes.headers.location) {
       const redirectUrl = new URL(radioRes.headers.location, currentRadioStreamUrl).toString();
-      console.log(`Redirecting radio audio source to ${redirectUrl}`);
-      startBackendStreaming(redirectUrl);
+      console.log(`Redirecting radio audio source to ${redirectUrl} (preserving logical station: ${currentRadioLogicalStationUrl})`);
+      startBackendStreaming(redirectUrl, currentRadioLogicalStationUrl);
       return;
     }
 

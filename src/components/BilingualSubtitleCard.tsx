@@ -300,21 +300,20 @@ export const BilingualSubtitleCard: React.FC<Props> = ({
     <div
       className={`rounded-2xl p-3 sm:p-3.5 shadow-sm border transition-[border-color,box-shadow,background-color] duration-300 hover:shadow-md relative group ${cardBgClass}`}
     >
-      {/* Bookmark Index Tab (Pinned on Top-Left Corner Edge, Page-Flag Style) */}
-      {segmentNumber !== undefined && (
-        <div className={`absolute -top-3 left-1.5 z-10 inline-flex items-center gap-1 font-mono font-extrabold text-[10px] sm:text-[11px] px-2 py-0.5 rounded-t-md rounded-br-md shadow-md border-t border-x select-none tracking-tight ${
-          theme === 'paper'
-            ? 'bg-amber-800 text-amber-100 border-amber-700'
-            : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white border-blue-400/50'
-        }`}>
-          <Tag className="w-2.5 h-2.5 shrink-0 opacity-80" />
-          #{segmentNumber} 段落
-        </div>
-      )}
-
-      {/* Top Bar: Timestamp & Action Buttons */}
+      {/* Top Bar: Timestamp, Segment Number & Action Buttons */}
       <div className="flex items-center justify-between mb-1.5 text-xs opacity-90">
         <div className="flex items-center gap-1.5 flex-wrap">
+          {segmentNumber !== undefined && (
+            <span className={`inline-flex items-center gap-1 font-mono font-bold text-[10px] sm:text-[11px] px-2 py-0.5 rounded-md border select-none tracking-tight shadow-xs ${
+              theme === 'paper'
+                ? 'bg-amber-800/15 text-amber-900 border-amber-700/30'
+                : 'bg-blue-600/20 text-blue-300 border-blue-500/30'
+            }`}>
+              <Tag className="w-2.5 h-2.5 shrink-0 opacity-80" />
+              #{segmentNumber} 段落
+            </span>
+          )}
+
           {isLatest && !isInterim && (
             <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] bg-rose-500/15 text-rose-500 dark:text-rose-400 border border-rose-500/30">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping shrink-0" />

@@ -11,6 +11,7 @@ export interface SubtitleItem {
   bookmarked?: boolean;
   audioTime?: number; // HTML5 audio element currentTime when released
   isInterim?: boolean; // Real-time streaming typing state
+  isNative?: boolean; // Dispatched directly from native Android STT pipeline
   durationMs?: number; // Estimated spoken duration in ms
   startTimeOffsetMs?: number; // Relative start offset
   start?: number; // Relative start time in seconds within 30s batch

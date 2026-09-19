@@ -2689,30 +2689,60 @@ var YOUTUBE_LIVE_STREAMS = [
     name: "Sky News 24/7 \u5168\u7403\u5373\u6642\u65B0\u805E",
     englishName: "Sky News Live",
     streamUrl: "http://radio.canstream.co.uk:8022/live.mp3",
-    defaultVideoId: "9Auq9mYxFEE",
+    defaultVideoId: "xDWQ3LkccY8",
     category: "\u82F1\u570B\u8207\u570B\u969B",
     badge: "Sky News",
-    keywords: ["sky", "9Auq9mYxFEE", "uk news"]
+    keywords: ["sky", "xDWQ3LkccY8", "uk news"]
   },
   {
     id: "bloomberg-live",
     name: "Bloomberg 24/7 \u5168\u7403\u8CA1\u7D93\u8207\u5E02\u5834\u76F4\u64AD",
     englishName: "Bloomberg Television Live",
     streamUrl: "https://stream.revma.ihrhls.com/zc4732",
-    defaultVideoId: "dp8PhLsUcFE",
+    defaultVideoId: "QB5BNdBFujE",
     category: "\u5546\u696D\u8CA1\u7D93",
     badge: "Bloomberg",
-    keywords: ["bloomberg", "dp8PhLsUcFE", "finance", "market"]
+    keywords: ["bloomberg", "QB5BNdBFujE", "finance", "market"]
   },
   {
     id: "nbc-news-live",
     name: "NBC News NOW / \u5168\u7F8E\u5373\u6642\u65B0\u805E\u7126\u9EDE",
     englishName: "NBC News NOW Live",
     streamUrl: "https://streams.kqed.org/kqedradio.mp3",
-    defaultVideoId: "34XpWw_6t0E",
+    defaultVideoId: "bdvIO2Tzcr4",
     category: "\u7F8E\u570B\u6642\u4E8B",
     badge: "NBC News",
-    keywords: ["nbc", "34XpWw_6t0E", "kqed"]
+    keywords: ["nbc", "bdvIO2Tzcr4", "kqed"]
+  },
+  {
+    id: "dw-news-live",
+    name: "DW News 24/7 \u5FB7\u570B\u4E4B\u8072\u570B\u969B\u65B0\u805E",
+    englishName: "DW News Live",
+    streamUrl: "https://npr-ice.streamguys1.com/live.mp3",
+    defaultVideoId: "LuKwFajn37U",
+    category: "\u6B50\u6D32\u570B\u969B",
+    badge: "DW News",
+    keywords: ["dw", "LuKwFajn37U", "germany"]
+  },
+  {
+    id: "france24-live",
+    name: "France 24 24/7 \u6CD5\u570B\u570B\u969B\u65B0\u805E",
+    englishName: "France 24 English Live",
+    streamUrl: "https://stream.revma.ihrhls.com/zc4732",
+    defaultVideoId: "HvZt-nh9sGg",
+    category: "\u6B50\u6D32\u6642\u4E8B",
+    badge: "France 24",
+    keywords: ["france", "HvZt-nh9sGg", "paris"]
+  },
+  {
+    id: "livenow-fox-live",
+    name: "LiveNOW from FOX 24/7 \u7F8E\u570B\u5373\u6642\u73FE\u5834",
+    englishName: "LiveNOW from FOX Live",
+    streamUrl: "https://streams.kqed.org/kqedradio.mp3",
+    defaultVideoId: "C96oohpWBGw",
+    category: "\u5168\u7F8E\u73FE\u5834",
+    badge: "LiveNOW FOX",
+    keywords: ["livenow", "fox", "C96oohpWBGw"]
   }
 ];
 app.get("/api/youtube-live/channels", (req, res) => {

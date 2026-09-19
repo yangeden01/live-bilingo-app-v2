@@ -76,10 +76,12 @@ export function useYouTubeLiveGroqSubtitles({
               item && item.id && item.english && !isHallucinationLoop(item.english)
           );
           if (valid.length > 0) {
+            // Sort descending by createdAt so newest is at the top
+            valid.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
             valid.forEach((item: SubtitleItem) => seenIdsRef.current.add(item.id));
             setLiveSubtitles(valid);
             setTotalCapturedCount(valid.length);
-            setActiveSubtitleId(valid[valid.length - 1]?.id || null);
+            setActiveSubtitleId(valid[0]?.id || null);
             return;
           }
         }
@@ -118,9 +120,12 @@ export function useYouTubeLiveGroqSubtitles({
       return;
     }
 
-    // Strict Station Isolation: Ensure it belongs to the current channel's stream
+    // Station Isolation: Ensure it belongs to current stream or name or is native
     const curStream = activeChannelRef.current.streamUrl;
-    if (item.stationUrl && !isStationUrlMatch(item.stationUrl, curStream)) {
+    const curName = activeChannelRef.current.name;
+    const isStreamMatch = !item.stationUrl || isStationUrlMatch(item.stationUrl, curStream);
+    const isNameMatch = item.stationName && (item.stationName.includes(curName) || curName.includes(item.stationName));
+    if (!isStreamMatch && !isNameMatch && !item.isNative) {
       return;
     }
 
@@ -140,10 +145,12 @@ export function useYouTubeLiveGroqSubtitles({
     };
 
     setLiveSubtitles((prev) => {
-      const next = [...prev, formattedItem];
+      // User requirement: 最新字幕在上面，舊資料往下 (Newest at top, older downwards)
+      const filtered = prev.filter((p) => p.id !== formattedItem.id);
+      const next = [formattedItem, ...filtered];
       // Keep up to 100 recent live subtitles
       if (next.length > 100) {
-        next.shift();
+        next.pop();
       }
       try {
         const cacheKey = `youtube_live_subtitles_${activeChannelRef.current.id}`;
@@ -155,6 +162,88 @@ export function useYouTubeLiveGroqSubtitles({
     setActiveSubtitleId(formattedItem.id);
     setTotalCapturedCount((cnt) => cnt + 1);
   }, []);
+
+  // Support Android Native Bridge (guarantees real-time subtitles in APK installation)
+  useEffect(() => {
+    if (!enabled) return;
+
+    // 1. Notify Android Native Bridge so RadioStreamSttManager starts STT immediately
+    if (typeof window !== 'undefined' && (window as any).AndroidBridge?.onStationPlaybackChanged) {
+      try {
+        (window as any).AndroidBridge.onStationPlaybackChanged(
+          activeChannel.streamUrl,
+          activeChannel.name,
+          isPlaying !== false
+        );
+      } catch (e) {
+        console.warn('[YouTubeLiveGroq] AndroidBridge error:', e);
+      }
+    }
+
+    // 2. Listen to native Android subtitle events dispatched by WebAppInterface
+    const handleNativeEvent = (e: any) => {
+      const sub = e.detail;
+      if (sub && sub.id && sub.english) {
+        setIsConnected(true);
+        handleIncomingSubtitle({
+          ...sub,
+          isNative: true,
+          stationUrl: activeChannel.streamUrl,
+          stationName: activeChannel.name,
+        });
+      }
+    };
+
+    const handleWindowMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'NEW_SUBTITLE' && e.data?.data) {
+        setIsConnected(true);
+        handleIncomingSubtitle({
+          ...e.data.data,
+          isNative: true,
+          stationUrl: activeChannel.streamUrl,
+          stationName: activeChannel.name,
+        });
+      }
+    };
+
+    const handleCustomSubtitle = (e: any) => {
+      if (e.detail && e.detail.english) {
+        setIsConnected(true);
+        handleIncomingSubtitle(e.detail);
+      }
+    };
+
+    window.addEventListener('native-subtitle', handleNativeEvent);
+    window.addEventListener('message', handleWindowMessage);
+    window.addEventListener('new-subtitle', handleCustomSubtitle);
+
+    const prevNativeHandler = (window as any).handleNativeSubtitle;
+    (window as any).handleNativeSubtitle = (sub: any) => {
+      if (sub && sub.id && sub.english) {
+        setIsConnected(true);
+        handleIncomingSubtitle({
+          ...sub,
+          isNative: true,
+          stationUrl: activeChannel.streamUrl,
+          stationName: activeChannel.name,
+        });
+      }
+      if (typeof prevNativeHandler === 'function') {
+        try {
+          prevNativeHandler(sub);
+        } catch (_) {}
+      }
+    };
+
+    return () => {
+      window.removeEventListener('native-subtitle', handleNativeEvent);
+      window.removeEventListener('message', handleWindowMessage);
+      window.removeEventListener('new-subtitle', handleCustomSubtitle);
+      if ((window as any).handleNativeSubtitle) {
+        (window as any).handleNativeSubtitle = prevNativeHandler;
+      }
+    };
+  }, [enabled, activeChannel.streamUrl, activeChannel.name, isPlaying, handleIncomingSubtitle]);
 
   // Connect and sync backend stream when enabled
   useEffect(() => {

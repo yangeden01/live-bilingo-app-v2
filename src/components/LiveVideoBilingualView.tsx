@@ -6,6 +6,7 @@ import {
   Search,
   Star,
   ArrowDown,
+  ArrowUp,
   Trash2,
   BookmarkCheck,
   Bookmark,
@@ -154,19 +155,19 @@ export const LiveVideoBilingualView: React.FC<LiveVideoBilingualViewProps> = ({
     };
   }, [playerState]);
 
-  // Auto-scroll when new subtitle arrives
+  // Auto-scroll to top when new subtitle arrives (newest subtitle is on top)
   useEffect(() => {
     if (!autoScroll || !subtitleContainerRef.current) return;
     const container = subtitleContainerRef.current;
     container.scrollTo({
-      top: container.scrollHeight,
+      top: 0,
       behavior: 'smooth',
     });
   }, [liveSubtitles.length, activeSubtitleId, autoScroll]);
 
-  // Filtered subtitles based on tab and search
+  // Filtered subtitles based on tab and search (strictly sorted newest first, older downwards)
   const filteredSubtitles = useMemo(() => {
-    let list = liveSubtitles;
+    let list = [...liveSubtitles];
     if (subtitleTab === 'bookmarks') {
       list = list.filter((s) => s.bookmarked);
     }
@@ -178,7 +179,7 @@ export const LiveVideoBilingualView: React.FC<LiveVideoBilingualViewProps> = ({
           (s.traditionalChinese && s.traditionalChinese.includes(q))
       );
     }
-    return list;
+    return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }, [liveSubtitles, subtitleTab, searchQuery]);
 
   // Color classes according to theme
@@ -398,10 +399,10 @@ export const LiveVideoBilingualView: React.FC<LiveVideoBilingualViewProps> = ({
                 ? 'bg-blue-600/20 text-blue-400 border-blue-500/30'
                 : 'bg-slate-800/60 text-slate-400 border-slate-700 hover:text-slate-200'
             }`}
-            title={autoScroll ? '自動滾動開' : '自動滾動關'}
+            title={autoScroll ? '最新字幕置頂（開）' : '最新字幕置頂（關）'}
           >
-            <ArrowDown className={`w-3 h-3 ${autoScroll ? 'animate-bounce' : ''}`} />
-            <span className="hidden sm:inline">自動滾動</span>
+            <ArrowUp className={`w-3 h-3 ${autoScroll ? 'animate-bounce' : ''}`} />
+            <span className="hidden sm:inline">最新置頂</span>
           </button>
 
           {liveSubtitles.length > 0 && (
@@ -475,7 +476,7 @@ export const LiveVideoBilingualView: React.FC<LiveVideoBilingualViewProps> = ({
         {/* Subtitles Scroll List */}
         <div
           ref={subtitleContainerRef}
-          className="space-y-2.5 max-h-[65vh] overflow-y-auto overscroll-contain pr-1 scrollbar-thin scrollbar-thumb-slate-800"
+          className="space-y-3 max-h-[65vh] overflow-y-auto overscroll-contain pt-2 pb-2 pr-1 scrollbar-thin scrollbar-thumb-slate-800"
         >
           {filteredSubtitles.length === 0 ? (
             <div className="py-12 text-center space-y-3">
@@ -500,11 +501,11 @@ export const LiveVideoBilingualView: React.FC<LiveVideoBilingualViewProps> = ({
                 subtitle={sub}
                 onBookmarkToggle={toggleBookmark}
                 onOpenDictionary={onOpenDictionary}
-                isLatest={idx === filteredSubtitles.length - 1}
+                isLatest={idx === 0}
                 searchQuery={searchQuery}
                 fontSize={fontSize}
                 chineseVariant={chineseVariant}
-                segmentNumber={idx + 1}
+                segmentNumber={filteredSubtitles.length - idx}
                 theme={currentTheme}
                 highlightDifficulty={highlightDifficulty}
               />

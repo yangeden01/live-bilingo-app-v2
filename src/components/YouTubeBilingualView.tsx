@@ -37,9 +37,6 @@ import {
 import { ReadingModeAndFontToolbar } from './ReadingModeAndFontToolbar';
 import { YouTubeNewsDiscoveryModal } from './YouTubeNewsDiscoveryModal';
 import { YouTubeSavedUrlsModal } from './YouTubeSavedUrlsModal';
-import { YouTubeLiveStreamCard } from './YouTubeLiveStreamCard';
-import { YouTubeLiveGroqSubtitlesCard } from './YouTubeLiveGroqSubtitlesCard';
-import { useYouTubeLiveGroqSubtitles } from '../hooks/useYouTubeLiveGroqSubtitles';
 
 interface Props {
   onOpenDictionary?: (word?: string) => void;
@@ -54,6 +51,7 @@ interface Props {
   onHighlightDifficultyChange?: (enabled: boolean) => void;
   onPlaybackStateChange?: (state: 'playing' | 'paused' | 'buffering' | 'idle') => void;
   isVideoLoopEnabled?: boolean;
+  onSwitchToLiveVideoMode?: () => void;
 }
 
 // Preset verified caption test video (passes all 6 backend extraction criteria 100%)
@@ -127,6 +125,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
   onHighlightDifficultyChange: propOnHighlightDifficultyChange,
   onPlaybackStateChange,
   isVideoLoopEnabled = false,
+  onSwitchToLiveVideoMode,
 }) => {
   const [localHighlightDifficulty, setLocalHighlightDifficulty] = useState<boolean>(() => {
     try {
@@ -518,26 +517,6 @@ export const YouTubeBilingualView: React.FC<Props> = ({
       activeVideoId === '34XpWw_6t0E'
     );
   }, [activeVideoId, urlInput, title]);
-
-  const [useGroqLiveStt, setUseGroqLiveStt] = useState<boolean>(true);
-  const [showLiveRawCcCard, setShowLiveRawCcCard] = useState<boolean>(false);
-
-  const {
-    liveSubtitles: groqLiveSubtitles,
-    activeSubtitleId: activeGroqSubtitleId,
-    activeChannel,
-    setActiveChannel,
-    isConnected: isGroqLiveConnected,
-    modelName: groqLiveModelName,
-    clearSubtitles: handleClearLiveGroqSubtitles,
-    toggleBookmark: handleToggleLiveGroqBookmark,
-  } = useYouTubeLiveGroqSubtitles({
-    enabled: isCurrentLiveVideo && useGroqLiveStt,
-    videoId: activeVideoId,
-    title,
-    url: urlInput,
-    isPlaying: playerState === 'playing',
-  });
 
   // Load the verified caption test video through the exact standard production pipeline
   const handleLoadTestVideo = () => {
@@ -1200,54 +1179,33 @@ export const YouTubeBilingualView: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Live Stream Mode Card (Groq Whisper AI Live Bilingual Subtitles or Raw CC info) */}
-          {isCurrentLiveVideo && subtitles.length === 0 && (
-            <div className="space-y-2">
-              {!showLiveRawCcCard ? (
-                <YouTubeLiveGroqSubtitlesCard
-                  videoId={activeVideoId || ''}
-                  url={urlInput || `https://www.youtube.com/watch?v=${activeVideoId}`}
-                  videoTitle={title || activeChannel.name}
-                  isSavedVideo={isCurrentVideoSaved}
-                  onToggleSaveVideo={handleToggleSaveCurrentUrl}
-                  liveSubtitles={groqLiveSubtitles}
-                  activeSubtitleId={activeGroqSubtitleId}
-                  activeChannel={activeChannel}
-                  onSelectChannel={setActiveChannel}
-                  isConnected={isGroqLiveConnected}
-                  modelName={groqLiveModelName}
-                  onBookmarkToggle={handleToggleLiveGroqBookmark}
-                  onOpenDictionary={onOpenDictionary}
-                  onClearSubtitles={handleClearLiveGroqSubtitles}
-                  readingMode={readingMode}
-                  chineseVariant={chineseVariant}
-                  fontSize={fontSize}
-                  currentTheme={currentTheme}
-                  onShowRawCcCard={() => setShowLiveRawCcCard(true)}
-                />
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between px-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowLiveRawCcCard(false)}
-                      className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      返回 Groq AI 即時雙語字幕
-                    </button>
-                  </div>
-                  <YouTubeLiveStreamCard
-                    videoId={activeVideoId || ''}
-                    url={urlInput || `https://www.youtube.com/watch?v=${activeVideoId}`}
-                    title={title || 'ABC News (Australia) 24/7 即時新聞直播'}
-                    isSaved={isCurrentVideoSaved}
-                    onToggleSave={handleToggleSaveCurrentUrl}
-                    onOpenDictionary={onOpenDictionary}
-                    onOpenNewsModal={() => setShowNewsModal(true)}
-                    currentTheme={currentTheme}
-                  />
-                </div>
+          {/* Live Stream Notice: Guide to dedicated Live Video Bilingual Mode */}
+          {isCurrentLiveVideo && (
+            <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 ${
+              currentTheme === 'paper'
+                ? 'bg-[#FAF4E8] border-[#E2D2B0] text-[#3B2E1E]'
+                : currentTheme === 'light'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                : 'bg-emerald-950/30 border-emerald-500/30 text-emerald-200'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span className="text-xs font-medium">
+                  此影片為 24/7 即時直播新聞，建議切換至「影音即時雙語」模式獲取專屬 Groq AI 即時雙語字幕與全球新聞台切換！
+                </span>
+              </div>
+              {onSwitchToLiveVideoMode && (
+                <button
+                  type="button"
+                  onClick={onSwitchToLiveVideoMode}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer shrink-0 shadow-sm flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>前往影音即時雙語模式 ➔</span>
+                </button>
               )}
             </div>
           )}
@@ -1280,17 +1238,16 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                   <p className="text-slate-400 text-[11px] leading-relaxed">
                     本影片無預先內嵌的 YouTube 官方字幕軌道。您可以切換啟用 Groq Whisper AI 即時雙語語音辨識串流，體驗如同廣播模式般的英中對齊學習！
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUseGroqLiveStt(true);
-                      setShowLiveRawCcCard(false);
-                    }}
-                    className="w-full mt-1 py-2 px-3 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    啟用 Groq AI 即時雙語辨識
-                  </button>
+                  {onSwitchToLiveVideoMode && (
+                    <button
+                      type="button"
+                      onClick={onSwitchToLiveVideoMode}
+                      className="w-full mt-1 py-2 px-3 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      前往「影音即時雙語」模式 (全球直播即時雙語)
+                    </button>
+                  )}
                 </div>
               )}
 

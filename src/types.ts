@@ -53,7 +53,7 @@ export interface StreamStats {
   totalSubtitlesCount: number;
 }
 
-export type ContentSourceMode = 'radio' | 'youtube';
+export type ContentSourceMode = 'radio' | 'youtube' | 'live-video';
 
 export interface YouTubeSubtitleItem {
   id: string;

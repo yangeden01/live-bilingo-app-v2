@@ -5,6 +5,7 @@ import { SubtitleItem, PlaybackStatus, RadioStation, ReadingMode, ChineseVariant
 import { AudioPlayerController } from './components/AudioPlayerController';
 import { Material3AndroidFrame } from './components/Material3AndroidFrame';
 import { YouTubeBilingualView } from './components/YouTubeBilingualView';
+import { LiveVideoBilingualView } from './components/LiveVideoBilingualView';
 import { AndroidCodeExplorer } from './components/AndroidCodeExplorer';
 import { StationManagerModal } from './components/StationManagerModal';
 import { DictionaryModal } from './components/DictionaryModal';
@@ -18,7 +19,7 @@ import { sanitizeTranscriptText, isHallucinationLoop } from './utils/textSanitiz
 import { getPersistentItem, setPersistentItem } from './utils/persistentStorage';
 import { useReadingModeSnapDetent } from './hooks/useReadingModeSnapDetent';
 import { isStationUrlMatch } from './utils/stationHelper';
-import { Radio, Youtube, Code2, Smartphone, Cpu, CheckCircle2, Sparkles, Volume2, ShieldCheck, Download, ListMusic, BookOpen, RefreshCw, Copy, Play, Pause, Sun, Moon, Bell, Power, ArrowUp, ArrowDown, Repeat } from 'lucide-react';
+import { Radio, Youtube, Tv, Code2, Smartphone, Cpu, CheckCircle2, Sparkles, Volume2, ShieldCheck, Download, ListMusic, BookOpen, RefreshCw, Copy, Play, Pause, Sun, Moon, Bell, Power, ArrowUp, ArrowDown, Repeat } from 'lucide-react';
 
 const DEFAULT_STATIONS: RadioStation[] = [
   {
@@ -1121,12 +1122,28 @@ export default function App() {
   };
 
   const [youtubePlaybackState, setYoutubePlaybackState] = useState<'playing' | 'paused' | 'buffering' | 'idle'>('idle');
+  const [liveVideoPlaybackState, setLiveVideoPlaybackState] = useState<'playing' | 'paused' | 'buffering' | 'idle'>('idle');
 
   const snapToYouTubeReadingMode = useCallback(() => {
     if (typeof document === 'undefined' || typeof window === 'undefined') return;
     const header = document.querySelector('header');
     const headerBottom = header ? header.getBoundingClientRect().bottom : 56;
     const targetEl = document.getElementById('youtube-player-anchor') || document.getElementById('youtube-player-section');
+    if (targetEl) {
+      const rect = targetEl.getBoundingClientRect();
+      const targetY = window.scrollY + rect.top - headerBottom;
+      window.scrollTo({
+        top: Math.max(0, targetY),
+        behavior: 'smooth',
+      });
+    }
+  }, []);
+
+  const snapToLiveVideoReadingMode = useCallback(() => {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+    const header = document.querySelector('header');
+    const headerBottom = header ? header.getBoundingClientRect().bottom : 56;
+    const targetEl = document.getElementById('live-video-player-section');
     if (targetEl) {
       const rect = targetEl.getBoundingClientRect();
       const targetY = window.scrollY + rect.top - headerBottom;
@@ -1149,9 +1166,16 @@ export default function App() {
       if (playbackStatusRef.current === 'PLAYING' || playbackStatusRef.current === 'BUFFERING') {
         window.dispatchEvent(new CustomEvent('radio-toggle-play'));
       }
-    } else if (newMode === 'radio') {
-      // Pause YouTube playback when switching to radio mode
+      window.dispatchEvent(new CustomEvent('live-video-pause'));
+    } else if (newMode === 'live-video') {
+      if (playbackStatusRef.current === 'PLAYING' || playbackStatusRef.current === 'BUFFERING') {
+        window.dispatchEvent(new CustomEvent('radio-toggle-play'));
+      }
       window.dispatchEvent(new CustomEvent('youtube-pause'));
+    } else if (newMode === 'radio') {
+      // Pause YouTube and Live video playback when switching to radio mode
+      window.dispatchEvent(new CustomEvent('youtube-pause'));
+      window.dispatchEvent(new CustomEvent('live-video-pause'));
     }
     setContentSource(newMode);
     setPersistentItem('active_content_source', newMode);
@@ -1211,7 +1235,9 @@ export default function App() {
       const header = document.querySelector('header');
       const headerBottom = header ? header.getBoundingClientRect().bottom : 56;
 
-      const targetEl = contentSource === 'youtube'
+      const targetEl = contentSource === 'live-video'
+        ? document.getElementById('live-video-player-section')
+        : contentSource === 'youtube'
         ? (document.getElementById('youtube-player-section') || document.getElementById('youtube-player-anchor'))
         : document.getElementById('subtitle-tabs-bar');
 
@@ -1242,13 +1268,15 @@ export default function App() {
   }, [activeTab, contentSource]);
 
   const handleReturnToReadingMode = useCallback(() => {
-    if (contentSource === 'youtube') {
+    if (contentSource === 'live-video') {
+      snapToLiveVideoReadingMode();
+    } else if (contentSource === 'youtube') {
       snapToYouTubeReadingMode();
     } else {
       scrollToSubtitleReadingPosition();
     }
     vibrateDetentTick();
-  }, [contentSource, snapToYouTubeReadingMode, scrollToSubtitleReadingPosition]);
+  }, [contentSource, snapToLiveVideoReadingMode, snapToYouTubeReadingMode, scrollToSubtitleReadingPosition]);
 
   useEffect(() => {
     const handleScrollEvent = (e: Event) => {
@@ -1267,6 +1295,17 @@ export default function App() {
   }, [scrollToSubtitleReadingPosition, showBackToReadingFab]);
 
   const handleTopHeaderPlayToggle = () => {
+    if (contentSource === 'live-video') {
+      const isCurrentlyPlaying = liveVideoPlaybackState === 'playing';
+      window.dispatchEvent(new CustomEvent('live-video-toggle-play'));
+      if (!isCurrentlyPlaying) {
+        setTimeout(() => {
+          snapToLiveVideoReadingMode();
+        }, 50);
+      }
+      return;
+    }
+
     if (contentSource === 'youtube') {
       const isCurrentlyPlaying = youtubePlaybackState === 'playing';
       // Toggle YouTube playback via custom event
@@ -1568,7 +1607,11 @@ export default function App() {
             <button
               onClick={handleTopHeaderPlayToggle}
               title={
-                contentSource === 'youtube'
+                contentSource === 'live-video'
+                  ? liveVideoPlaybackState === 'playing'
+                    ? '暫停即時雙語影音'
+                    : '播放即時雙語影音'
+                  : contentSource === 'youtube'
                   ? youtubePlaybackState === 'playing'
                     ? '暫停 YouTube 影音播放'
                     : '播放 YouTube 影音（進入閱讀模式）'
@@ -1577,19 +1620,35 @@ export default function App() {
                   : '播放廣播（自動置頂字幕搜尋區）'
               }
               className={`px-3 sm:px-3.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer ${
-                (contentSource === 'youtube' ? youtubePlaybackState === 'playing' : playbackStatus === 'PLAYING')
+                (contentSource === 'live-video'
+                  ? liveVideoPlaybackState === 'playing'
+                  : contentSource === 'youtube'
+                  ? youtubePlaybackState === 'playing'
+                  : playbackStatus === 'PLAYING')
                   ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20 ring-2 ring-amber-400/40'
-                  : (contentSource === 'youtube' ? youtubePlaybackState === 'buffering' : playbackStatus === 'BUFFERING')
+                  : (contentSource === 'live-video'
+                  ? liveVideoPlaybackState === 'buffering'
+                  : contentSource === 'youtube'
+                  ? youtubePlaybackState === 'buffering'
+                  : playbackStatus === 'BUFFERING')
                   ? 'bg-blue-600/80 text-white shadow-blue-500/20'
                   : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/30 ring-2 ring-blue-500/40'
               }`}
             >
-              {(contentSource === 'youtube' ? youtubePlaybackState === 'buffering' : playbackStatus === 'BUFFERING') ? (
+              {(contentSource === 'live-video'
+                ? liveVideoPlaybackState === 'buffering'
+                : contentSource === 'youtube'
+                ? youtubePlaybackState === 'buffering'
+                : playbackStatus === 'BUFFERING') ? (
                 <>
                   <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
                   <span>連線中...</span>
                 </>
-              ) : (contentSource === 'youtube' ? youtubePlaybackState === 'playing' : playbackStatus === 'PLAYING') ? (
+              ) : (contentSource === 'live-video'
+                ? liveVideoPlaybackState === 'playing'
+                : contentSource === 'youtube'
+                ? youtubePlaybackState === 'playing'
+                : playbackStatus === 'PLAYING') ? (
                 <>
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-900 opacity-75"></span>
@@ -1627,12 +1686,12 @@ export default function App() {
 
       {/* Main Container */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-12 pb-[max(3rem,env(safe-area-inset-bottom))] space-y-6">
-        {/* Source Mode Toggle: Radio | YouTube */}
-        <div className="flex items-center justify-between pb-1">
-          <div className="inline-flex p-1 bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 shadow-lg">
+        {/* Source Mode Toggle: Radio | YouTube | Live Video */}
+        <div className="flex items-center justify-between pb-1 gap-2">
+          <div className="inline-flex p-1 bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 shadow-lg max-w-full overflow-x-auto scrollbar-none">
             <button
               onClick={() => handleContentSourceChange('radio')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
                 contentSource === 'radio'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -1643,7 +1702,7 @@ export default function App() {
             </button>
             <button
               onClick={() => handleContentSourceChange('youtube')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
                 contentSource === 'youtube'
                   ? 'bg-rose-600 text-white shadow-md shadow-rose-500/20'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -1652,12 +1711,25 @@ export default function App() {
               <Youtube className="w-3.5 h-3.5" />
               <span>YouTube 雙語影音</span>
             </button>
+            <button
+              onClick={() => handleContentSourceChange('live-video')}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                contentSource === 'live-video'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Tv className="w-3.5 h-3.5" />
+              <span>影音即時雙語</span>
+            </button>
           </div>
 
-          <span className="hidden sm:inline-block text-xs text-slate-400">
+          <span className="hidden md:inline-block text-xs text-slate-400">
             {contentSource === 'radio'
               ? '即時廣播串流 ASR 雙語對齊'
-              : 'YouTube 影音時間軸雙語同步'}
+              : contentSource === 'youtube'
+              ? 'YouTube 影音時間軸雙語同步'
+              : '24/7 新聞直播即時語音辨識與翻譯'}
           </span>
         </div>
 
@@ -1722,6 +1794,23 @@ export default function App() {
                 onHighlightDifficultyChange={handleHighlightDifficultyChange}
                 onPlaybackStateChange={setYoutubePlaybackState}
                 isVideoLoopEnabled={isYouTubeLoopEnabled}
+                onSwitchToLiveVideoMode={() => handleContentSourceChange('live-video')}
+              />
+            </div>
+
+            <div className={contentSource === 'live-video' ? 'contents' : 'hidden'}>
+              <LiveVideoBilingualView
+                onOpenDictionary={handleOpenDictionary}
+                readingMode={readingMode}
+                onReadingModeChange={setReadingMode}
+                effectiveTheme={effectiveTheme}
+                chineseVariant={chineseVariant}
+                onChineseVariantChange={setChineseVariant}
+                fontSize={subtitleFontSize}
+                onFontSizeChange={setSubtitleFontSize}
+                highlightDifficulty={highlightDifficulty}
+                onHighlightDifficultyChange={handleHighlightDifficultyChange}
+                onPlaybackStateChange={setLiveVideoPlaybackState}
               />
             </div>
           </>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Live Bilingo 雙語電台</string>
+    <string name="widget_name">Live Bilingo 廣播控制</string>
+    <string name="widget_description">控制 Live Bilingo 廣播播放、睡眠定時與電台切換</string>
+</resources>

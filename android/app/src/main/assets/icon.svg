@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+  </defs>
+
+  <!-- Maskable background -->
+  <rect width="512" height="512" rx="100" fill="url(#bg)"/>
+  
+  <!-- Outer Glow Circle -->
+  <circle cx="256" cy="256" r="180" fill="url(#accent)" opacity="0.2" />
+
+  <!-- Radio Waves -->
+  <path d="M 140 256 A 116 116 0 0 1 372 256" fill="none" stroke="#3b82f6" stroke-width="24" stroke-linecap="round" />
+  <path d="M 180 256 A 76 76 0 0 1 332 256" fill="none" stroke="#60a5fa" stroke-width="20" stroke-linecap="round" />
+  <path d="M 216 256 A 40 40 0 0 1 296 256" fill="none" stroke="#93c5fd" stroke-width="16" stroke-linecap="round" />
+
+  <!-- Central Radio Tower Dot -->
+  <circle cx="256" cy="256" r="24" fill="#ffffff" />
+
+  <!-- Text Label -->
+  <text x="256" y="370" font-family="sans-serif" font-weight="bold" font-size="40" fill="#ffffff" text-anchor="middle">Bilingo 雙語</text>
+  <text x="256" y="415" font-family="sans-serif" font-weight="500" font-size="28" fill="#60a5fa" text-anchor="middle">RADIO LIVE</text>
+</svg>

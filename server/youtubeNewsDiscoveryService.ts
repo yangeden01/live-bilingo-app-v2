@@ -581,7 +581,7 @@ async function enrichNewsVideosWithDetailsAndTranslation(videos: YouTubeNewsItem
   const titlesToTranslate = videos.map((v) => v.title);
   const translatedMap = new Map<string, string>();
 
-  // Tier 1: Gemini 3.6-flash / 2.5-flash
+  // Tier 1: Gemini 2.5-flash / 2.0-flash (with graceful fallback on credit depletion)
   const geminiKey = process.env.GEMINI_API_KEY?.trim();
   if (geminiKey && titlesToTranslate.length > 0) {
     try {
@@ -596,27 +596,39 @@ async function enrichNewsVideosWithDetailsAndTranslation(videos: YouTubeNewsItem
       try {
         resp = await Promise.race([
           ai.models.generateContent({
-            model: 'gemini-3.6-flash',
+            model: 'gemini-2.5-flash',
             contents: prompt,
           }),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 7000)),
         ]);
-      } catch (e: any) {
-        console.warn('[YouTubeNews] Gemini 3.6-flash translation note:', e?.message || e);
+      } catch {
+        try {
+          resp = await Promise.race([
+            ai.models.generateContent({
+              model: 'gemini-2.0-flash',
+              contents: prompt,
+            }),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 7000)),
+          ]);
+        } catch {
+          // Gemini credits/quota depleted or model unavailable - smoothly fall back to Tier 2 (clients5)
+        }
       }
 
       const text = (resp as any)?.text?.trim() || '';
-      const cleanJson = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-      const parsed = JSON.parse(cleanJson);
-      if (Array.isArray(parsed) && parsed.length === titlesToTranslate.length) {
-        titlesToTranslate.forEach((t, i) => {
-          if (parsed[i] && typeof parsed[i] === 'string' && parsed[i].trim().length > 0) {
-            translatedMap.set(t, parsed[i].trim());
-          }
-        });
+      if (text) {
+        const cleanJson = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+        const parsed = JSON.parse(cleanJson);
+        if (Array.isArray(parsed) && parsed.length === titlesToTranslate.length) {
+          titlesToTranslate.forEach((t, i) => {
+            if (parsed[i] && typeof parsed[i] === 'string' && parsed[i].trim().length > 0) {
+              translatedMap.set(t, parsed[i].trim());
+            }
+          });
+        }
       }
-    } catch (gErr: any) {
-      console.warn('[YouTubeNews] Gemini title translation note:', gErr?.message || gErr);
+    } catch {
+      // Smoothly fall back to Tier 2 without throwing or logging noisy error notes
     }
   }
 

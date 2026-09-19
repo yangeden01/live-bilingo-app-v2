@@ -229,16 +229,20 @@ Text to translate:
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       contents: prompt,
     });
     return response.text?.trim() || '';
   } catch {
-    const fallbackResp = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: prompt,
-    });
-    return fallbackResp.text?.trim() || '';
+    try {
+      const fallbackResp = await ai.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: prompt,
+      });
+      return fallbackResp.text?.trim() || '';
+    } catch {
+      return '';
+    }
   }
 }
 
@@ -266,19 +270,23 @@ CRITICAL INSTRUCTIONS:
       try {
         resp = await withTimeout(
           ai.models.generateContent({
-            model: 'gemini-3.6-flash',
+            model: 'gemini-2.5-flash',
             contents: prompt,
           }),
           8000
         );
       } catch (err) {
-        resp = await withTimeout(
-          ai.models.generateContent({
-            model: 'gemini-2.0-flash',
-            contents: prompt,
-          }),
-          8000
-        );
+        try {
+          resp = await withTimeout(
+            ai.models.generateContent({
+              model: 'gemini-2.0-flash',
+              contents: prompt,
+            }),
+            8000
+          );
+        } catch {
+          // silently fallback to parallel local/GTX translation
+        }
       }
 
       const text = resp?.text?.trim() || '';
@@ -299,8 +307,8 @@ CRITICAL INSTRUCTIONS:
           return results;
         }
       }
-    } catch (e) {
-      console.warn('[GeminiBatchTranslate] Batch translation fallback to parallel engine:', e);
+    } catch {
+      // silently fallback to parallel translation
     }
   }
 

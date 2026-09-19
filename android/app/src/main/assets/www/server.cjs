@@ -1555,26 +1555,36 @@ async function enrichNewsVideosWithDetailsAndTranslation(videos) {
       try {
         resp = await Promise.race([
           ai.models.generateContent({
-            model: "gemini-3.6-flash",
+            model: "gemini-2.5-flash",
             contents: prompt
           }),
           new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 7e3))
         ]);
-      } catch (e) {
-        console.warn("[YouTubeNews] Gemini 3.6-flash translation note:", e?.message || e);
+      } catch {
+        try {
+          resp = await Promise.race([
+            ai.models.generateContent({
+              model: "gemini-2.0-flash",
+              contents: prompt
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 7e3))
+          ]);
+        } catch {
+        }
       }
       const text = resp?.text?.trim() || "";
-      const cleanJson = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-      const parsed = JSON.parse(cleanJson);
-      if (Array.isArray(parsed) && parsed.length === titlesToTranslate.length) {
-        titlesToTranslate.forEach((t, i) => {
-          if (parsed[i] && typeof parsed[i] === "string" && parsed[i].trim().length > 0) {
-            translatedMap.set(t, parsed[i].trim());
-          }
-        });
+      if (text) {
+        const cleanJson = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+        const parsed = JSON.parse(cleanJson);
+        if (Array.isArray(parsed) && parsed.length === titlesToTranslate.length) {
+          titlesToTranslate.forEach((t, i) => {
+            if (parsed[i] && typeof parsed[i] === "string" && parsed[i].trim().length > 0) {
+              translatedMap.set(t, parsed[i].trim());
+            }
+          });
+        }
       }
-    } catch (gErr) {
-      console.warn("[YouTubeNews] Gemini title translation note:", gErr?.message || gErr);
+    } catch {
     }
   }
   const untranslated = videos.filter((v) => !translatedMap.has(v.title));
@@ -1781,16 +1791,20 @@ Text to translate:
 "${englishText}"`;
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-2.5-flash",
       contents: prompt
     });
     return response.text?.trim() || "";
   } catch {
-    const fallbackResp = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: prompt
-    });
-    return fallbackResp.text?.trim() || "";
+    try {
+      const fallbackResp = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: prompt
+      });
+      return fallbackResp.text?.trim() || "";
+    } catch {
+      return "";
+    }
   }
 }
 async function batchTranslateSubtitlesWithGemini(items) {
@@ -1813,19 +1827,22 @@ CRITICAL INSTRUCTIONS:
       try {
         resp = await withTimeout(
           ai.models.generateContent({
-            model: "gemini-3.6-flash",
+            model: "gemini-2.5-flash",
             contents: prompt
           }),
           8e3
         );
       } catch (err) {
-        resp = await withTimeout(
-          ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: prompt
-          }),
-          8e3
-        );
+        try {
+          resp = await withTimeout(
+            ai.models.generateContent({
+              model: "gemini-2.0-flash",
+              contents: prompt
+            }),
+            8e3
+          );
+        } catch {
+        }
       }
       const text = resp?.text?.trim() || "";
       const cleanJson = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
@@ -1845,8 +1862,7 @@ CRITICAL INSTRUCTIONS:
           return results;
         }
       }
-    } catch (e) {
-      console.warn("[GeminiBatchTranslate] Batch translation fallback to parallel engine:", e);
+    } catch {
     }
   }
   const fallbackResults = await Promise.all(

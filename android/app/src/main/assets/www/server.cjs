@@ -1363,6 +1363,64 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
   } catch (e) {
     console.warn("[YouTubeNews] Feed aggregation error:", e?.message || e);
   }
+  if (apiKey) {
+    try {
+      const oneYearAgoIso = new Date(now - 365 * 24 * 60 * 60 * 1e3).toISOString();
+      const talkShowQueries = [
+        { name: "The Tonight Show Starring Jimmy Fallon", id: "UC8-Th83bH_thdKZDJCrn88g" },
+        { name: "Jimmy Kimmel Live", id: "UCa6vGFO9ty8v5KZJXQxdhaw" },
+        { name: "The Late Show with Stephen Colbert", id: "UCMtFAi84ehTSYSE9XoHefig", query: "Stephen Colbert interview" },
+        { name: "Late Night with Seth Meyers", id: "UCVTyTA7-g9nopHeHbeuvpRA" },
+        { name: "The Daily Show", id: "UCwWhs_6x42TyRM4Wstoq8HA" },
+        { name: "Team Coco", id: "UCi7GJNg51C3jgmYTUwqoUXA" }
+      ];
+      for (const tsq of talkShowQueries) {
+        try {
+          const sUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+          sUrl.searchParams.set("part", "snippet");
+          sUrl.searchParams.set("type", "video");
+          if (tsq.query) {
+            sUrl.searchParams.set("q", tsq.query);
+          } else {
+            sUrl.searchParams.set("channelId", tsq.id);
+          }
+          sUrl.searchParams.set("publishedAfter", oneYearAgoIso);
+          sUrl.searchParams.set("order", "viewCount");
+          sUrl.searchParams.set("maxResults", "3");
+          sUrl.searchParams.set("key", apiKey);
+          const sRes = await fetch(sUrl.toString(), { headers: { Accept: "application/json" } });
+          if (!sRes.ok) continue;
+          const sData = await sRes.json();
+          for (const item of sData.items || []) {
+            const vId = item.id?.videoId;
+            const title = (item.snippet?.title || "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+            const published = item.snippet?.publishedAt || "";
+            if (!vId || !title || !isNewsContent(title, tsq.name)) continue;
+            if (!candidateVideos.some((cv) => cv.videoId === vId)) {
+              candidateVideos.push({
+                videoId: vId,
+                title,
+                channelTitle: tsq.name,
+                channelId: tsq.id,
+                publishedAt: published,
+                publishedRelative: formatRelativeTimeZh(published),
+                durationFormatted: "06:00",
+                durationSeconds: 360,
+                thumbnailUrl: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${vId}/hqdefault.jpg`,
+                hasCaptions: true,
+                captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
+                category: "TalkShow"
+              });
+            }
+          }
+        } catch (subErr) {
+          console.warn(`[YouTubeNews] 1-year talk show query error for ${tsq.name}:`, subErr?.message || subErr);
+        }
+      }
+    } catch (tsErr) {
+      console.warn("[YouTubeNews] 1-year talk show discovery error:", tsErr?.message || tsErr);
+    }
+  }
   if (apiKey && candidateVideos.length > 0) {
     try {
       const allIds = candidateVideos.map((v) => v.videoId).filter(Boolean);
@@ -1396,13 +1454,13 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
       candidateVideos = candidateVideos.filter((v) => {
         const details = validDetailsMap.get(v.videoId);
         if (!details) return false;
-        if (!details.hasCaption) return false;
         if (details.isLive) return false;
         if (!details.embeddable) return false;
         if (details.seconds < 60 || details.seconds > 7200) return false;
         v.durationSeconds = details.seconds;
         v.durationFormatted = details.formatted;
         v.hasCaptions = true;
+        v.captionBadge = details.hasCaption ? "CC \u82F1\u6587\u5B57\u5E55" : "\u82F1\u6587\u5B57\u5E55";
         return true;
       });
     } catch (apiErr) {
@@ -1483,7 +1541,8 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
   const selectedIds = /* @__PURE__ */ new Set();
   for (const cat of categoryOrder) {
     const catItems = deduplicated.filter((v) => v.category === cat);
-    for (const item of catItems.slice(0, 4)) {
+    const maxForCat = cat === "TalkShow" ? 12 : 5;
+    for (const item of catItems.slice(0, maxForCat)) {
       if (!selectedIds.has(item.videoId)) {
         selectedIds.add(item.videoId);
         selectedVideos.push(item);
@@ -1491,7 +1550,7 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
     }
   }
   for (const item of deduplicated) {
-    if (selectedVideos.length >= 45) break;
+    if (selectedVideos.length >= 60) break;
     if (!selectedIds.has(item.videoId)) {
       selectedIds.add(item.videoId);
       selectedVideos.push(item);
@@ -1500,7 +1559,7 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
   selectedVideos.sort(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );
-  const validatedList = selectedVideos.length > 0 ? selectedVideos : deduplicated.slice(0, 45);
+  const validatedList = selectedVideos.length > 0 ? selectedVideos : deduplicated.slice(0, 60);
   if (validatedList.length === 0) {
     return {
       success: true,
@@ -1508,7 +1567,7 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
       timestamp: now,
       publishedAfter: publishedAfterIso,
       videos: [],
-      message: "\u6700\u8FD1 7 \u5929\u66AB\u6642\u627E\u4E0D\u5230\u53EF\u7528\u82F1\u6587\u5B57\u5E55\u7684\u65B0\u805E\u5F71\u7247"
+      message: "\u66AB\u6642\u627E\u4E0D\u5230\u53EF\u7528\u82F1\u6587\u5B57\u5E55\u7684\u65B0\u805E\u6216\u812B\u53E3\u79C0\u5F71\u7247"
     };
   }
   await enrichNewsVideosWithDetailsAndTranslation(validatedList);

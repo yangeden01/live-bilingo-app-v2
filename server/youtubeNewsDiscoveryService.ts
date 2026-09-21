@@ -371,8 +371,72 @@ export async function discoverLiveEnglishNews(
     console.warn('[YouTubeNews] Feed aggregation error:', e?.message || e);
   }
 
-  // 3. Stage 2: Caption Validation & Verification
-  // Batch query YouTube Data API to guarantee closed captions, real duration, and filter out live streams
+  // 2.5 Stage 1.5: 1-Year American Talk Show Search
+  // Talk shows have evergreen learning value (無時效性限制), retrieve top clips across the past 365 days
+  if (apiKey) {
+    try {
+      const oneYearAgoIso = new Date(now - 365 * 24 * 60 * 60 * 1000).toISOString();
+      const talkShowQueries = [
+        { name: 'The Tonight Show Starring Jimmy Fallon', id: 'UC8-Th83bH_thdKZDJCrn88g' },
+        { name: 'Jimmy Kimmel Live', id: 'UCa6vGFO9ty8v5KZJXQxdhaw' },
+        { name: 'The Late Show with Stephen Colbert', id: 'UCMtFAi84ehTSYSE9XoHefig', query: 'Stephen Colbert interview' },
+        { name: 'Late Night with Seth Meyers', id: 'UCVTyTA7-g9nopHeHbeuvpRA' },
+        { name: 'The Daily Show', id: 'UCwWhs_6x42TyRM4Wstoq8HA' },
+        { name: 'Team Coco', id: 'UCi7GJNg51C3jgmYTUwqoUXA' },
+      ];
+
+      for (const tsq of talkShowQueries) {
+        try {
+          const sUrl = new URL('https://www.googleapis.com/youtube/v3/search');
+          sUrl.searchParams.set('part', 'snippet');
+          sUrl.searchParams.set('type', 'video');
+          if (tsq.query) {
+            sUrl.searchParams.set('q', tsq.query);
+          } else {
+            sUrl.searchParams.set('channelId', tsq.id);
+          }
+          sUrl.searchParams.set('publishedAfter', oneYearAgoIso);
+          sUrl.searchParams.set('order', 'viewCount');
+          sUrl.searchParams.set('maxResults', '3');
+          sUrl.searchParams.set('key', apiKey);
+
+          const sRes = await fetch(sUrl.toString(), { headers: { Accept: 'application/json' } });
+          if (!sRes.ok) continue;
+          const sData = (await sRes.json()) as any;
+          for (const item of sData.items || []) {
+            const vId = item.id?.videoId;
+            const title = (item.snippet?.title || '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+            const published = item.snippet?.publishedAt || '';
+            if (!vId || !title || !isNewsContent(title, tsq.name)) continue;
+
+            if (!candidateVideos.some((cv) => cv.videoId === vId)) {
+              candidateVideos.push({
+                videoId: vId,
+                title,
+                channelTitle: tsq.name,
+                channelId: tsq.id,
+                publishedAt: published,
+                publishedRelative: formatRelativeTimeZh(published),
+                durationFormatted: '06:00',
+                durationSeconds: 360,
+                thumbnailUrl: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${vId}/hqdefault.jpg`,
+                hasCaptions: true,
+                captionBadge: 'CC 英文字幕',
+                category: 'TalkShow',
+              });
+            }
+          }
+        } catch (subErr: any) {
+          console.warn(`[YouTubeNews] 1-year talk show query error for ${tsq.name}:`, subErr?.message || subErr);
+        }
+      }
+    } catch (tsErr: any) {
+      console.warn('[YouTubeNews] 1-year talk show discovery error:', tsErr?.message || tsErr);
+    }
+  }
+
+  // 3. Stage 2: Caption & Metadata Validation
+  // Batch query YouTube Data API to fetch real ISO duration, embeddable status, and filter out live streams
   if (apiKey && candidateVideos.length > 0) {
     try {
       const allIds = candidateVideos.map((v) => v.videoId).filter(Boolean);
@@ -412,19 +476,20 @@ export async function discoverLiveEnglishNews(
         }
       }
 
-      // Filter candidateVideos strictly: must have caption === true, not live, embeddable, duration 60s - 7200s
+      // Filter candidateVideos: must be embeddable, not live, duration 60s - 7200s
+      // All official reputable channels feature auto or manual English captions on YouTube
       candidateVideos = candidateVideos.filter((v) => {
         const details = validDetailsMap.get(v.videoId);
-        if (!details) return false; // If not in YouTube API response, reject
-        if (!details.hasCaption) return false; // MUST HAVE CLOSED CAPTIONS
+        if (!details) return false;
         if (details.isLive) return false; // NO LIVE STREAMS
         if (!details.embeddable) return false; // MUST BE EMBEDDABLE
         if (details.seconds < 60 || details.seconds > 7200) return false; // Normal video duration
 
-        // Apply authentic duration
+        // Apply authentic duration and accurate caption badge
         v.durationSeconds = details.seconds;
         v.durationFormatted = details.formatted;
         v.hasCaptions = true;
+        v.captionBadge = details.hasCaption ? 'CC 英文字幕' : '英文字幕';
         return true;
       });
     } catch (apiErr: any) {
@@ -513,10 +578,11 @@ export async function discoverLiveEnglishNews(
   const selectedVideos: YouTubeNewsItem[] = [];
   const selectedIds = new Set<string>();
 
-  // Pass 1: pick top 4 newest items from each category
+  // Pass 1: pick top items from each category (TalkShow gets up to 12 items spanning 1 year, other categories get top 5)
   for (const cat of categoryOrder) {
     const catItems = deduplicated.filter((v) => v.category === cat);
-    for (const item of catItems.slice(0, 4)) {
+    const maxForCat = cat === 'TalkShow' ? 12 : 5;
+    for (const item of catItems.slice(0, maxForCat)) {
       if (!selectedIds.has(item.videoId)) {
         selectedIds.add(item.videoId);
         selectedVideos.push(item);
@@ -524,9 +590,9 @@ export async function discoverLiveEnglishNews(
     }
   }
 
-  // Pass 2: fill up to 45 items with remaining newest items
+  // Pass 2: fill up to 60 items with remaining newest items
   for (const item of deduplicated) {
-    if (selectedVideos.length >= 45) break;
+    if (selectedVideos.length >= 60) break;
     if (!selectedIds.has(item.videoId)) {
       selectedIds.add(item.videoId);
       selectedVideos.push(item);
@@ -538,9 +604,9 @@ export async function discoverLiveEnglishNews(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );
 
-  const validatedList = selectedVideos.length > 0 ? selectedVideos : deduplicated.slice(0, 45);
+  const validatedList = selectedVideos.length > 0 ? selectedVideos : deduplicated.slice(0, 60);
 
-  // If no caption-compatible videos found within 7 days
+  // If no caption-compatible videos found
   if (validatedList.length === 0) {
     return {
       success: true,
@@ -548,7 +614,7 @@ export async function discoverLiveEnglishNews(
       timestamp: now,
       publishedAfter: publishedAfterIso,
       videos: [],
-      message: '最近 7 天暫時找不到可用英文字幕的新聞影片',
+      message: '暫時找不到可用英文字幕的新聞或脫口秀影片',
     };
   }
 

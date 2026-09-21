@@ -146,6 +146,68 @@ class YouTubeNewsManager(
             for (res in results) {
                 allItems.addAll(res)
             }
+
+            // 1.5 1-Year American Talk Show Search
+            // Retrieve top evergreen talk show videos spanning the past 365 days
+            val oneYearAgoIso = isoFormat.format(Date(oneYearAgoMs))
+            val talkShowQueries = listOf(
+                Pair("The Tonight Show Starring Jimmy Fallon", "UC8-Th83bH_thdKZDJCrn88g"),
+                Pair("Jimmy Kimmel Live", "UCa6vGFO9ty8v5KZJXQxdhaw"),
+                Pair("Stephen Colbert interview", ""),
+                Pair("Late Night with Seth Meyers", "UCVTyTA7-g9nopHeHbeuvpRA"),
+                Pair("The Daily Show", "UCwWhs_6x42TyRM4Wstoq8HA"),
+                Pair("Team Coco", "UCi7GJNg51C3jgmYTUwqoUXA")
+            )
+
+            for ((queryOrName, chId) in talkShowQueries) {
+                try {
+                    val searchUrl = if (chId.isNotEmpty()) {
+                        "https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&channelId=$chId&publishedAfter=$oneYearAgoIso&order=viewCount&maxResults=3&key=$YOUTUBE_DATA_API_KEY"
+                    } else {
+                        "https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=Stephen+Colbert+interview&publishedAfter=$oneYearAgoIso&order=viewCount&maxResults=3&key=$YOUTUBE_DATA_API_KEY"
+                    }
+                    val req = Request.Builder().url(searchUrl).header("User-Agent", "LiveBilingo-Android/2.5.2").build()
+                    client.newCall(req).execute().use { res ->
+                        if (res.isSuccessful) {
+                            val body = res.body?.string() ?: ""
+                            val json = JSONObject(body)
+                            val items = json.optJSONArray("items") ?: JSONArray()
+                            for (i in 0 until items.length()) {
+                                val item = items.optJSONObject(i) ?: continue
+                                val idObj = item.optJSONObject("id")
+                                val videoId = idObj?.optString("videoId") ?: ""
+                                val snippet = item.optJSONObject("snippet")
+                                val title = snippet?.optString("title") ?: ""
+                                val chTitle = snippet?.optString("channelTitle") ?: queryOrName
+                                val pubAt = snippet?.optString("publishedAt") ?: ""
+                                val thumbObj = snippet?.optJSONObject("thumbnails")
+                                val thumbUrl = thumbObj?.optJSONObject("high")?.optString("url")
+                                    ?: thumbObj?.optJSONObject("medium")?.optString("url")
+                                    ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+
+                                if (videoId.isNotEmpty() && title.isNotEmpty()) {
+                                    val pubDate = try { isoFormat.parse(pubAt) } catch (e: Exception) { null }
+                                    val pubMs = pubDate?.time ?: now
+                                    allItems.add(
+                                        RawNewsItem(
+                                            videoId = videoId,
+                                            title = title.replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'"),
+                                            channelTitle = chTitle,
+                                            channelId = chId,
+                                            publishedAt = pubAt,
+                                            publishedMs = pubMs,
+                                            thumbnailUrl = thumbUrl,
+                                            category = "TalkShow"
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Talk show search failed for $queryOrName: ${e.message}")
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error aggregating news feeds", e)
         }
@@ -172,7 +234,7 @@ class YouTubeNewsManager(
 
         // 4. Verify closed captions and fetch real ISO duration via YouTube Data API v3
         val verifiedVideos = mutableListOf<EnrichedNewsItem>()
-        val candidateList = filtered.take(80)
+        val candidateList = filtered.take(100)
 
         if (candidateList.isNotEmpty()) {
             val candidateIds = candidateList.map { it.videoId }
@@ -200,21 +262,18 @@ class YouTubeNewsManager(
                                 }
 
                                 for (raw in candidateList) {
-                                    if (verifiedVideos.size >= 60) break
+                                    if (verifiedVideos.size >= 70) break
                                     val detailsObj = itemMap[raw.videoId] ?: continue
                                     val status = detailsObj.optJSONObject("status")
                                     val isEmbeddable = status?.optBoolean("embeddable", true) ?: true
                                     if (!isEmbeddable) continue
-
-                                    val contentDetails = detailsObj.optJSONObject("contentDetails")
-                                    val hasCaption = contentDetails?.optString("caption") == "true"
-                                    if (!hasCaption) continue // MUST HAVE CLOSED CAPTIONS
 
                                     val liveStreamingDetails = detailsObj.optJSONObject("liveStreamingDetails")
                                     val snippet = detailsObj.optJSONObject("snippet")
                                     val liveBroadcastContent = snippet?.optString("liveBroadcastContent", "none") ?: "none"
                                     if (liveStreamingDetails != null || liveBroadcastContent == "live") continue // NO LIVE STREAMS
 
+                                    val contentDetails = detailsObj.optJSONObject("contentDetails")
                                     val isoDuration = contentDetails?.optString("duration", "") ?: ""
                                     val (durSec, durFormatted) = parseIsoDuration(isoDuration)
                                     if (durSec < 60 || durSec > 7200) continue // Filter out micro clips or >2h marathons
@@ -238,7 +297,7 @@ class YouTubeNewsManager(
 
         // If API verification yielded 0 videos (e.g. temporary network issue), fall back safely
         if (verifiedVideos.isEmpty()) {
-            for (raw in candidateList.take(45)) {
+            for (raw in candidateList.take(50)) {
                 verifiedVideos.add(
                     EnrichedNewsItem(
                         raw = raw,
@@ -254,10 +313,11 @@ class YouTubeNewsManager(
         val balancedVideos = mutableListOf<EnrichedNewsItem>()
         val selectedIds = mutableSetOf<String>()
 
-        // Pass 1: pick top 4 newest for each category
+        // Pass 1: pick top items for each category (TalkShow gets up to 12 items spanning 1 year, others get top 4)
         for (cat in categoryOrder) {
             val catItems = verifiedVideos.filter { it.raw.category == cat }
-            for (item in catItems.take(4)) {
+            val maxCount = if (cat == "TalkShow") 12 else 4
+            for (item in catItems.take(maxCount)) {
                 if (!selectedIds.contains(item.raw.videoId)) {
                     selectedIds.add(item.raw.videoId)
                     balancedVideos.add(item)
@@ -265,9 +325,9 @@ class YouTubeNewsManager(
             }
         }
 
-        // Pass 2: fill up to 45 items with remaining newest items
+        // Pass 2: fill up to 60 items with remaining newest items
         for (item in verifiedVideos) {
-            if (balancedVideos.size >= 45) break
+            if (balancedVideos.size >= 60) break
             if (!selectedIds.contains(item.raw.videoId)) {
                 selectedIds.add(item.raw.videoId)
                 balancedVideos.add(item)

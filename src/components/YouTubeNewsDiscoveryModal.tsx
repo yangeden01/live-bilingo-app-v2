@@ -44,7 +44,7 @@ interface YouTubeNewsDiscoveryModalProps {
 
 const CATEGORY_TABS: { key: NewsModalCategoryTab; label: string; icon: React.FC<{ className?: string }> }[] = [
   { key: 'ALL', label: '全部', icon: Compass },
-  { key: 'TalkShow', label: '美語脫口秀', icon: Mic2 },
+  { key: 'TalkShow', label: '美語脫口秀 (1年精選)', icon: Mic2 },
   { key: 'Knowledge', label: '知識科普', icon: BookOpen },
   { key: 'Technology', label: '科技前沿', icon: Cpu },
   { key: 'Business', label: '商業財經', icon: Building2 },
@@ -337,11 +337,11 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
                   美語精選頻道
                 </h3>
                 <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
-                  一週內 • 完整英文字幕
+                  完整英文字幕 • 雙語對齊
                 </span>
               </div>
               <p className={`text-xs truncate ${secondaryTextClass}`}>
-                知識科普、商業科技與權威外電 • 點擊即刻啟動雙語學習
+                時事外電（7天即時）與美語脫口秀（1年精選）• 點擊即刻啟動雙語學習
                 {lastUpdated && ` (更新於 ${lastUpdated}${cached ? '，快取模式' : ''})`}
               </p>
             </div>
@@ -553,9 +553,13 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
             <div className="flex flex-col items-center justify-center py-16 space-y-3 text-center">
               <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
               <div className="space-y-1">
-                <p className="text-sm font-semibold">正在搜尋最近 7 天美語新聞...</p>
+                <p className="text-sm font-semibold">
+                  {selectedCategory === 'TalkShow' ? '正在搜尋最近 1 年美語脫口秀精選...' : '正在搜尋美語精選新聞與脫口秀...'}
+                </p>
                 <p className={`text-xs ${secondaryTextClass}`}>
-                  依序檢索 PBS, CNN, BBC, NBC, CBS, Sky News 等權威頻道並驗證英文字幕
+                  {selectedCategory === 'TalkShow'
+                    ? '依序檢索 Fallon, Kimmel, Colbert, Seth Meyers, Daily Show, Conan 等熱門脫口秀經典對話'
+                    : '檢索權威外電與熱門美語脫口秀，並確認英文字幕雙語對齊'}
                 </p>
               </div>
             </div>
@@ -570,7 +574,7 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
               <div className="space-y-1 max-w-md mx-auto">
                 <h4 className="text-sm font-semibold">{error}</h4>
                 <p className={`text-xs ${secondaryTextClass}`}>
-                  系統僅推薦符合最近 7 天發布時間且已確認具備英文字幕之影片，確保雙語學習體驗。
+                  新聞影片嚴格篩選最近 7 天即時發布，美語脫口秀則精選 1 年內經典訪談對話，皆確認具備英文字幕。
                 </p>
               </div>
               <button
@@ -588,13 +592,15 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
           {/* Video List */}
           {!isLoading && !error && filteredVideos.length === 0 && (
             <div className={`p-8 rounded-2xl border text-center space-y-3 ${cardBgClass}`}>
-              <p className="text-sm font-semibold">此分類在最近 7 天暫無影片</p>
+              <p className="text-sm font-semibold">
+                {selectedCategory === 'TalkShow' ? '美語脫口秀在最近 1 年暫無影片' : '此分類在最近 7 天暫無影片'}
+              </p>
               <button
                 type="button"
                 onClick={() => setSelectedCategory('ALL')}
                 className="text-xs text-emerald-400 hover:underline cursor-pointer"
               >
-                查看全部新聞
+                查看全部精選影片
               </button>
             </div>
           )}

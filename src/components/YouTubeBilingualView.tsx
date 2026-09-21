@@ -34,6 +34,10 @@ import {
   Star,
   Tv,
   Loader2,
+  Minus,
+  Plus,
+  RotateCcw,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { ReadingModeAndFontToolbar } from './ReadingModeAndFontToolbar';
 import { YouTubeNewsDiscoveryModal } from './YouTubeNewsDiscoveryModal';
@@ -716,6 +720,60 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     }
   };
 
+  // Video Subtitle Voice Alignment Offset (-2 ~ 5 segments)
+  const [videoSyncOffset, setVideoSyncOffset] = useState<number>(() => {
+    try {
+      const saved = getPersistentItem('youtube_video_sync_offset');
+      if (saved !== null && saved !== undefined) {
+        const val = parseInt(String(saved), 10);
+        if (!isNaN(val)) return Math.max(-2, Math.min(5, val));
+      }
+    } catch (e) {}
+    return 0;
+  });
+
+  // State to toggle pre-read sentences preview when offset > 0
+  const [showPreRead, setShowPreRead] = useState<boolean>(false);
+
+  const handleVideoSyncOffsetChange = (newOffset: number) => {
+    const clamped = Math.max(-2, Math.min(5, newOffset));
+    setVideoSyncOffset(clamped);
+    vibrateDetentTick();
+    try {
+      setPersistentItem('youtube_video_sync_offset', String(clamped));
+    } catch (e) {}
+    if (clamped === 0) {
+      setSaveToast('影音同步：已重置為標準時間軸對齊 (0)');
+    } else if (clamped > 0) {
+      setSaveToast(`影音語音對齊：語音延遲 ${clamped} 段 (+${clamped})`);
+    } else {
+      setSaveToast(`影音語音對齊：語音提前 ${Math.abs(clamped)} 段 (${clamped})`);
+    }
+    setTimeout(() => setSaveToast(null), 2500);
+  };
+
+  // Calculate effective active index considering videoSyncOffset
+  const effectiveActiveIndex = useMemo(() => {
+    if (activeSubtitleIndex < 0 || subtitles.length === 0) return -1;
+    const targetIdx = activeSubtitleIndex - videoSyncOffset;
+    return Math.max(0, Math.min(subtitles.length - 1, targetIdx));
+  }, [activeSubtitleIndex, videoSyncOffset, subtitles.length]);
+
+  const effectiveActiveId = useMemo(() => {
+    if (effectiveActiveIndex >= 0 && effectiveActiveIndex < subtitles.length) {
+      return subtitles[effectiveActiveIndex].id;
+    }
+    return activeSubtitleId;
+  }, [effectiveActiveIndex, subtitles, activeSubtitleId]);
+
+  // Ahead Subtitles (for pre-reading when voice is delayed by videoSyncOffset > 0)
+  const aheadSubtitles = useMemo(() => {
+    if (videoSyncOffset <= 0 || effectiveActiveIndex < 0 || subtitles.length === 0) return [];
+    const start = effectiveActiveIndex + 1;
+    const end = Math.min(subtitles.length, effectiveActiveIndex + 1 + videoSyncOffset);
+    return subtitles.slice(start, end);
+  }, [subtitles, effectiveActiveIndex, videoSyncOffset]);
+
   // Floating Return-To-Live Subtitle Button State:
   // 'above' = active subtitle is above the visible area (user scrolled DOWN to view future subtitles)
   // 'below' = active subtitle is below the visible area (user scrolled UP to view earlier subtitles)
@@ -726,13 +784,14 @@ export const YouTubeBilingualView: React.FC<Props> = ({
   const rafCheckId = useRef<number | null>(null);
 
   const checkSubtitlePosition = useCallback(() => {
-    if (!activeSubtitleId || !subtitleContainerRef.current) {
+    const targetId = effectiveActiveId || activeSubtitleId;
+    if (!targetId || !subtitleContainerRef.current) {
       setActiveSubtitleRelativePos(null);
       return;
     }
 
     const container = subtitleContainerRef.current;
-    const cardEl = document.getElementById(`yt-card-${activeSubtitleId}`);
+    const cardEl = document.getElementById(`yt-card-${targetId}`);
     if (!cardEl) {
       return;
     }
@@ -761,7 +820,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
         setIsUserScrolledAway(false);
       }
     }
-  }, [activeSubtitleId]);
+  }, [effectiveActiveId, activeSubtitleId]);
 
   const scheduleCheck = useCallback(() => {
     if (rafCheckId.current) cancelAnimationFrame(rafCheckId.current);
@@ -802,13 +861,14 @@ export const YouTubeBilingualView: React.FC<Props> = ({
   // Check visibility whenever active subtitle ID changes
   useEffect(() => {
     scheduleCheck();
-  }, [activeSubtitleId, scheduleCheck]);
+  }, [effectiveActiveId, activeSubtitleId, scheduleCheck]);
 
   // Auto-scroll ONLY inside the dedicated subtitle container when NOT scrolled away
   useEffect(() => {
-    if (!autoScroll || isUserScrolledAway || !activeSubtitleId || !subtitleContainerRef.current) return;
+    const targetId = effectiveActiveId || activeSubtitleId;
+    if (!autoScroll || isUserScrolledAway || !targetId || !subtitleContainerRef.current) return;
     const container = subtitleContainerRef.current;
-    const cardEl = document.getElementById(`yt-card-${activeSubtitleId}`);
+    const cardEl = document.getElementById(`yt-card-${targetId}`);
     if (!cardEl) return;
 
     // Calculate position of the active card relative to the subtitle container
@@ -832,7 +892,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     }, 450);
 
     return () => clearTimeout(timer);
-  }, [activeSubtitleId, autoScroll, isUserScrolledAway, scheduleCheck]);
+  }, [effectiveActiveId, activeSubtitleId, autoScroll, isUserScrolledAway, scheduleCheck]);
 
   // Handler to return to currently active subtitle segment
   const handleReturnToLiveSubtitle = useCallback(() => {
@@ -841,7 +901,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     setActiveSubtitleRelativePos(null);
     vibrateDetentTick();
 
-    const targetId = activeSubtitleId || (subtitles.length > 0 ? subtitles[0].id : null);
+    const targetId = effectiveActiveId || activeSubtitleId || (subtitles.length > 0 ? subtitles[0].id : null);
     if (!targetId) return;
 
     const cardEl = document.getElementById(`yt-card-${targetId}`);
@@ -877,7 +937,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
       isProgrammaticScrollRef.current = false;
       scheduleCheck();
     }, 550);
-  }, [activeSubtitleId, subtitles, scheduleCheck]);
+  }, [effectiveActiveId, activeSubtitleId, subtitles, scheduleCheck]);
 
   const filteredSubtitles = subtitles;
 
@@ -1400,55 +1460,216 @@ export const YouTubeBilingualView: React.FC<Props> = ({
 
           {/* Subtitles Container (Reusing BilingualSubtitleCard.tsx) */}
           {subtitles.length > 0 && (
-            <div
-              ref={subtitleContainerRef}
-              className="space-y-3 max-h-[calc(100dvh-260px)] sm:max-h-[calc(100dvh-280px)] lg:max-h-[calc(100vh-140px)] overflow-y-auto overscroll-contain pr-1 pb-36 sm:pb-44 scrollbar-thin scrollbar-thumb-slate-800"
-            >
-              {filteredSubtitles.map((ytItem, idx) => {
-                const subItem = toSubtitleItem(ytItem, idx);
-                const isActive = ytItem.id === activeSubtitleId;
-                const isPlayingThisSegment = isActive && playerState === 'playing';
+            <>
+              {/* Voice Sync Toolbar & Ahead Preview Banner */}
+              <div id="youtube-voice-sync-toolbar" className="space-y-2 mb-3">
+                <div className="flex items-center justify-between gap-2">
+                  {/* Left: Indicator & Title */}
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    <span className={`text-xs font-bold truncate ${
+                      effectiveTheme === 'paper' ? 'text-[#4A3B2C]' : 'text-slate-200'
+                    }`}>
+                      語音對齊調整
+                    </span>
+                    {videoSyncOffset !== 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 shrink-0">
+                        {videoSyncOffset > 0 ? `+${videoSyncOffset} 段` : `${videoSyncOffset} 段`}
+                      </span>
+                    )}
+                  </div>
 
-                return (
-                  <div
-                    key={ytItem.id}
-                    id={`yt-card-${ytItem.id}`}
-                    onClick={() => handleSeekToSentence(ytItem.startMs)}
-                    className={`transition-all duration-200 cursor-pointer rounded-2xl ${
-                      isActive
-                        ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-500/10 scale-[1.01]'
-                        : 'hover:opacity-95'
-                    }`}
-                  >
-                    <BilingualSubtitleCard
-                      subtitle={subItem}
-                      onBookmarkToggle={handleBookmarkToggle}
-                      onOpenDictionary={onOpenDictionary}
-                      isLatest={isActive}
-                      searchQuery=""
-                      fontSize={fontSize}
-                      chineseVariant={chineseVariant}
-                      highlightDifficulty={highlightDifficulty}
-                      theme={effectiveTheme}
-                      hideSpeedBookmark={true}
-                      isPlayingSegment={isPlayingThisSegment}
-                      onPlaySegment={() => {
-                        if (isPlayingThisSegment) {
-                          playerRef.current?.pause();
-                        } else {
-                          handleSeekToSentence(ytItem.startMs);
+                  {/* Right: Step controller [-] [ 慢 1 段 (+1) ↺ ] [+] */}
+                  <div className={`inline-flex items-center gap-1 p-1 rounded-xl border text-xs font-bold shrink-0 ${
+                    effectiveTheme === 'paper'
+                      ? 'bg-[#EADDC2]/80 border-[#C8B282]'
+                      : effectiveTheme === 'light'
+                      ? 'bg-slate-100 border-slate-300'
+                      : 'bg-slate-900/90 border-slate-700/80'
+                  }`}>
+                    {/* Minus button */}
+                    <button
+                      type="button"
+                      id="youtube-sync-minus-btn"
+                      onClick={() => handleVideoSyncOffsetChange(videoSyncOffset - 1)}
+                      disabled={videoSyncOffset <= -2}
+                      title="減少延遲 (提前字幕)"
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed active:scale-90 select-none ${
+                        effectiveTheme === 'paper'
+                          ? 'hover:bg-[#DBCBB0] text-[#4A3B2C]'
+                          : 'hover:bg-slate-800 text-slate-200 hover:text-white'
+                      }`}
+                    >
+                      <Minus className="w-4 h-4 stroke-[2.5]" />
+                    </button>
+
+                    {/* Offset Display Pill - Click to reset to 0 */}
+                    <button
+                      type="button"
+                      id="youtube-sync-reset-btn"
+                      onClick={() => {
+                        if (videoSyncOffset !== 0) {
+                          handleVideoSyncOffsetChange(0);
                         }
                       }}
-                      isRepeatActive={repeatSegmentId === ytItem.id}
-                      onToggleRepeatSegment={() => handleToggleRepeatSegment(ytItem.id, ytItem.startMs)}
-                    />
-                  </div>
-                );
-              })}
+                      title={
+                        videoSyncOffset === 0
+                          ? '目前為標準時間軸同步，點擊 +/- 調整延遲段落'
+                          : `目前語音延遲 ${videoSyncOffset} 段，點擊一鍵歸零重置`
+                      }
+                      className={`h-7 sm:h-8 px-2.5 sm:px-3 rounded-lg font-mono text-xs font-black flex items-center gap-1.5 transition-all select-none whitespace-nowrap cursor-pointer ${
+                        videoSyncOffset === 0
+                          ? effectiveTheme === 'paper'
+                            ? 'bg-[#FFFDF7] text-[#5C4830] border border-[#E0CFAB]'
+                            : effectiveTheme === 'light'
+                            ? 'bg-white text-slate-700 border border-slate-300'
+                            : 'bg-slate-800/90 text-slate-300 border border-slate-700/70'
+                          : effectiveTheme === 'paper'
+                          ? 'bg-amber-700 text-amber-100 ring-1 ring-amber-600/40 hover:bg-amber-800'
+                          : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white ring-1 ring-blue-400/40 hover:from-blue-500 hover:to-indigo-500'
+                      }`}
+                    >
+                      {videoSyncOffset === 0 ? (
+                        <span>正常 (0)</span>
+                      ) : videoSyncOffset > 0 ? (
+                        <span className="flex items-center gap-1">
+                          慢 {videoSyncOffset} 段 (+{videoSyncOffset})
+                          <RotateCcw className="w-2.5 h-2.5 text-white/90 shrink-0" />
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          快 {Math.abs(videoSyncOffset)} 段 ({videoSyncOffset})
+                          <RotateCcw className="w-2.5 h-2.5 text-white/90 shrink-0" />
+                        </span>
+                      )}
+                    </button>
 
-              {/* Bottom Scroll Clearance Spacer: Guarantees the very last paragraph and translation can be scrolled completely above bottom bar/FAB */}
-              <div className="h-36 sm:h-44 w-full shrink-0 select-none pointer-events-none" aria-hidden="true" />
-            </div>
+                    {/* Plus button */}
+                    <button
+                      type="button"
+                      id="youtube-sync-plus-btn"
+                      onClick={() => handleVideoSyncOffsetChange(videoSyncOffset + 1)}
+                      disabled={videoSyncOffset >= 5}
+                      title="增加延遲 (字幕超前語音時微調，最多 +5 段)"
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed active:scale-90 select-none ${
+                        effectiveTheme === 'paper'
+                          ? 'hover:bg-[#DBCBB0] text-[#4A3B2C]'
+                          : 'hover:bg-slate-800 text-slate-200 hover:text-white'
+                      }`}
+                    >
+                      <Plus className="w-4 h-4 stroke-[2.5]" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Alignment Banner & Expandable Ahead Buffer Preview (Exact counterpart to Radio mode) */}
+                {videoSyncOffset > 0 && (
+                  <div>
+                    <div className={`px-2.5 py-1.5 rounded-xl border flex items-center justify-between text-xs transition-colors ${
+                      effectiveTheme === 'paper'
+                        ? 'bg-[#EADDC2]/60 border-[#C8B282] text-[#5C4830]'
+                        : 'bg-blue-500/10 border-blue-500/25 text-blue-300'
+                    }`}>
+                      <span className="flex items-center gap-1.5 font-bold text-[11px] sm:text-xs select-none">
+                        <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <span>即時影音對齊（語音延遲 {videoSyncOffset} 段）</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowPreRead((prev) => !prev)}
+                        className="text-[10px] sm:text-[11px] font-bold text-cyan-400 hover:text-cyan-300 cursor-pointer select-none underline ml-2 shrink-0"
+                      >
+                        {showPreRead ? '收合超前語句 ▲' : `預覽超前 ${videoSyncOffset} 段 ▼`}
+                      </button>
+                    </div>
+
+                    {showPreRead && aheadSubtitles.length > 0 && (
+                      <div className="mt-1.5 space-y-1.5 p-2 rounded-xl bg-slate-900/80 border border-slate-700/80">
+                        {aheadSubtitles.map((preSub, pIdx) => (
+                          <div
+                            key={preSub.id}
+                            onClick={() => handleSeekToSentence(preSub.startMs)}
+                            className="text-[11px] border-b border-slate-800/80 pb-1.5 last:border-0 last:pb-0 cursor-pointer hover:bg-slate-800/50 p-1 rounded transition-colors"
+                          >
+                            <div className="flex items-center gap-1 text-[10px] font-mono text-cyan-400 font-bold mb-0.5">
+                              <span>超前 +{pIdx + 1} 段</span>
+                              <span className="text-slate-500">·</span>
+                              <span className="text-slate-400">
+                                {Math.floor(preSub.startMs / 60000)}:{String(Math.floor((preSub.startMs % 60000) / 1000)).padStart(2, '0')}
+                              </span>
+                            </div>
+                            <div className="text-slate-200 font-medium">{preSub.english}</div>
+                            <div className="text-slate-400 text-[10px] mt-0.5">{preSub.traditionalChinese}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div
+                ref={subtitleContainerRef}
+                className="space-y-3 max-h-[calc(100dvh-260px)] sm:max-h-[calc(100dvh-280px)] lg:max-h-[calc(100vh-140px)] overflow-y-auto overscroll-contain pr-1 pb-36 sm:pb-44 scrollbar-thin scrollbar-thumb-slate-800"
+              >
+                {filteredSubtitles.map((ytItem, idx) => {
+                  const subItem = toSubtitleItem(ytItem, idx);
+                  const isActive = ytItem.id === (effectiveActiveId || activeSubtitleId);
+                  const isPlayingThisSegment = isActive && playerState === 'playing';
+
+                  // Calculate aheadOffset if card is in ahead preview buffer
+                  let aheadOffset: number | undefined = undefined;
+                  if (videoSyncOffset > 0 && effectiveActiveIndex >= 0) {
+                    if (idx > effectiveActiveIndex && idx <= effectiveActiveIndex + videoSyncOffset) {
+                      aheadOffset = idx - effectiveActiveIndex;
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={ytItem.id}
+                      id={`yt-card-${ytItem.id}`}
+                      onClick={() => handleSeekToSentence(ytItem.startMs)}
+                      className={`transition-all duration-200 cursor-pointer rounded-2xl ${
+                        isActive
+                          ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-500/10 scale-[1.01]'
+                          : 'hover:opacity-95'
+                      }`}
+                    >
+                      <BilingualSubtitleCard
+                        subtitle={subItem}
+                        onBookmarkToggle={handleBookmarkToggle}
+                        onOpenDictionary={onOpenDictionary}
+                        isLatest={isActive}
+                        aheadOffset={aheadOffset}
+                        liveSyncOffset={videoSyncOffset}
+                        mode="video"
+                        activeBadgeLabel="影音對齊"
+                        searchQuery=""
+                        fontSize={fontSize}
+                        chineseVariant={chineseVariant}
+                        highlightDifficulty={highlightDifficulty}
+                        theme={effectiveTheme}
+                        hideSpeedBookmark={true}
+                        isPlayingSegment={isPlayingThisSegment}
+                        onPlaySegment={() => {
+                          if (isPlayingThisSegment) {
+                            playerRef.current?.pause();
+                          } else {
+                            handleSeekToSentence(ytItem.startMs);
+                          }
+                        }}
+                        isRepeatActive={repeatSegmentId === ytItem.id}
+                        onToggleRepeatSegment={() => handleToggleRepeatSegment(ytItem.id, ytItem.startMs)}
+                      />
+                    </div>
+                  );
+                })}
+
+                {/* Bottom Scroll Clearance Spacer: Guarantees the very last paragraph and translation can be scrolled completely above bottom bar/FAB */}
+                <div className="h-36 sm:h-44 w-full shrink-0 select-none pointer-events-none" aria-hidden="true" />
+              </div>
+            </>
           )}
         </div>
       </div>

@@ -25,6 +25,8 @@ interface Props {
   isPlayingSegment?: boolean;
   isRepeatActive?: boolean;
   onToggleRepeatSegment?: () => void;
+  mode?: 'radio' | 'video';
+  activeBadgeLabel?: string;
 }
 
 const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -48,6 +50,8 @@ export const BilingualSubtitleCard: React.FC<Props> = ({
   isPlayingSegment = false,
   isRepeatActive = false,
   onToggleRepeatSegment,
+  mode = 'radio',
+  activeBadgeLabel,
 }) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechRate, setSpeechRate] = useState<number>(1.0);
@@ -317,7 +321,12 @@ export const BilingualSubtitleCard: React.FC<Props> = ({
           {isLatest && !isInterim && (
             <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] bg-rose-500/15 text-rose-500 dark:text-rose-400 border border-rose-500/30">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping shrink-0" />
-              即時廣播{liveSyncOffset && liveSyncOffset > 0 ? ` (慢 ${liveSyncOffset} 段)` : ''}
+              {activeBadgeLabel || (mode === 'video' ? '影音對齊' : '即時廣播')}
+              {liveSyncOffset && liveSyncOffset > 0
+                ? ` (慢 ${liveSyncOffset} 段)`
+                : liveSyncOffset && liveSyncOffset < 0
+                ? ` (快 ${Math.abs(liveSyncOffset)} 段)`
+                : ''}
             </span>
           )}
 

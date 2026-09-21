@@ -1422,7 +1422,7 @@ export const Material3AndroidFrame: React.FC<Props> = ({
                   </h3>
 
                   <p className={`text-xs max-w-sm leading-relaxed mb-4 ${effectiveTheme === 'paper' ? 'text-[#6B5840]' : 'text-slate-500 dark:text-slate-400'}`}>
-                    在廣播或影音雙語字幕中點擊任何英文單字查詢字典，系統將自動為您蒐藏至生詞本。
+                    在廣播或影音雙語字幕中點擊任何英文單字查字典，並點擊書籤圖示將單字加入專屬生詞本。
                   </p>
                 </div>
               ) : (

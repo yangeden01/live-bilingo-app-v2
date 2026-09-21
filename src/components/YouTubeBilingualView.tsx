@@ -1115,20 +1115,20 @@ export const YouTubeBilingualView: React.FC<Props> = ({
               )}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 w-full min-w-0">
             <button
               type="button"
               id="youtube-live-news-btn"
               onClick={() => setShowNewsModal(true)}
               aria-label="美語精選頻道"
               title="探索權威美語頻道影片與收藏影片"
-              className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border shadow-sm transition-all shrink-0 cursor-pointer whitespace-nowrap ${testBtnClass}`}
+              className={`flex items-center justify-center gap-1.5 px-3 py-2 min-h-[36px] rounded-xl text-xs sm:text-sm font-semibold border shadow-sm transition-all shrink-0 cursor-pointer whitespace-nowrap ${testBtnClass}`}
             >
-              <Newspaper className="w-4 h-4 text-emerald-400" />
+              <Newspaper className="w-3.5 h-3.5 text-emerald-400" />
               <span>美語精選頻道</span>
               {savedUrls.length > 0 && (
-                <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-500 font-bold flex items-center gap-0.5">
-                  <Star className="w-3 h-3 fill-amber-500" />
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-500 font-bold flex items-center gap-0.5">
+                  <Star className="w-2.5 h-2.5 fill-amber-500" />
                   {savedUrls.length}
                 </span>
               )}
@@ -1141,7 +1141,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                 aria-valuenow={progress.percent || 15}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                className={`relative overflow-hidden rounded-xl border flex items-center justify-between px-3.5 py-2 min-h-[42px] min-w-[210px] sm:min-w-[250px] shadow-md transition-all select-none ${
+                className={`relative overflow-hidden rounded-xl border flex items-center justify-between px-2.5 py-1.5 min-h-[36px] flex-1 min-w-0 shadow-sm transition-all select-none ${
                   effectiveTheme === 'paper'
                     ? 'bg-[#FAF4E8] border-[#CDB58A] text-[#3B2E1E]'
                     : effectiveTheme === 'light'
@@ -1160,21 +1160,21 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                 />
 
                 {/* Left: Indicator & Stage Description */}
-                <div className="relative z-10 flex items-center gap-2 min-w-0 pr-2">
+                <div className="relative z-10 flex items-center gap-1.5 min-w-0 pr-1">
                   {(progress.percent >= 100 || status === 'ready') ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 animate-in zoom-in-75 duration-200" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 animate-in zoom-in-75 duration-200" />
                   ) : (
-                    <Loader2 className="w-4 h-4 text-emerald-400 animate-spin shrink-0" />
+                    <Loader2 className="w-3.5 h-3.5 text-emerald-400 animate-spin shrink-0" />
                   )}
-                  <span className="text-xs font-semibold truncate">
+                  <span className="text-[11px] sm:text-xs font-semibold truncate">
                     {(progress.percent >= 100 || status === 'ready')
-                      ? '雙語字幕就緒，開始播放'
-                      : progress.message || (status === 'loading' ? '正在擷取英文字幕...' : '雙語字幕生成中...')}
+                      ? '雙語字幕就緒'
+                      : progress.message || (status === 'loading' ? '擷取英文字幕...' : '雙語字幕生成中...')}
                   </span>
                 </div>
 
                 {/* Right: Percentage */}
-                <div className="relative z-10 font-mono text-xs font-bold text-emerald-400 shrink-0">
+                <div className="relative z-10 font-mono text-[11px] sm:text-xs font-bold text-emerald-400 shrink-0 pl-1">
                   {(progress.percent >= 100 || status === 'ready') ? 100 : (progress.percent || (status === 'loading' ? 25 : 60))}%
                 </div>
               </div>
@@ -1183,10 +1183,10 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                 type="submit"
                 id="youtube-load-btn"
                 disabled={!urlInput.trim()}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white shadow-lg shadow-rose-600/20 transition-all shrink-0 cursor-pointer whitespace-nowrap active:scale-95"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 min-h-[36px] rounded-xl text-xs sm:text-sm font-semibold bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white shadow-sm transition-all shrink-0 cursor-pointer whitespace-nowrap active:scale-95"
               >
-                <Sparkles className="w-4 h-4" />
-                <span>{status === 'ready' ? '重新載入字幕' : '載入雙語字幕'}</span>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{status === 'ready' ? '重新載入' : '載入字幕'}</span>
               </button>
             )}
           </div>

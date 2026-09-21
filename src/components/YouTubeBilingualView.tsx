@@ -1283,10 +1283,10 @@ export const YouTubeBilingualView: React.FC<Props> = ({
       </div>
 
       {/* Main Learning Interface: Video Player & Subtitles Grid */}
-      <div id="youtube-player-section" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div id="youtube-player-section" className="grid grid-cols-1 lg:grid-cols-12 gap-1.5 sm:gap-4 lg:gap-6 items-start">
         {/* Left Column: Player (Clean fixed/sticky reading mode) */}
-        <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-20">
-          <div id="youtube-player-anchor" className={`sticky top-[56px] z-20 sm:static pb-2 sm:pb-0 transition-colors duration-200 ${playerAnchorBg}`}>
+        <div className="lg:col-span-5 space-y-2 lg:space-y-4 lg:sticky lg:top-20">
+          <div id="youtube-player-anchor" className={`sticky top-[56px] z-20 sm:static pb-0 transition-colors duration-200 ${playerAnchorBg}`}>
             <YouTubeBilingualPlayer
               ref={playerRef}
               videoId={activeVideoId}
@@ -1301,7 +1301,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
         </div>
 
         {/* Right Column: Bilingual Subtitle Stream (Clean reading mode) */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 space-y-1 sm:space-y-3 lg:space-y-4">
           {/* Subtitle Idle / Ready to Load State */}
           {status === 'idle' && subtitles.length === 0 && (
             <div className={`rounded-2xl p-10 border flex flex-col items-center justify-center text-center space-y-3 transition-colors duration-200 ${statusCardBgClass}`}>
@@ -1461,32 +1461,36 @@ export const YouTubeBilingualView: React.FC<Props> = ({
           {/* Subtitles Container (Reusing BilingualSubtitleCard.tsx) */}
           {subtitles.length > 0 && (
             <>
-              {/* Voice Sync Toolbar & Ahead Preview Banner */}
-              <div id="youtube-voice-sync-toolbar" className="space-y-2 mb-3">
-                <div className="flex items-center justify-between gap-2">
-                  {/* Left: Indicator & Title */}
+              {/* Voice Sync Toolbar: Ultra-Compact Slim Row (Minimizing vertical height) */}
+              <div id="youtube-voice-sync-toolbar" className="mb-1.5">
+                <div className={`flex items-center justify-between gap-1.5 px-2 py-0.5 rounded-lg border text-xs ${
+                  effectiveTheme === 'paper'
+                    ? 'bg-[#EADDC2]/60 border-[#C8B282]/80 text-[#5C4830]'
+                    : effectiveTheme === 'light'
+                    ? 'bg-slate-100/90 border-slate-200 text-slate-700'
+                    : 'bg-slate-900/80 border-slate-800 text-slate-300'
+                }`}>
+                  {/* Left: Compact Title & Ahead toggle if offset > 0 */}
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                    <span className={`text-xs font-bold truncate ${
-                      effectiveTheme === 'paper' ? 'text-[#4A3B2C]' : 'text-slate-200'
+                    <SlidersHorizontal className="w-3 h-3 text-blue-400 shrink-0" />
+                    <span className={`text-[11px] font-bold truncate ${
+                      effectiveTheme === 'paper' ? 'text-[#4A3B2C]' : 'text-slate-300'
                     }`}>
-                      語音對齊調整
+                      語音對齊
                     </span>
-                    {videoSyncOffset !== 0 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 shrink-0">
-                        {videoSyncOffset > 0 ? `+${videoSyncOffset} 段` : `${videoSyncOffset} 段`}
-                      </span>
+                    {videoSyncOffset > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowPreRead((prev) => !prev)}
+                        className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 cursor-pointer select-none underline shrink-0 ml-0.5"
+                      >
+                        {showPreRead ? '收合超前' : `預覽+${videoSyncOffset}段`}
+                      </button>
                     )}
                   </div>
 
-                  {/* Right: Step controller [-] [ 慢 1 段 (+1) ↺ ] [+] */}
-                  <div className={`inline-flex items-center gap-1 p-1 rounded-xl border text-xs font-bold shrink-0 ${
-                    effectiveTheme === 'paper'
-                      ? 'bg-[#EADDC2]/80 border-[#C8B282]'
-                      : effectiveTheme === 'light'
-                      ? 'bg-slate-100 border-slate-300'
-                      : 'bg-slate-900/90 border-slate-700/80'
-                  }`}>
+                  {/* Right: Step controller [-] [ 慢 1 段 (+1) ↺ ] [+] - Micro compact */}
+                  <div className="inline-flex items-center gap-0.5 shrink-0">
                     {/* Minus button */}
                     <button
                       type="button"
@@ -1494,13 +1498,13 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                       onClick={() => handleVideoSyncOffsetChange(videoSyncOffset - 1)}
                       disabled={videoSyncOffset <= -2}
                       title="減少延遲 (提前字幕)"
-                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed active:scale-90 select-none ${
+                      className={`w-5.5 h-5.5 sm:w-6 sm:h-6 rounded flex items-center justify-center transition-all cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed active:scale-90 select-none ${
                         effectiveTheme === 'paper'
                           ? 'hover:bg-[#DBCBB0] text-[#4A3B2C]'
-                          : 'hover:bg-slate-800 text-slate-200 hover:text-white'
+                          : 'hover:bg-slate-800 text-slate-300 hover:text-white'
                       }`}
                     >
-                      <Minus className="w-4 h-4 stroke-[2.5]" />
+                      <Minus className="w-3 h-3 stroke-[2.5]" />
                     </button>
 
                     {/* Offset Display Pill - Click to reset to 0 */}
@@ -1517,7 +1521,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                           ? '目前為標準時間軸同步，點擊 +/- 調整延遲段落'
                           : `目前語音延遲 ${videoSyncOffset} 段，點擊一鍵歸零重置`
                       }
-                      className={`h-7 sm:h-8 px-2.5 sm:px-3 rounded-lg font-mono text-xs font-black flex items-center gap-1.5 transition-all select-none whitespace-nowrap cursor-pointer ${
+                      className={`h-5 sm:h-5.5 px-2 rounded font-mono text-[10px] font-black flex items-center gap-1 transition-all select-none whitespace-nowrap cursor-pointer ${
                         videoSyncOffset === 0
                           ? effectiveTheme === 'paper'
                             ? 'bg-[#FFFDF7] text-[#5C4830] border border-[#E0CFAB]'
@@ -1532,12 +1536,12 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                       {videoSyncOffset === 0 ? (
                         <span>正常 (0)</span>
                       ) : videoSyncOffset > 0 ? (
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-0.5">
                           慢 {videoSyncOffset} 段 (+{videoSyncOffset})
                           <RotateCcw className="w-2.5 h-2.5 text-white/90 shrink-0" />
                         </span>
                       ) : (
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-0.5">
                           快 {Math.abs(videoSyncOffset)} 段 ({videoSyncOffset})
                           <RotateCcw className="w-2.5 h-2.5 text-white/90 shrink-0" />
                         </span>
@@ -1551,66 +1555,44 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                       onClick={() => handleVideoSyncOffsetChange(videoSyncOffset + 1)}
                       disabled={videoSyncOffset >= 5}
                       title="增加延遲 (字幕超前語音時微調，最多 +5 段)"
-                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed active:scale-90 select-none ${
+                      className={`w-5.5 h-5.5 sm:w-6 sm:h-6 rounded flex items-center justify-center transition-all cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed active:scale-90 select-none ${
                         effectiveTheme === 'paper'
                           ? 'hover:bg-[#DBCBB0] text-[#4A3B2C]'
-                          : 'hover:bg-slate-800 text-slate-200 hover:text-white'
+                          : 'hover:bg-slate-800 text-slate-300 hover:text-white'
                       }`}
                     >
-                      <Plus className="w-4 h-4 stroke-[2.5]" />
+                      <Plus className="w-3 h-3 stroke-[2.5]" />
                     </button>
                   </div>
                 </div>
 
-                {/* Alignment Banner & Expandable Ahead Buffer Preview (Exact counterpart to Radio mode) */}
-                {videoSyncOffset > 0 && (
-                  <div>
-                    <div className={`px-2.5 py-1.5 rounded-xl border flex items-center justify-between text-xs transition-colors ${
-                      effectiveTheme === 'paper'
-                        ? 'bg-[#EADDC2]/60 border-[#C8B282] text-[#5C4830]'
-                        : 'bg-blue-500/10 border-blue-500/25 text-blue-300'
-                    }`}>
-                      <span className="flex items-center gap-1.5 font-bold text-[11px] sm:text-xs select-none">
-                        <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                        <span>即時影音對齊（語音延遲 {videoSyncOffset} 段）</span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setShowPreRead((prev) => !prev)}
-                        className="text-[10px] sm:text-[11px] font-bold text-cyan-400 hover:text-cyan-300 cursor-pointer select-none underline ml-2 shrink-0"
+                {/* Expandable Ahead Buffer Preview (Only rendered when explicitly opened) */}
+                {showPreRead && aheadSubtitles.length > 0 && (
+                  <div className="mt-1 space-y-1 p-2 rounded-xl bg-slate-900/90 border border-slate-700/80">
+                    {aheadSubtitles.map((preSub, pIdx) => (
+                      <div
+                        key={preSub.id}
+                        onClick={() => handleSeekToSentence(preSub.startMs)}
+                        className="text-[11px] border-b border-slate-800/80 pb-1 last:border-0 last:pb-0 cursor-pointer hover:bg-slate-800/50 p-1 rounded transition-colors"
                       >
-                        {showPreRead ? '收合超前語句 ▲' : `預覽超前 ${videoSyncOffset} 段 ▼`}
-                      </button>
-                    </div>
-
-                    {showPreRead && aheadSubtitles.length > 0 && (
-                      <div className="mt-1.5 space-y-1.5 p-2 rounded-xl bg-slate-900/80 border border-slate-700/80">
-                        {aheadSubtitles.map((preSub, pIdx) => (
-                          <div
-                            key={preSub.id}
-                            onClick={() => handleSeekToSentence(preSub.startMs)}
-                            className="text-[11px] border-b border-slate-800/80 pb-1.5 last:border-0 last:pb-0 cursor-pointer hover:bg-slate-800/50 p-1 rounded transition-colors"
-                          >
-                            <div className="flex items-center gap-1 text-[10px] font-mono text-cyan-400 font-bold mb-0.5">
-                              <span>超前 +{pIdx + 1} 段</span>
-                              <span className="text-slate-500">·</span>
-                              <span className="text-slate-400">
-                                {Math.floor(preSub.startMs / 60000)}:{String(Math.floor((preSub.startMs % 60000) / 1000)).padStart(2, '0')}
-                              </span>
-                            </div>
-                            <div className="text-slate-200 font-medium">{preSub.english}</div>
-                            <div className="text-slate-400 text-[10px] mt-0.5">{preSub.traditionalChinese}</div>
-                          </div>
-                        ))}
+                        <div className="flex items-center gap-1 text-[10px] font-mono text-cyan-400 font-bold mb-0.5">
+                          <span>超前 +{pIdx + 1} 段</span>
+                          <span className="text-slate-500">·</span>
+                          <span className="text-slate-400">
+                            {Math.floor(preSub.startMs / 60000)}:{String(Math.floor((preSub.startMs % 60000) / 1000)).padStart(2, '0')}
+                          </span>
+                        </div>
+                        <div className="text-slate-200 font-medium">{preSub.english}</div>
+                        <div className="text-slate-400 text-[10px] mt-0.5">{preSub.traditionalChinese}</div>
                       </div>
-                    )}
+                    ))}
                   </div>
                 )}
               </div>
 
               <div
                 ref={subtitleContainerRef}
-                className="space-y-3 max-h-[calc(100dvh-260px)] sm:max-h-[calc(100dvh-280px)] lg:max-h-[calc(100vh-140px)] overflow-y-auto overscroll-contain pr-1 pb-36 sm:pb-44 scrollbar-thin scrollbar-thumb-slate-800"
+                className="space-y-2.5 max-h-[calc(100dvh-210px)] sm:max-h-[calc(100dvh-230px)] lg:max-h-[calc(100vh-140px)] overflow-y-auto overscroll-contain pr-1 pb-36 sm:pb-44 scrollbar-thin scrollbar-thumb-slate-800"
               >
                 {filteredSubtitles.map((ytItem, idx) => {
                   const subItem = toSubtitleItem(ytItem, idx);

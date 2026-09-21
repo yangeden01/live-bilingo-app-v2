@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
@@ -19,6 +19,7 @@ import { speakText, stopSpeech } from '../utils/tts';
 import { lookupQuickWord } from '../utils/quickDictionary';
 import { convertChinese, ChineseVariant } from '../utils/chineseConverter';
 import { getWordDifficulty } from '../utils/cefrDifficulty';
+import { getPersistentItem, setPersistentItem } from '../utils/persistentStorage';
 
 interface Props {
   isOpen: boolean;
@@ -40,7 +41,18 @@ export const FlashcardQuizModal: React.FC<Props> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [speechRate, setSpeechRate] = useState<number>(1.0);
+
+  // Auto-speak preference: Default is TRUE (預設開啟自動發音)
+  const [autoSpeak, setAutoSpeak] = useState<boolean>(() => {
+    const saved = getPersistentItem('flashcard_auto_speak');
+    return saved === null ? true : saved !== 'false';
+  });
+
+  const [speechRate, setSpeechRate] = useState<number>(() => {
+    const savedRate = getPersistentItem('flashcard_speech_rate');
+    return savedRate ? parseFloat(savedRate) || 1.0 : 1.0;
+  });
+
   const [shuffledWords, setShuffledWords] = useState<string[]>(words);
   const [knownWords, setKnownWords] = useState<Set<string>>(new Set());
   const [reviewWords, setReviewWords] = useState<Set<string>>(new Set());
@@ -71,6 +83,38 @@ export const FlashcardQuizModal: React.FC<Props> = ({
   const rawZh = quickInfo?.zh || asyncWordTranslations[currentWord] || '英語廣播常用生詞';
   const zhTranslation = chineseVariant === 'simplified' ? convertChinese(rawZh, 'simplified') : rawZh;
 
+  // Auto-pronounce current word on card change or open when autoSpeak is enabled
+  useEffect(() => {
+    if (!isOpen || isCompleted || !currentWord || !autoSpeak) {
+      return;
+    }
+
+    // Small delay to allow card flip / transition to render before voice starts
+    const timer = setTimeout(() => {
+      speakText(
+        currentWord,
+        () => setIsSpeaking(true),
+        () => setIsSpeaking(false),
+        () => setIsSpeaking(false),
+        speechRate
+      );
+    }, 160);
+
+    return () => {
+      clearTimeout(timer);
+      stopSpeech();
+      setIsSpeaking(false);
+    };
+  }, [isOpen, currentIndex, isCompleted, currentWord, autoSpeak, speechRate]);
+
+  // Stop speech immediately when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      stopSpeech();
+      setIsSpeaking(false);
+    }
+  }, [isOpen]);
+
   const handleSpeak = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (!currentWord) return;
@@ -86,6 +130,24 @@ export const FlashcardQuizModal: React.FC<Props> = ({
         speechRate
       );
     }
+  };
+
+  const handleToggleAutoSpeak = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAutoSpeak((prev) => {
+      const next = !prev;
+      setPersistentItem('flashcard_auto_speak', String(next));
+      return next;
+    });
+  };
+
+  const handleToggleRate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSpeechRate((prev) => {
+      const next = prev === 1.0 ? 0.75 : prev === 0.75 ? 0.5 : 1.0;
+      setPersistentItem('flashcard_speech_rate', String(next));
+      return next;
+    });
   };
 
   const handleMarkKnown = (e: React.MouseEvent) => {
@@ -114,11 +176,6 @@ export const FlashcardQuizModal: React.FC<Props> = ({
     if (currentIndex > 0) {
       setCurrentIndex((prev) => prev - 1);
     }
-  };
-
-  const handleToggleRate = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSpeechRate((prev) => (prev === 1.0 ? 0.75 : prev === 0.75 ? 0.5 : 1.0));
   };
 
   if (!isOpen) return null;
@@ -249,22 +306,38 @@ export const FlashcardQuizModal: React.FC<Props> = ({
               onClick={() => setIsFlipped((prev) => !prev)}
               className={`flex-1 rounded-3xl p-6 sm:p-8 border-2 flex flex-col justify-between cursor-pointer transition-all shadow-lg select-none relative overflow-hidden group hover:scale-[1.01] ${cardBg}`}
             >
-              {/* Card Top Pill: Difficulty Level & Speed */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
+              {/* Card Top Pill: Difficulty Level & Speed & Auto Speak */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
                   {diffInfo && (
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${diffInfo.badgeColor}`}>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border truncate ${diffInfo.badgeColor}`}>
                       {diffInfo.level} · {diffInfo.label}
                     </span>
                   )}
                   {quickInfo?.phonetic && (
-                    <span className="text-xs font-mono font-bold opacity-70">
+                    <span className="text-xs font-mono font-bold opacity-70 truncate hidden sm:inline">
                       /{quickInfo.phonetic}/
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  {/* Auto-pronounce toggle button (Default enabled: true) */}
+                  <button
+                    type="button"
+                    onClick={handleToggleAutoSpeak}
+                    title={autoSpeak ? '自動發音：已啟用（換題自動發音朗讀，點擊關閉）' : '自動發音：已關閉（點擊開啟預設發音）'}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold border transition-all select-none active:scale-95 cursor-pointer ${
+                      autoSpeak
+                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                        : 'border-slate-300 dark:border-slate-700 opacity-60 hover:opacity-100 text-slate-500 dark:text-slate-400'
+                    }`}
+                  >
+                    <Volume2 className="w-3 h-3" />
+                    <span>自動發音</span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${autoSpeak ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                  </button>
+
                   <button
                     type="button"
                     onClick={handleToggleRate}
@@ -278,8 +351,10 @@ export const FlashcardQuizModal: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={handleSpeak}
-                    title="播放單字發音"
-                    className="p-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-all active:scale-95 cursor-pointer"
+                    title={isSpeaking ? '停止發音' : '手動播放單字發音'}
+                    className={`p-2 rounded-xl text-white shadow-md transition-all active:scale-95 cursor-pointer ${
+                      isSpeaking ? 'bg-amber-600 animate-pulse' : 'bg-blue-600 hover:bg-blue-500'
+                    }`}
                   >
                     {isSpeaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                   </button>
@@ -325,8 +400,12 @@ export const FlashcardQuizModal: React.FC<Props> = ({
               </div>
 
               {/* Hint footer */}
-              <div className="text-center text-[11px] opacity-50">
-                {isFlipped ? '請評估記憶程度選擇下方按鈕' : '可點擊右上角喇叭聆聽標準發音'}
+              <div className="text-center text-[11px] opacity-60">
+                {isFlipped
+                  ? '請評估記憶程度選擇下方按鈕'
+                  : autoSpeak
+                  ? '已預設開啟自動發音 · 換題自動朗讀（亦可手動重播）'
+                  : '可點擊右上角喇叭聆聽標準發音'}
               </div>
             </div>
 

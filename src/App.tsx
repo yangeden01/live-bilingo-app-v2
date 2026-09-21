@@ -1480,13 +1480,13 @@ export default function App() {
         style={{ top: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2 flex flex-nowrap items-center justify-between gap-2">
-          {/* Left: Exit/Power Button + Logo & Title */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
+          {/* Left: Exit/Power Button + Top Segmented Mode Switcher (Covering/replacing old logo as requested) */}
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
             {/* Quick Exit Button */}
             <button
               onClick={() => setShowExitModal(true)}
               title="退出應用程式並清理快取"
-              className={`p-2 rounded-xl border flex items-center justify-center transition-all active:scale-95 cursor-pointer shrink-0 shadow-sm ${
+              className={`p-1.5 sm:p-2 rounded-xl border flex items-center justify-center transition-all active:scale-95 cursor-pointer shrink-0 shadow-sm ${
                 effectiveTheme === 'paper'
                   ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200 shadow-red-900/5'
                   : effectiveTheme === 'light'
@@ -1498,19 +1498,50 @@ export default function App() {
               <Power className="w-4 h-4" />
             </button>
 
-            {/* Radio Logo Icon */}
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
-              <Radio className="w-4 h-4" />
-            </div>
-
-            {/* Title - Live Bilingo */}
-            <div className="min-w-0 flex-1">
-              <h1 className="font-bold text-sm sm:text-base tracking-tight flex items-center gap-1.5 whitespace-nowrap overflow-hidden text-ellipsis">
-                <span>Live Bilingo</span>
-              </h1>
-              <p className="text-[11px] opacity-70 truncate hidden sm:block">
-                Media3 ExoPlayer • 即時雙語字幕 • 語音對齊串流
-              </p>
+            {/* Top Segmented Mode Switcher: Live Bilingo Audio | Live Bilingo Video */}
+            <div className={`inline-flex p-0.5 sm:p-1 rounded-xl border shadow-inner max-w-full overflow-x-auto scrollbar-none transition-colors ${
+              effectiveTheme === 'paper'
+                ? 'bg-[#EADDC2]/80 border-[#C8B282]'
+                : effectiveTheme === 'light'
+                ? 'bg-slate-200/90 border-slate-300'
+                : 'bg-slate-900/95 border-slate-700/80'
+            }`}>
+              <button
+                type="button"
+                id="top-mode-audio-btn"
+                onClick={() => handleContentSourceChange('radio')}
+                title="切換至 Live Bilingo Audio (24/7 原音廣播串流與即時雙語字幕)"
+                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer whitespace-nowrap select-none ${
+                  contentSource === 'radio'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-1 ring-blue-400/40 font-extrabold'
+                    : effectiveTheme === 'paper'
+                    ? 'text-[#5C4830] hover:text-[#2C1D0F] hover:bg-[#DFCFA8]/60'
+                    : effectiveTheme === 'light'
+                    ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-300/60'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                }`}
+              >
+                <Radio className={`w-3.5 h-3.5 shrink-0 ${contentSource === 'radio' ? 'text-white animate-pulse' : ''}`} />
+                <span>Live Bilingo Audio</span>
+              </button>
+              <button
+                type="button"
+                id="top-mode-video-btn"
+                onClick={() => handleContentSourceChange('youtube')}
+                title="切換至 Live Bilingo Video (YouTube 雙語影音學習與時間軸字幕)"
+                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer whitespace-nowrap select-none ${
+                  contentSource === 'youtube'
+                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 ring-1 ring-rose-400/40 font-extrabold'
+                    : effectiveTheme === 'paper'
+                    ? 'text-[#5C4830] hover:text-[#2C1D0F] hover:bg-[#DFCFA8]/60'
+                    : effectiveTheme === 'light'
+                    ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-300/60'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                }`}
+              >
+                <Youtube className={`w-3.5 h-3.5 shrink-0 ${contentSource === 'youtube' ? 'text-white' : ''}`} />
+                <span>Live Bilingo Video</span>
+              </button>
             </div>
           </div>
 
@@ -1652,40 +1683,6 @@ export default function App() {
 
       {/* Main Container */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-12 pb-[max(3rem,env(safe-area-inset-bottom))] space-y-6">
-        {/* Source Mode Toggle: Radio | YouTube */}
-        <div className="flex items-center justify-between pb-1 gap-2">
-          <div className="inline-flex p-1 bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 shadow-lg max-w-full overflow-x-auto scrollbar-none">
-            <button
-              onClick={() => handleContentSourceChange('radio')}
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                contentSource === 'radio'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <Radio className="w-3.5 h-3.5" />
-              <span>廣播電台 Radio</span>
-            </button>
-            <button
-              onClick={() => handleContentSourceChange('youtube')}
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                contentSource === 'youtube'
-                  ? 'bg-rose-600 text-white shadow-md shadow-rose-500/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <Youtube className="w-3.5 h-3.5" />
-              <span>YouTube 雙語影音</span>
-            </button>
-          </div>
-
-          <span className="hidden md:inline-block text-xs text-slate-400">
-            {contentSource === 'radio'
-              ? '24/7 原音廣播串流與 Groq AI 即時雙語字幕'
-              : 'YouTube 精選新聞與影片時間軸中英雙語同步'}
-          </span>
-        </div>
-
         {/* Tab View Switching */}
         {activeTab === 'app' && (
           <>

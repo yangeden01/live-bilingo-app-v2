@@ -1282,7 +1282,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
           {subtitles.length > 0 && (
             <div
               ref={subtitleContainerRef}
-              className="space-y-3 max-h-[70vh] overflow-y-auto overscroll-contain pr-1 scrollbar-thin scrollbar-thumb-slate-800"
+              className="space-y-3 max-h-[calc(100dvh-260px)] sm:max-h-[calc(100dvh-280px)] lg:max-h-[calc(100vh-140px)] overflow-y-auto overscroll-contain pr-1 pb-36 sm:pb-44 scrollbar-thin scrollbar-thumb-slate-800"
             >
               {filteredSubtitles.map((ytItem, idx) => {
                 const subItem = toSubtitleItem(ytItem, idx);
@@ -1325,6 +1325,9 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                   </div>
                 );
               })}
+
+              {/* Bottom Scroll Clearance Spacer: Guarantees the very last paragraph and translation can be scrolled completely above bottom bar/FAB */}
+              <div className="h-36 sm:h-44 w-full shrink-0 select-none pointer-events-none" aria-hidden="true" />
             </div>
           )}
         </div>

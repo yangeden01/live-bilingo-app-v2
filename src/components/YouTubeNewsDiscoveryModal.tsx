@@ -14,23 +14,34 @@ import {
   Cpu,
   BookOpen,
   Compass,
+  Star,
+  Trash2,
+  Radio,
 } from 'lucide-react';
 import { getApiUrl } from '../utils/apiUrl';
 import {
   YouTubeNewsVideo,
   YouTubeNewsResponse,
   YouTubeNewsCategory,
+  YouTubeSavedUrl,
   ReadingMode,
 } from '../types';
+
+export type NewsModalCategoryTab = 'ALL' | YouTubeNewsCategory | 'Favorites';
 
 interface YouTubeNewsDiscoveryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectVideo: (video: YouTubeNewsVideo) => void;
   effectiveTheme?: ReadingMode;
+  savedUrls?: YouTubeSavedUrl[];
+  activeVideoId?: string | null;
+  onSelectSavedUrl?: (url: string, videoId: string, title?: string) => void;
+  onDeleteSavedUrl?: (id: string) => void;
+  initialCategory?: NewsModalCategoryTab;
 }
 
-const CATEGORY_TABS: { key: 'ALL' | YouTubeNewsCategory; label: string; icon: React.FC<{ className?: string }> }[] = [
+const CATEGORY_TABS: { key: NewsModalCategoryTab; label: string; icon: React.FC<{ className?: string }> }[] = [
   { key: 'ALL', label: '全部', icon: Compass },
   { key: 'Knowledge', label: '知識科普', icon: BookOpen },
   { key: 'Technology', label: '科技前沿', icon: Cpu },
@@ -38,6 +49,7 @@ const CATEGORY_TABS: { key: 'ALL' | YouTubeNewsCategory; label: string; icon: Re
   { key: 'World', label: '國際視野', icon: Globe },
   { key: 'US', label: '美國焦點', icon: Landmark },
   { key: 'Breaking', label: '焦點', icon: Flame },
+  { key: 'Favorites', label: '收藏影片', icon: Star },
 ];
 
 export const CATEGORY_NAMES_ZH: Record<string, string> = {
@@ -66,13 +78,24 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
   onClose,
   onSelectVideo,
   effectiveTheme = 'dark',
+  savedUrls = [],
+  activeVideoId = null,
+  onSelectSavedUrl,
+  onDeleteSavedUrl,
+  initialCategory,
 }) => {
   const [videos, setVideos] = useState<YouTubeNewsVideo[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<'ALL' | YouTubeNewsCategory>('ALL');
+  const [selectedCategory, setSelectedCategory] = useState<NewsModalCategoryTab>(initialCategory || 'ALL');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [cached, setCached] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialCategory) {
+      setSelectedCategory(initialCategory);
+    }
+  }, [initialCategory, isOpen]);
 
   const fetchNews = useCallback(async (forceRefresh = false) => {
     setIsLoading(true);
@@ -353,6 +376,7 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
           {CATEGORY_TABS.map((tab) => {
             const Icon = tab.icon;
             const isSelected = selectedCategory === tab.key;
+            const count = tab.key === 'Favorites' ? (savedUrls?.length ?? 0) : null;
             return (
               <button
                 key={tab.key}
@@ -361,12 +385,21 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
                 onClick={() => setSelectedCategory(tab.key)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
                   isSelected
-                    ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                    ? tab.key === 'Favorites'
+                      ? 'bg-amber-600 text-white font-semibold shadow-sm'
+                      : 'bg-emerald-600 text-white font-semibold shadow-sm'
                     : pillInactiveClass
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
+                <Icon className={`w-3.5 h-3.5 ${tab.key === 'Favorites' ? (isSelected ? 'fill-white text-white' : 'text-amber-500 fill-amber-500') : ''}`} />
                 <span>{tab.label}</span>
+                {count !== null && count > 0 && (
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    isSelected ? 'bg-black/25 text-white' : 'bg-amber-500/20 text-amber-500'
+                  }`}>
+                    {count}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -374,7 +407,145 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
 
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 min-h-[300px]">
-          {/* Loading State */}
+          {selectedCategory === 'Favorites' ? (
+            <div className="space-y-3">
+              {savedUrls.length === 0 ? (
+                <div className={`p-8 rounded-2xl border text-center space-y-3 my-4 ${cardBgClass}`}>
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                    <Star className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1 max-w-sm mx-auto">
+                    <h4 className="text-sm font-semibold">尚無收藏影片</h4>
+                    <p className={`text-xs ${secondaryTextClass}`}>
+                      在主畫面的 YouTube 網址前點擊 ⭐ 圖示，即可將喜愛的影片加入收藏，隨時在此點選複習！
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                savedUrls.map((saved) => (
+                  <div
+                    key={saved.id || saved.videoId}
+                    id={`youtube-saved-item-${saved.videoId}`}
+                    onClick={() => {
+                      if (onSelectSavedUrl) {
+                        onSelectSavedUrl(saved.url, saved.videoId, saved.title);
+                      } else {
+                        onSelectVideo({
+                          videoId: saved.videoId,
+                          title: saved.title || `YouTube 影片 (${saved.videoId})`,
+                          channelTitle: saved.channelName || 'YouTube',
+                          publishedAt: '',
+                          publishedRelative: '',
+                          durationFormatted: '',
+                          durationSeconds: 0,
+                          thumbnailUrl: `https://i.ytimg.com/vi/${saved.videoId}/mqdefault.jpg`,
+                          hasCaptions: true,
+                          captionBadge: 'CC 英文字幕',
+                          category: 'Knowledge',
+                        });
+                      }
+                      onClose();
+                    }}
+                    className={`group flex flex-col sm:flex-row gap-3.5 p-3 sm:p-3.5 rounded-xl border transition-all cursor-pointer relative ${cardBgClass} ${
+                      saved.videoId === activeVideoId ? 'ring-2 ring-amber-500/50' : ''
+                    }`}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (onSelectSavedUrl) {
+                          onSelectSavedUrl(saved.url, saved.videoId, saved.title);
+                        }
+                        onClose();
+                      }
+                    }}
+                  >
+                    {/* Video Thumbnail */}
+                    <div className="relative w-full sm:w-44 aspect-video sm:aspect-[16/9] rounded-lg overflow-hidden bg-slate-800 shrink-0">
+                      <img
+                        src={`https://i.ytimg.com/vi/${saved.videoId}/mqdefault.jpg`}
+                        alt={saved.title || saved.url}
+                        loading="lazy"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://i.ytimg.com/vi/${saved.videoId}/hqdefault.jpg`;
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-rose-600/90 text-white flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
+                          <Play className="w-4 h-4 fill-white ml-0.5" />
+                        </div>
+                      </div>
+                      {saved.isLive ? (
+                        <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-600 text-white flex items-center gap-1 shadow-xs">
+                          <Radio className="w-2.5 h-2.5 animate-pulse" />
+                          <span>LIVE</span>
+                        </div>
+                      ) : (
+                        <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-black/80 text-white backdrop-blur-xs">
+                          收藏
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Video Metadata */}
+                    <div className="flex-1 flex flex-col justify-between min-w-0 space-y-2">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-500 border border-amber-500/20 flex items-center gap-1">
+                            <Star className="w-3 h-3 fill-amber-500" />
+                            <span>收藏影片</span>
+                          </span>
+                          {saved.videoId === activeVideoId && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-400 border border-blue-500/20">
+                              播放中
+                            </span>
+                          )}
+                        </div>
+
+                        <h4 className="text-xs sm:text-sm font-semibold line-clamp-2 leading-snug group-hover:text-amber-400 transition-colors">
+                          {saved.title || `YouTube 影片 (${saved.videoId})`}
+                        </h4>
+
+                        <p className="text-[11px] font-mono text-slate-400/80 truncate">
+                          {saved.url}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 border-t border-inherit/20 text-[11px]">
+                        <span className={secondaryTextClass}>
+                          {saved.savedAt ? new Date(saved.savedAt).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '已收藏'}
+                        </span>
+
+                        {onDeleteSavedUrl && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteSavedUrl(saved.id);
+                            }}
+                            title="從收藏影片移除"
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${
+                              isPaper
+                                ? 'hover:bg-rose-100 text-rose-700'
+                                : 'hover:bg-rose-500/20 text-rose-400'
+                            }`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span className="text-[10px]">移除</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Loading State */}
           {isLoading && videos.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 space-y-3 text-center">
               <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
@@ -527,6 +698,8 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
                 </div>
               </div>
             ))}
+            </>
+          )}
         </div>
 
         {/* Footer info banner */}

@@ -280,10 +280,6 @@ export function useSubtitleSync({
             lastSubtitleReceivedTime = Date.now();
             json.subtitles.forEach((sub: any) => {
               if (sub && sub.id && sub.english && sub.traditionalChinese) {
-                // Strict Station Isolation: verify match against currently active station
-                if (!sub.stationUrl || !isStationUrlMatch(sub.stationUrl, activeStationRef.current?.streamUrl)) {
-                  return;
-                }
                 const subCreatedAt = sub.createdAt || Date.now();
                 if (subCreatedAt > lastPollTimestamp) {
                   lastPollTimestamp = Math.max(lastPollTimestamp, subCreatedAt);
@@ -301,8 +297,8 @@ export function useSubtitleSync({
                   english: sub.english,
                   traditionalChinese: sub.traditionalChinese,
                   isFinal: true,
-                  stationUrl: sub.stationUrl,
-                  stationName: sub.stationName || activeStation.name,
+                  stationUrl: sub.stationUrl || activeStationRef.current?.streamUrl,
+                  stationName: sub.stationName || activeStationRef.current?.name,
                 };
                 const latencyMs = Math.max(0, Date.now() - subCreatedAt);
                 recordSttStreamLatency('REST Polling Fallback', latencyMs, {
@@ -329,11 +325,6 @@ export function useSubtitleSync({
         return;
       }
       if (data && data.id && data.english && data.traditionalChinese) {
-        // Strict Station Isolation: verify match against currently active station
-        if (!data.stationUrl || !isStationUrlMatch(data.stationUrl, activeStationRef.current?.streamUrl)) {
-          return;
-        }
-
         const createdAt = data.createdAt || Date.now();
         lastPollTimestamp = Math.max(lastPollTimestamp, createdAt);
         lastSubtitleReceivedTime = Date.now();
@@ -352,8 +343,8 @@ export function useSubtitleSync({
           english: data.english,
           traditionalChinese: data.traditionalChinese,
           isFinal: true,
-          stationUrl: data.stationUrl,
-          stationName: data.stationName || activeStation.name,
+          stationUrl: data.stationUrl || activeStationRef.current?.streamUrl,
+          stationName: data.stationName || activeStationRef.current?.name,
         };
 
         const latencyMs = Math.max(0, Date.now() - createdAt);

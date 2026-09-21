@@ -33,10 +33,10 @@ import {
   Newspaper,
   Star,
   Tv,
+  Loader2,
 } from 'lucide-react';
 import { ReadingModeAndFontToolbar } from './ReadingModeAndFontToolbar';
 import { YouTubeNewsDiscoveryModal } from './YouTubeNewsDiscoveryModal';
-import { YouTubeSavedUrlsModal } from './YouTubeSavedUrlsModal';
 
 interface Props {
   onOpenDictionary?: (word?: string) => void;
@@ -249,9 +249,8 @@ export const YouTubeBilingualView: React.FC<Props> = ({
   const [showNewsModal, setShowNewsModal] = useState<boolean>(false);
   const historyDropdownRef = useRef<HTMLDivElement | null>(null);
 
-  // Saved / Favorite URLs state and modal
+  // Saved / Favorite URLs state
   const [savedUrls, setSavedUrls] = useState<YouTubeSavedUrl[]>(() => getSavedYouTubeUrls());
-  const [showSavedUrlsModal, setShowSavedUrlsModal] = useState<boolean>(false);
   const [saveToast, setSaveToast] = useState<string | null>(null);
 
   const playerRef = useRef<YouTubePlayerRef | null>(null);
@@ -443,54 +442,145 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     }
   }, [activeVideoId, title]);
 
-  // Check if current active video is saved in favorites
+  // Check if current active video or input video is saved in favorites
+  const currentTargetVideoId = useMemo(() => {
+    if (activeVideoId) return activeVideoId;
+    if (urlInput.trim()) return extractYouTubeVideoId(urlInput.trim());
+    return null;
+  }, [activeVideoId, urlInput]);
+
   const isCurrentVideoSaved = useMemo(() => {
-    return isYouTubeUrlSaved(activeVideoId);
-  }, [activeVideoId, savedUrls]);
+    if (!currentTargetVideoId) return false;
+    return isYouTubeUrlSaved(currentTargetVideoId) || savedUrls.some(s => s.videoId === currentTargetVideoId);
+  }, [currentTargetVideoId, savedUrls]);
 
   // Toggle saving current video URL to favorites
   const handleToggleSaveCurrentUrl = useCallback(() => {
-    if (!activeVideoId) return;
-    const urlToSave = urlInput.trim() || `https://www.youtube.com/watch?v=${activeVideoId}`;
+    const targetVid = currentTargetVideoId;
+    if (!targetVid) {
+      setUrlInputError('請先輸入有效的 YouTube 網址再點擊收藏');
+      return;
+    }
+    const urlToSave = urlInput.trim() || `https://www.youtube.com/watch?v=${targetVid}`;
     if (isCurrentVideoSaved) {
-      const updated = removeSavedYouTubeUrl(activeVideoId);
+      const updated = removeSavedYouTubeUrl(targetVid);
       setSavedUrls(updated);
-      setSaveToast('已從喜愛網址清單移除');
+      setSaveToast('已從「收藏影片」移除');
       vibrateDetentTick();
       setTimeout(() => setSaveToast(null), 2500);
     } else {
-      const isLive = urlToSave.includes('/live/') || (title && title.toLowerCase().includes('live')) || activeVideoId === 'vOTiJkg1voo';
+      const isLive = urlToSave.includes('/live/') || (title && title.toLowerCase().includes('live')) || targetVid === 'vOTiJkg1voo';
       const updated = saveYouTubeUrl({
-        videoId: activeVideoId,
+        videoId: targetVid,
         url: urlToSave,
-        title: title || (activeVideoId === VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.id ? VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.title : undefined),
+        title: title || (targetVid === VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.id ? VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.title : undefined),
         isLive,
       });
       setSavedUrls(updated);
-      setSaveToast('已儲存至喜歡的網址 ⭐');
+      setSaveToast('已儲存至「收藏影片」 ⭐');
       vibrateDetentTick();
       setTimeout(() => setSaveToast(null), 2500);
     }
-  }, [activeVideoId, urlInput, isCurrentVideoSaved, title]);
+  }, [currentTargetVideoId, urlInput, isCurrentVideoSaved, title]);
+
+  // Auto-play and Progress Bar State for Video Selection
+  const [isAutoPlayPending, setIsAutoPlayPending] = useState<boolean>(false);
+  const [isProgressActive, setIsProgressActive] = useState<boolean>(false);
+
+  // Smoothly scroll window so the video player and subtitle stream align right under top header (Reading Mode)
+  const scrollToYouTubeReadingMode = useCallback(() => {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+    const header = document.querySelector('header');
+    const headerBottom = header ? header.getBoundingClientRect().bottom : 56;
+    const targetEl = document.getElementById('youtube-player-anchor') || document.getElementById('youtube-player-section');
+    if (targetEl) {
+      const rect = targetEl.getBoundingClientRect();
+      const targetY = window.scrollY + rect.top - headerBottom;
+      window.scrollTo({
+        top: Math.max(0, targetY),
+        behavior: 'smooth',
+      });
+    }
+  }, []);
+
+  // Unified loader when a video is selected (via news modal, saved urls, history, or input)
+  const startLoadingVideoWithAutoPlay = useCallback((targetVid: string, targetUrl: string, targetTitle?: string) => {
+    setUrlInput(targetUrl);
+    setUrlInputError(null);
+    setIsAutoPlayPending(true);
+    setIsProgressActive(true);
+    setActiveVideoId(targetVid);
+    setPersistentItem('youtube_last_url', targetUrl);
+    setPersistentItem('youtube_last_video_id', targetVid);
+    saveUrlToHistory(targetUrl, targetVid, targetTitle);
+    setShowNewsModal(false);
+    setShowHistoryDropdown(false);
+  }, [saveUrlToHistory]);
+
+  // When subtitles are ready and autoPlay was requested, automatically play video, scroll to reading mode, and start live subtitles
+  useEffect(() => {
+    if (!isAutoPlayPending) return;
+
+    if (status === 'ready' && subtitles.length > 0) {
+      setIsAutoPlayPending(false);
+
+      // 1. Automatically start video playback with resilient retry intervals
+      const startPlayback = () => {
+        try {
+          playerRef.current?.play();
+          setPlayerState('playing');
+          onPlaybackStateChange?.('playing');
+        } catch (_) {}
+      };
+
+      startPlayback();
+      const t1 = setTimeout(startPlayback, 200);
+      const t2 = setTimeout(startPlayback, 550);
+      const t3 = setTimeout(startPlayback, 1000);
+
+      // 2. Automatically glide screen into reading mode (video placed directly under header)
+      const scrollTimer = setTimeout(() => {
+        scrollToYouTubeReadingMode();
+        window.dispatchEvent(new CustomEvent('scroll-to-youtube-reading'));
+        vibrateDetentTick();
+      }, 350);
+
+      // 3. Automatically execute synchronized bilingual subtitles
+      setAutoScroll(true);
+      setIsUserScrolledAway(false);
+      setActiveSubtitleRelativePos(null);
+      if (subtitleContainerRef.current) {
+        subtitleContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      // Keep 100% completion badge visible briefly, then settle
+      const progressTimer = setTimeout(() => {
+        setIsProgressActive(false);
+      }, 2500);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+        clearTimeout(scrollTimer);
+        clearTimeout(progressTimer);
+      };
+    } else if (status === 'error') {
+      setIsAutoPlayPending(false);
+      setIsProgressActive(false);
+    }
+  }, [status, isAutoPlayPending, subtitles.length, onPlaybackStateChange, scrollToYouTubeReadingMode]);
 
   // Select a saved URL from the Saved URLs modal
   const handleSelectSavedUrl = useCallback((urlToPlay: string, vid: string, savedTitle?: string) => {
-    setUrlInput(urlToPlay);
-    setUrlInputError(null);
-    setActiveVideoId(vid);
-    setPersistentItem('youtube_last_url', urlToPlay);
-    setPersistentItem('youtube_last_video_id', vid);
-    saveUrlToHistory(urlToPlay, vid, savedTitle);
-    setShowSavedUrlsModal(false);
-    setPlayerState('paused');
-    onPlaybackStateChange?.('paused');
-  }, [saveUrlToHistory, onPlaybackStateChange]);
+    startLoadingVideoWithAutoPlay(vid, urlToPlay, savedTitle);
+  }, [startLoadingVideoWithAutoPlay]);
 
   // Save URL directly from modal or custom input
   const handleSaveUrlFromModal = useCallback((item: { videoId: string; url: string; title?: string; isLive?: boolean }) => {
     const updated = saveYouTubeUrl(item);
     setSavedUrls(updated);
-    setSaveToast('已儲存至喜歡的網址 ⭐');
+    setSaveToast('已儲存至「收藏影片」 ⭐');
     vibrateDetentTick();
     setTimeout(() => setSaveToast(null), 2500);
   }, []);
@@ -520,27 +610,17 @@ export const YouTubeBilingualView: React.FC<Props> = ({
 
   // Load the verified caption test video through the exact standard production pipeline
   const handleLoadTestVideo = () => {
-    setUrlInput(VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.url);
-    setUrlInputError(null);
-    setActiveVideoId(VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.id);
-    setPersistentItem('youtube_last_url', VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.url);
-    setPersistentItem('youtube_last_video_id', VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.id);
-    saveUrlToHistory(VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.url, VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.id, VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.title);
-    setShowHistoryDropdown(false);
+    startLoadingVideoWithAutoPlay(
+      VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.id,
+      VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.url,
+      VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.title
+    );
   };
 
   // Select a news video from the Live English News discovery modal
   const handleSelectNewsVideo = (video: YouTubeNewsVideo) => {
     const fullUrl = `https://www.youtube.com/watch?v=${video.videoId}`;
-    setUrlInput(fullUrl);
-    setUrlInputError(null);
-    setActiveVideoId(video.videoId);
-    setPersistentItem('youtube_last_url', fullUrl);
-    setPersistentItem('youtube_last_video_id', video.videoId);
-    saveUrlToHistory(fullUrl, video.videoId, video.title);
-    setShowNewsModal(false);
-    setPlayerState('paused');
-    onPlaybackStateChange?.('paused');
+    startLoadingVideoWithAutoPlay(video.videoId, fullUrl, video.title);
   };
 
   // Load video handler
@@ -552,23 +632,18 @@ export const YouTubeBilingualView: React.FC<Props> = ({
       return;
     }
     setUrlInputError(null);
-    setActiveVideoId(id);
-    setPersistentItem('youtube_last_url', urlInput.trim());
-    setPersistentItem('youtube_last_video_id', id);
-    saveUrlToHistory(urlInput.trim(), id);
-    setShowHistoryDropdown(false);
+    if (id === activeVideoId && status === 'ready') {
+      setIsAutoPlayPending(true);
+      setIsProgressActive(true);
+      retry();
+    } else {
+      startLoadingVideoWithAutoPlay(id, urlInput.trim(), title);
+    }
   };
 
   // Select a URL from the history dropdown
   const handleSelectHistoryItem = (item: YouTubeHistoryItem) => {
-    setUrlInput(item.url);
-    setUrlInputError(null);
-    setActiveVideoId(item.videoId);
-    setPersistentItem('youtube_last_url', item.url);
-    setPersistentItem('youtube_last_video_id', item.videoId);
-    // Move selected to top of history
-    saveUrlToHistory(item.url, item.videoId, item.title);
-    setShowHistoryDropdown(false);
+    startLoadingVideoWithAutoPlay(item.videoId, item.url, item.title);
   };
 
   // Delete an individual item from history
@@ -810,9 +885,34 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     <div className="space-y-6">
       {/* Top YouTube URL Input & Search Bar */}
       <div className={`backdrop-blur-md rounded-2xl p-4 sm:p-5 border transition-colors duration-200 shadow-xl space-y-3 ${cardBgClass}`}>
-        <form onSubmit={handleLoadVideo} className="flex flex-col sm:flex-row gap-2">
-          <div ref={historyDropdownRef} className="relative flex-1">
-            <Youtube className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-500 pointer-events-none" />
+        <form onSubmit={handleLoadVideo} className="space-y-3">
+          <div className="flex items-center gap-2">
+            {/* Star Icon Button for saving URL - placed BEFORE input */}
+            <button
+              type="button"
+              id="youtube-save-current-url-btn"
+              onClick={handleToggleSaveCurrentUrl}
+              aria-label={isCurrentVideoSaved ? '已收藏此影片 (點擊取消收藏)' : '儲存網址至收藏影片'}
+              title={isCurrentVideoSaved ? '已收藏此影片 (點擊取消收藏)' : '儲存網址至「收藏影片」'}
+              className={`h-[42px] w-[42px] rounded-xl border flex items-center justify-center transition-all active:scale-95 cursor-pointer shrink-0 shadow-sm ${
+                isCurrentVideoSaved
+                  ? 'bg-amber-500/20 text-amber-500 border-amber-500/50 shadow-amber-500/10 hover:bg-amber-500/30'
+                  : currentTheme === 'paper'
+                  ? 'bg-[#EFE5CE] hover:bg-[#E5D9BE] text-[#7A6853] hover:text-amber-600 border-[#CDB58A]'
+                  : currentTheme === 'light'
+                  ? 'bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-amber-500 border-slate-200'
+                  : 'bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-amber-400 border-slate-700/80'
+              }`}
+            >
+              <Star
+                className={`w-4 h-4 transition-all duration-200 ${
+                  isCurrentVideoSaved ? 'fill-amber-500 text-amber-500 scale-110' : ''
+                }`}
+              />
+            </button>
+
+            <div ref={historyDropdownRef} className="relative flex-1 min-w-0">
+              <Youtube className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-500 pointer-events-none" />
             <input
               ref={urlInputRef}
               type="text"
@@ -1013,63 +1113,82 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                   </div>
                 </div>
               )}
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {/* Save Current URL / Bookmark Button */}
-            {activeVideoId && (
-              <button
-                type="button"
-                id="youtube-save-current-url-btn"
-                onClick={handleToggleSaveCurrentUrl}
-                aria-label={isCurrentVideoSaved ? '已收藏此網址' : '儲存此網址至喜歡'}
-                title={isCurrentVideoSaved ? '點擊從喜歡的網址移除' : '儲存目前播放網址至喜歡的清單'}
-                className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border shadow-sm transition-all shrink-0 cursor-pointer whitespace-nowrap ${
-                  isCurrentVideoSaved
-                    ? 'bg-amber-500/15 text-amber-500 border-amber-500/40 hover:bg-amber-500/25'
-                    : testBtnClass
-                }`}
-              >
-                <Star className={`w-4 h-4 ${isCurrentVideoSaved ? 'fill-amber-500 text-amber-500' : 'text-amber-500'}`} />
-                <span>{isCurrentVideoSaved ? '已收藏網址' : '儲存網址'}</span>
-              </button>
-            )}
-
-            {/* Saved URLs Modal Button */}
-            <button
-              type="button"
-              id="youtube-saved-urls-modal-btn"
-              onClick={() => setShowSavedUrlsModal(true)}
-              aria-label="喜歡的網址"
-              title="查看與管理已儲存的 YouTube 喜歡網址"
-              className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border shadow-sm transition-all shrink-0 cursor-pointer whitespace-nowrap ${testBtnClass}`}
-            >
-              <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-              <span>喜歡的網址</span>
-              <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-500 font-bold">
-                {savedUrls.length}
-              </span>
-            </button>
-
             <button
               type="button"
               id="youtube-live-news-btn"
               onClick={() => setShowNewsModal(true)}
               aria-label="美語精選頻道"
-              title="探索最近一週具備完整英文字幕之權威美語頻道 (新聞/知識/科技/商業)"
+              title="探索權威美語頻道影片與收藏影片"
               className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border shadow-sm transition-all shrink-0 cursor-pointer whitespace-nowrap ${testBtnClass}`}
             >
               <Newspaper className="w-4 h-4 text-emerald-400" />
               <span>美語精選頻道</span>
+              {savedUrls.length > 0 && (
+                <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-500 font-bold flex items-center gap-0.5">
+                  <Star className="w-3 h-3 fill-amber-500" />
+                  {savedUrls.length}
+                </span>
+              )}
             </button>
-            <button
-              type="submit"
-              id="youtube-load-btn"
-              disabled={!urlInput.trim() || status === 'loading' || status === 'translating'}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white shadow-lg shadow-rose-600/20 transition-all shrink-0 cursor-pointer whitespace-nowrap"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>載入雙語字幕</span>
-            </button>
+            {/* If loading, translating, or progress is active, show the live Progress Indicator bar */}
+            {(isProgressActive || status === 'loading' || status === 'translating') ? (
+              <div
+                id="youtube-caption-progress-bar"
+                role="progressbar"
+                aria-valuenow={progress.percent || 15}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                className={`relative overflow-hidden rounded-xl border flex items-center justify-between px-3.5 py-2 min-h-[42px] min-w-[210px] sm:min-w-[250px] shadow-md transition-all select-none ${
+                  effectiveTheme === 'paper'
+                    ? 'bg-[#FAF4E8] border-[#CDB58A] text-[#3B2E1E]'
+                    : effectiveTheme === 'light'
+                    ? 'bg-white border-slate-300 text-slate-800'
+                    : 'bg-slate-900/90 border-emerald-500/40 text-white'
+                }`}
+              >
+                {/* Animated Background Progress Fill */}
+                <div
+                  className={`absolute inset-y-0 left-0 transition-all duration-300 ease-out ${
+                    (progress.percent >= 100 || status === 'ready')
+                      ? 'bg-gradient-to-r from-emerald-600/40 via-emerald-500/50 to-teal-400/50'
+                      : 'bg-gradient-to-r from-rose-500/25 via-amber-500/25 to-emerald-500/30'
+                  }`}
+                  style={{ width: `${Math.max(12, Math.min(100, progress.percent || (status === 'loading' ? 25 : 60)))}%` }}
+                />
+
+                {/* Left: Indicator & Stage Description */}
+                <div className="relative z-10 flex items-center gap-2 min-w-0 pr-2">
+                  {(progress.percent >= 100 || status === 'ready') ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 animate-in zoom-in-75 duration-200" />
+                  ) : (
+                    <Loader2 className="w-4 h-4 text-emerald-400 animate-spin shrink-0" />
+                  )}
+                  <span className="text-xs font-semibold truncate">
+                    {(progress.percent >= 100 || status === 'ready')
+                      ? '雙語字幕就緒，開始播放'
+                      : progress.message || (status === 'loading' ? '正在擷取英文字幕...' : '雙語字幕生成中...')}
+                  </span>
+                </div>
+
+                {/* Right: Percentage */}
+                <div className="relative z-10 font-mono text-xs font-bold text-emerald-400 shrink-0">
+                  {(progress.percent >= 100 || status === 'ready') ? 100 : (progress.percent || (status === 'loading' ? 25 : 60))}%
+                </div>
+              </div>
+            ) : (
+              <button
+                type="submit"
+                id="youtube-load-btn"
+                disabled={!urlInput.trim()}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white shadow-lg shadow-rose-600/20 transition-all shrink-0 cursor-pointer whitespace-nowrap active:scale-95"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>{status === 'ready' ? '重新載入字幕' : '載入雙語字幕'}</span>
+              </button>
+            )}
           </div>
         </form>
 
@@ -1116,6 +1235,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
               onStateChange={handlePlayerStateChange}
               hideActionControls
               isLoopEnabled={isVideoLoopEnabled}
+              autoPlay={isAutoPlayPending}
             />
           </div>
         </div>
@@ -1372,24 +1492,16 @@ export const YouTubeBilingualView: React.FC<Props> = ({
           </button>
         )}
 
-      {/* Live English News Discovery Modal */}
+      {/* Live English News & Favorites Discovery Modal */}
       <YouTubeNewsDiscoveryModal
         isOpen={showNewsModal}
         onClose={() => setShowNewsModal(false)}
         onSelectVideo={handleSelectNewsVideo}
         effectiveTheme={effectiveTheme}
-      />
-
-      {/* YouTube Saved URLs / Favorites Manager Modal */}
-      <YouTubeSavedUrlsModal
-        isOpen={showSavedUrlsModal}
-        onClose={() => setShowSavedUrlsModal(false)}
         savedUrls={savedUrls}
         activeVideoId={activeVideoId}
-        onSelectUrl={handleSelectSavedUrl}
-        onSaveUrl={handleSaveUrlFromModal}
-        onDeleteUrl={handleDeleteSavedUrl}
-        currentTheme={currentTheme}
+        onSelectSavedUrl={handleSelectSavedUrl}
+        onDeleteSavedUrl={handleDeleteSavedUrl}
       />
     </div>
   );

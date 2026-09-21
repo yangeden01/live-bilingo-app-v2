@@ -19,6 +19,7 @@ interface Props {
   hideActionControls?: boolean;
   isLoopEnabled?: boolean;
   isLive?: boolean;
+  autoPlay?: boolean;
   ref?: React.Ref<YouTubePlayerRef>;
 }
 
@@ -39,6 +40,7 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
   hideActionControls = false,
   isLoopEnabled = false,
   isLive = false,
+  autoPlay = false,
   ref,
 }) => {
   const containerId = useRef(`yt-player-${Math.random().toString(36).substring(2, 9)}`).current;
@@ -241,16 +243,26 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
                 setDuration(dur);
                 onDurationChangeRef.current?.(dur);
               }
-              if (initialTimeSeconds > 0) {
+              if (autoPlay) {
+                if (initialTimeSeconds > 0) {
+                  event.target.seekTo(initialTimeSeconds, true);
+                  setCurrentTime(initialTimeSeconds);
+                  hasAppliedInitialTimeRef.current = true;
+                }
+                event.target.playVideo();
+                setIsPlaying(true);
+                onStateChangeRef.current?.('playing');
+              } else if (initialTimeSeconds > 0) {
                 // Seek to initial position quietly without triggering autoplay
                 event.target.seekTo(initialTimeSeconds, false);
                 event.target.pauseVideo();
                 setCurrentTime(initialTimeSeconds);
                 hasAppliedInitialTimeRef.current = true;
+                onStateChangeRef.current?.('paused');
               } else {
                 event.target.pauseVideo();
+                onStateChangeRef.current?.('paused');
               }
-              onStateChangeRef.current?.('paused');
             },
             onStateChange: (event: any) => {
               if (!isMounted) return;

@@ -18,7 +18,7 @@ import { sanitizeTranscriptText, isHallucinationLoop } from './utils/textSanitiz
 import { getPersistentItem, setPersistentItem } from './utils/persistentStorage';
 import { useReadingModeSnapDetent } from './hooks/useReadingModeSnapDetent';
 import { isStationUrlMatch } from './utils/stationHelper';
-import { Radio, Youtube, Tv, Code2, Smartphone, Cpu, CheckCircle2, Sparkles, Volume2, ShieldCheck, Download, ListMusic, BookOpen, RefreshCw, Copy, Play, Pause, Sun, Moon, Bell, Power, ArrowUp, ArrowDown, Repeat } from 'lucide-react';
+import { Radio, Youtube, Tv, Code2, Smartphone, Cpu, CheckCircle2, Sparkles, Volume2, ShieldCheck, Download, ListMusic, BookOpen, RefreshCw, Copy, Play, Pause, Sun, Moon, Bell, Power, ArrowUp, ArrowDown, Repeat, ChevronDown, Check } from 'lucide-react';
 
 const DEFAULT_STATIONS: RadioStation[] = [
   {
@@ -85,6 +85,24 @@ export default function App() {
     if (saved === 'live-video') return 'radio';
     return saved || 'radio';
   });
+  const [isModeDropdownOpen, setIsModeDropdownOpen] = useState(false);
+  const modeDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close mode dropdown when clicking or touching outside
+  useEffect(() => {
+    if (!isModeDropdownOpen) return;
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      if (modeDropdownRef.current && !modeDropdownRef.current.contains(e.target as Node)) {
+        setIsModeDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, [isModeDropdownOpen]);
   const [playbackStatus, setPlaybackStatus] = useState<PlaybackStatus>('IDLE');
   const playbackStatusRef = useRef<PlaybackStatus>(playbackStatus);
   const [sttConnected, setSttConnected] = useState(false);
@@ -750,52 +768,21 @@ export default function App() {
   const activeStationRef = useRef(activeStation);
   const previousStationUrlRef = useRef<string>(activeStation?.streamUrl);
 
-  // Synchronize active station stream with backend Deepgram STT listener & handle seamless station isolation
+  // Synchronize active station stream with backend Deepgram STT listener
+  // Subtitles are unified across all radio stations (即時, 紀錄, 收藏 全電台共用資料)
   useEffect(() => {
     activeStationRef.current = activeStation;
 
     if (activeStation?.streamUrl && previousStationUrlRef.current !== activeStation.streamUrl) {
-      const prevUrl = previousStationUrlRef.current;
       previousStationUrlRef.current = activeStation.streamUrl;
 
-      // 1. Immediately drop any pending interim typing subtitle
+      // 1. Drop any pending interim typing subtitle from previous station
       setInterimSubtitle(null);
 
-      // 2. Persist previous station subtitles into per-station local storage
-      if (prevUrl) {
-        try {
-          const prevKey = `radio_subtitles_cache_${encodeURIComponent(prevUrl)}`;
-          setPersistentItem(prevKey, JSON.stringify(subtitles));
-        } catch (_) {}
-      }
-
-      // 3. Immediately switch screen subtitles to the new station's subtitles
-      let switchedToCached = false;
+      // 2. Persist the unified shared subtitles into persistent storage
       try {
-        const newKey = `radio_subtitles_cache_${encodeURIComponent(activeStation.streamUrl)}`;
-        const savedNew = getPersistentItem(newKey);
-        if (savedNew) {
-          const parsed = JSON.parse(savedNew);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const valid = parsed
-              .filter((item: SubtitleItem) => isStationUrlMatch(item.stationUrl, activeStation.streamUrl))
-              .map((item: SubtitleItem) => ({
-                ...item,
-                stationUrl: activeStation.streamUrl,
-                stationName: activeStation.name,
-              }));
-            if (valid.length > 0) {
-              setSubtitles(valid);
-              switchedToCached = true;
-            }
-          }
-        }
+        setPersistentItem('radio_subtitles_cache', JSON.stringify(subtitles));
       } catch (_) {}
-
-      // If no valid cached subtitles for this station, clear subtitles immediately
-      if (!switchedToCached) {
-        setSubtitles([]);
-      }
     }
 
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
@@ -809,34 +796,63 @@ export default function App() {
   }, [activeStation]);
 
   // Real-time live broadcast subtitles with persistent storage across app restarts and updates
+  // Unified across all radio stations (即時, 紀錄, 收藏 資料全電台共用)
   const [subtitles, setSubtitles] = useState<SubtitleItem[]>(() => {
     try {
-      const stationKey = `radio_subtitles_cache_${encodeURIComponent(DEFAULT_STATIONS[0].streamUrl)}`;
-      const savedStation = getPersistentItem(stationKey) || getPersistentItem('radio_subtitles_cache');
-      if (savedStation) {
-        const parsed = JSON.parse(savedStation);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Clean cached items and drop any prior hallucination loops
-          const cleanedList = parsed
-            .map((item: SubtitleItem) => ({
-              ...item,
-              english: sanitizeTranscriptText(item.english),
-            }))
-            .filter((item: SubtitleItem) => !isHallucinationLoop(item.english) && item.english.length >= 4);
+      const allItems: SubtitleItem[] = [];
+      const seenIds = new Set<string>();
 
-          if (cleanedList.length > 0) {
-            // Guarantee 100% uniqueness by subtitle id on initial load
-            const seenIds = new Set<string>();
-            const dedupedList: SubtitleItem[] = [];
-            for (const item of cleanedList) {
+      // 1. Load from unified global cache
+      const globalSaved = getPersistentItem('radio_subtitles_cache');
+      if (globalSaved) {
+        try {
+          const parsed = JSON.parse(globalSaved);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((item: SubtitleItem) => {
               if (item && item.id && !seenIds.has(item.id)) {
                 seenIds.add(item.id);
-                dedupedList.push(item);
+                allItems.push(item);
               }
-            }
-
-            return dedupedList;
+            });
           }
+        } catch (_) {}
+      }
+
+      // 2. Also collect/merge any prior per-station caches
+      DEFAULT_STATIONS.forEach((station) => {
+        try {
+          const stKey = `radio_subtitles_cache_${encodeURIComponent(station.streamUrl)}`;
+          const stSaved = getPersistentItem(stKey);
+          if (stSaved) {
+            const parsed = JSON.parse(stSaved);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((item: SubtitleItem) => {
+                if (item && item.id) {
+                  if (!seenIds.has(item.id)) {
+                    seenIds.add(item.id);
+                    allItems.push(item);
+                  } else if (item.bookmarked) {
+                    const existing = allItems.find((x) => x.id === item.id);
+                    if (existing) existing.bookmarked = true;
+                  }
+                }
+              });
+            }
+          }
+        } catch (_) {}
+      });
+
+      if (allItems.length > 0) {
+        const cleanedList = allItems
+          .map((item: SubtitleItem) => ({
+            ...item,
+            english: sanitizeTranscriptText(item.english),
+          }))
+          .filter((item: SubtitleItem) => !isHallucinationLoop(item.english) && item.english.length >= 4)
+          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+        if (cleanedList.length > 0) {
+          return cleanedList;
         }
       }
     } catch (e) {
@@ -922,14 +938,10 @@ export default function App() {
     });
   }, []);
 
-  // Persist subtitles in persistent storage whenever updated
+  // Persist subtitles in persistent storage whenever updated (unified global cache)
   useEffect(() => {
     try {
       setPersistentItem('radio_subtitles_cache', JSON.stringify(subtitles));
-      if (activeStationRef.current?.streamUrl) {
-        const key = `radio_subtitles_cache_${encodeURIComponent(activeStationRef.current.streamUrl)}`;
-        setPersistentItem(key, JSON.stringify(subtitles));
-      }
     } catch (e) {
       console.warn('Failed to save subtitles cache:', e);
     }
@@ -944,12 +956,9 @@ export default function App() {
       return;
     }
 
-    // Strict Station Isolation Guard:
-    // Drop subtitle if missing station identity or if it does not match current active station
+    // Assign active station identity to the incoming subtitle item for display / tracking
     const currentUrl = activeStationRef.current?.streamUrl;
-    if (!item.stationUrl || !isStationUrlMatch(item.stationUrl, currentUrl)) {
-      return;
-    }
+    const currentName = activeStationRef.current?.name;
 
     const cleanedEnglish = sanitizeTranscriptText(item.english);
     if (cleanedEnglish.length < 3 || isHallucinationLoop(cleanedEnglish)) {
@@ -959,7 +968,7 @@ export default function App() {
     const cleanItem: SubtitleItem = {
       ...item,
       stationUrl: item.stationUrl || currentUrl,
-      stationName: item.stationName || activeStationRef.current?.name,
+      stationName: item.stationName || currentName,
       english: cleanedEnglish,
       createdAt: item.createdAt || Date.now(),
     };
@@ -1093,10 +1102,6 @@ export default function App() {
       const updated = prev.map((item) => ({ ...item, bookmarked: false }));
       try {
         setPersistentItem('radio_subtitles_cache', JSON.stringify(updated));
-        if (activeStationRef.current?.streamUrl) {
-          const key = `radio_subtitles_cache_${encodeURIComponent(activeStationRef.current.streamUrl)}`;
-          setPersistentItem(key, JSON.stringify(updated));
-        }
       } catch (e) {}
       return updated;
     });
@@ -1108,10 +1113,6 @@ export default function App() {
       const bookmarkedOnly = prev.filter((item) => item.bookmarked);
       try {
         setPersistentItem('radio_subtitles_cache', JSON.stringify(bookmarkedOnly));
-        if (activeStationRef.current?.streamUrl) {
-          const key = `radio_subtitles_cache_${encodeURIComponent(activeStationRef.current.streamUrl)}`;
-          setPersistentItem(key, JSON.stringify(bookmarkedOnly));
-        }
       } catch (e) {}
       return bookmarkedOnly;
     });
@@ -1282,6 +1283,16 @@ export default function App() {
       window.removeEventListener('scroll-to-subtitles', handleScrollEvent);
     };
   }, [scrollToSubtitleReadingPosition, showBackToReadingFab]);
+
+  useEffect(() => {
+    const handleYouTubeScrollEvent = () => {
+      snapToYouTubeReadingMode();
+    };
+    window.addEventListener('scroll-to-youtube-reading', handleYouTubeScrollEvent);
+    return () => {
+      window.removeEventListener('scroll-to-youtube-reading', handleYouTubeScrollEvent);
+    };
+  }, [snapToYouTubeReadingMode]);
 
   const handleTopHeaderPlayToggle = () => {
     if (contentSource === 'youtube') {
@@ -1480,8 +1491,8 @@ export default function App() {
         style={{ top: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2 flex flex-nowrap items-center justify-between gap-2">
-          {/* Left: Exit/Power Button + Top Segmented Mode Switcher (Covering/replacing old logo as requested) */}
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+          {/* Left: Exit/Power Button + App Facade Dropdown Mode Switcher */}
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 relative" ref={modeDropdownRef}>
             {/* Quick Exit Button */}
             <button
               onClick={() => setShowExitModal(true)}
@@ -1498,51 +1509,135 @@ export default function App() {
               <Power className="w-4 h-4" />
             </button>
 
-            {/* Top Segmented Mode Switcher: Live Bilingo Audio | Live Bilingo Video */}
-            <div className={`inline-flex p-0.5 sm:p-1 rounded-xl border shadow-inner max-w-full overflow-x-auto scrollbar-none transition-colors ${
-              effectiveTheme === 'paper'
-                ? 'bg-[#EADDC2]/80 border-[#C8B282]'
-                : effectiveTheme === 'light'
-                ? 'bg-slate-200/90 border-slate-300'
-                : 'bg-slate-900/95 border-slate-700/80'
-            }`}>
-              <button
-                type="button"
-                id="top-mode-audio-btn"
-                onClick={() => handleContentSourceChange('radio')}
-                title="切換至 Live Bilingo Audio (24/7 原音廣播串流與即時雙語字幕)"
-                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer whitespace-nowrap select-none ${
-                  contentSource === 'radio'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-1 ring-blue-400/40 font-extrabold'
-                    : effectiveTheme === 'paper'
-                    ? 'text-[#5C4830] hover:text-[#2C1D0F] hover:bg-[#DFCFA8]/60'
+            {/* App Facade Dropdown Trigger */}
+            <button
+              type="button"
+              id="app-mode-facade-dropdown-btn"
+              onClick={() => setIsModeDropdownOpen((prev) => !prev)}
+              aria-expanded={isModeDropdownOpen}
+              aria-haspopup="listbox"
+              title="點擊切換 Live Bilingo Audio / Live Bilingo Video 模式"
+              className={`group flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border transition-all active:scale-98 cursor-pointer shadow-sm min-w-0 select-none ${
+                effectiveTheme === 'paper'
+                  ? 'bg-[#EADDC2]/90 hover:bg-[#DFCFA8] border-[#C8B282] text-[#2C1D0F]'
+                  : effectiveTheme === 'light'
+                  ? 'bg-slate-100/90 hover:bg-slate-200/90 border-slate-300 text-slate-900'
+                  : 'bg-slate-900/95 hover:bg-slate-800/90 border-slate-700/80 text-white'
+              }`}
+            >
+              {/* Mode Brand Icon */}
+              <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center text-white shrink-0 shadow-md transition-transform group-hover:scale-105 ${
+                contentSource === 'radio'
+                  ? 'bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-blue-500/30'
+                  : 'bg-gradient-to-tr from-rose-600 to-red-500 shadow-rose-500/30'
+              }`}>
+                {contentSource === 'radio' ? (
+                  <Radio className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-pulse" />
+                ) : (
+                  <Youtube className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                )}
+              </div>
+
+              {/* Title and Dropdown Arrow */}
+              <div className="flex items-center gap-1 min-w-0">
+                <span className="font-black text-xs sm:text-sm tracking-tight truncate">
+                  {contentSource === 'radio' ? 'Live Bilingo Audio' : 'Live Bilingo Video'}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 opacity-60 shrink-0 transition-transform duration-200 ${isModeDropdownOpen ? 'rotate-180 opacity-100 text-blue-400' : 'group-hover:opacity-100'}`} />
+              </div>
+            </button>
+
+            {/* Dropdown Menu Modal/Popup */}
+            {isModeDropdownOpen && (
+              <div
+                className={`absolute top-full left-8 sm:left-10 mt-1.5 w-64 sm:w-72 rounded-2xl border p-1.5 shadow-2xl z-50 animate-in fade-in-0 zoom-in-95 duration-150 backdrop-blur-xl ${
+                  effectiveTheme === 'paper'
+                    ? 'bg-[#FAF4E8]/98 border-[#D8C49E] shadow-[#2C1D0F]/15 text-[#2C1D0F]'
                     : effectiveTheme === 'light'
-                    ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-300/60'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                    ? 'bg-white/98 border-slate-200 shadow-slate-900/15 text-slate-800'
+                    : 'bg-slate-950/98 border-slate-800 shadow-black/70 text-slate-100'
                 }`}
               >
-                <Radio className={`w-3.5 h-3.5 shrink-0 ${contentSource === 'radio' ? 'text-white animate-pulse' : ''}`} />
-                <span>Live Bilingo Audio</span>
-              </button>
-              <button
-                type="button"
-                id="top-mode-video-btn"
-                onClick={() => handleContentSourceChange('youtube')}
-                title="切換至 Live Bilingo Video (YouTube 雙語影音學習與時間軸字幕)"
-                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer whitespace-nowrap select-none ${
-                  contentSource === 'youtube'
-                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 ring-1 ring-rose-400/40 font-extrabold'
-                    : effectiveTheme === 'paper'
-                    ? 'text-[#5C4830] hover:text-[#2C1D0F] hover:bg-[#DFCFA8]/60'
-                    : effectiveTheme === 'light'
-                    ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-300/60'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-                }`}
-              >
-                <Youtube className={`w-3.5 h-3.5 shrink-0 ${contentSource === 'youtube' ? 'text-white' : ''}`} />
-                <span>Live Bilingo Video</span>
-              </button>
-            </div>
+                <div className="px-2.5 py-1 mb-1 flex items-center justify-between text-[10px] font-bold tracking-wider opacity-60 select-none border-b border-inherit/30">
+                  <span>學習模式切換</span>
+                  <span className="text-[9px] font-mono opacity-60">MODE SWITCH</span>
+                </div>
+
+                {/* Option 1: Live Bilingo Audio */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleContentSourceChange('radio');
+                    setIsModeDropdownOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between p-2 rounded-xl transition-all cursor-pointer text-left ${
+                    contentSource === 'radio'
+                      ? effectiveTheme === 'paper'
+                        ? 'bg-[#DFCFA8] border border-[#C8B282] font-bold shadow-xs'
+                        : effectiveTheme === 'light'
+                        ? 'bg-blue-50 border border-blue-200 text-blue-900 font-bold shadow-xs'
+                        : 'bg-blue-600/20 border border-blue-500/40 text-blue-100 font-bold shadow-xs'
+                      : effectiveTheme === 'paper'
+                      ? 'hover:bg-[#DFCFA8]/50 text-[#5C4830]'
+                      : effectiveTheme === 'light'
+                      ? 'hover:bg-slate-100 text-slate-600'
+                      : 'hover:bg-slate-900 text-slate-400'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+                      <Radio className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs sm:text-sm font-bold truncate">Live Bilingo Audio</div>
+                      <div className="text-[11px] opacity-70 truncate font-normal">24/7 原音廣播 • AI 即時雙語字幕</div>
+                    </div>
+                  </div>
+                  {contentSource === 'radio' && (
+                    <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 ml-2 shadow-xs">
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </div>
+                  )}
+                </button>
+
+                {/* Option 2: Live Bilingo Video */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleContentSourceChange('youtube');
+                    setIsModeDropdownOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between p-2 rounded-xl transition-all cursor-pointer text-left mt-1 ${
+                    contentSource === 'youtube'
+                      ? effectiveTheme === 'paper'
+                        ? 'bg-[#DFCFA8] border border-[#C8B282] font-bold shadow-xs'
+                        : effectiveTheme === 'light'
+                        ? 'bg-rose-50 border border-rose-200 text-rose-900 font-bold shadow-xs'
+                        : 'bg-rose-600/20 border border-rose-500/40 text-rose-100 font-bold shadow-xs'
+                      : effectiveTheme === 'paper'
+                      ? 'hover:bg-[#DFCFA8]/50 text-[#5C4830]'
+                      : effectiveTheme === 'light'
+                      ? 'hover:bg-slate-100 text-slate-600'
+                      : 'hover:bg-slate-900 text-slate-400'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-600 to-red-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-rose-500/20">
+                      <Youtube className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs sm:text-sm font-bold truncate">Live Bilingo Video</div>
+                      <div className="text-[11px] opacity-70 truncate font-normal">YouTube 影音 • 時間軸雙語學習</div>
+                    </div>
+                  </div>
+                  {contentSource === 'youtube' && (
+                    <div className="w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center shrink-0 ml-2 shadow-xs">
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </div>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Right: Mode Action (YouTube: Loop Button | Radio: Sleep Timer) + Play/Pause Button */}

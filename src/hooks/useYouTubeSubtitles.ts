@@ -18,6 +18,7 @@ export interface YouTubeSubtitlesState {
     translated: number;
     total: number;
     percent: number;
+    message?: string;
   };
   error: {
     code: YouTubeErrorCode;
@@ -36,7 +37,12 @@ export function useYouTubeSubtitles(
   const [status, setStatus] = useState<'idle' | 'loading' | 'translating' | 'ready' | 'error'>('idle');
   const [title, setTitle] = useState<string>('');
   const [duration, setDuration] = useState<number>(0);
-  const [progress, setProgress] = useState({ translated: 0, total: 0, percent: 0 });
+  const [progress, setProgress] = useState<{ translated: number; total: number; percent: number; message?: string }>({
+    translated: 0,
+    total: 0,
+    percent: 0,
+    message: '',
+  });
   const [error, setError] = useState<{ code: YouTubeErrorCode; message: string } | null>(null);
 
   // Cancellation token for videoId changes
@@ -50,7 +56,7 @@ export function useYouTubeSubtitles(
     setSubtitles([]);
     setActiveSubtitleId(null);
     setActiveSubtitleIndex(-1);
-    setProgress({ translated: 0, total: 0, percent: 0 });
+    setProgress({ translated: 0, total: 100, percent: 15, message: '正在擷取影片英文字幕...' });
 
     // 1. Check local persistent cache first
     const cached = getCachedYouTubeData(targetVideoId);
@@ -63,6 +69,7 @@ export function useYouTubeSubtitles(
         translated: cached.subtitles.length,
         total: cached.subtitles.length,
         percent: 100,
+        message: '雙語字幕已準備就緒 100%',
       });
       setStatus('ready');
       return;
@@ -157,7 +164,12 @@ export function useYouTubeSubtitles(
       }
 
       const totalSentences = normalizedItems.length;
-      setProgress({ translated: 0, total: totalSentences, percent: 0 });
+      setProgress({
+        translated: 0,
+        total: totalSentences,
+        percent: 35,
+        message: `已解析英文字幕 (${totalSentences} 句)，準備雙語翻譯...`,
+      });
       setStatus('translating');
 
       // Create chunks for batch translation
@@ -264,11 +276,13 @@ export function useYouTubeSubtitles(
       }
 
       // Progressive availability: unlock playback & reading immediately!
+      const firstPercent = Math.min(100, Math.round(35 + (firstBatch.length / totalSentences) * 65));
       setSubtitles([...allSubtitlesState]);
       setProgress({
         translated: firstBatch.length,
         total: totalSentences,
-        percent: Math.round((firstBatch.length / totalSentences) * 100),
+        percent: firstPercent,
+        message: `雙語字幕生成中 (${firstBatch.length}/${totalSentences})...`,
       });
       setStatus('ready');
 
@@ -293,11 +307,15 @@ export function useYouTubeSubtitles(
         }
 
         translatedSoFar += currentBatch.length;
+        const curPercent = Math.min(100, Math.round(35 + (translatedSoFar / totalSentences) * 65));
         setSubtitles([...allSubtitlesState]);
         setProgress({
           translated: translatedSoFar,
           total: totalSentences,
-          percent: Math.round((translatedSoFar / totalSentences) * 100),
+          percent: curPercent,
+          message: curPercent >= 100
+            ? '雙語字幕準備完成 100%'
+            : `雙語字幕翻譯中 (${translatedSoFar}/${totalSentences})...`,
         });
       }
 

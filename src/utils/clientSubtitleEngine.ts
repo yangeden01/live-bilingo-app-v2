@@ -85,11 +85,6 @@ class ClientSubtitleEngine {
 
         data.subtitles.forEach((sub: any) => {
           if (sub && sub.id && sub.english && !this.seenSubtitleIds.has(sub.id)) {
-            // Strict Station Isolation: Reject subtitles that lack stationUrl or belong to a different station
-            if (!sub.stationUrl || !isStationUrlMatch(sub.stationUrl, this.activeStation?.streamUrl)) {
-              return;
-            }
-
             // Filter out system greeting message
             if (sub.id.startsWith('station-play-') || sub.english.includes('Connected to live radio stream')) {
               return;
@@ -123,7 +118,7 @@ class ClientSubtitleEngine {
               english: cleanedEnglish,
               traditionalChinese: sub.traditionalChinese || cleanedEnglish,
               isFinal: true,
-              stationUrl: sub.stationUrl,
+              stationUrl: sub.stationUrl || this.activeStation?.streamUrl,
               stationName: sub.stationName || this.activeStation?.name,
             };
 

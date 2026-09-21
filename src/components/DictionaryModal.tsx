@@ -276,6 +276,26 @@ export const DictionaryModal: React.FC<Props> = ({ isOpen, onClose, initialWord 
     };
   }, [isOpen]);
 
+  const autoCollectQueriedWord = (word: string) => {
+    const clean = cleanWordToken(word);
+    if (!clean || clean.length < 2 || !/^[a-zA-Z' -]+$/.test(clean)) return;
+
+    try {
+      const saved = getPersistentItem('saved_dict_words');
+      const list: string[] = saved ? JSON.parse(saved) : [];
+      // Put queried word at the top of the collection, deduplicating case-insensitively
+      const existingFiltered = list.filter((w) => w.toLowerCase() !== clean.toLowerCase());
+      const updated = [clean, ...existingFiltered];
+      setPersistentItem('saved_dict_words', JSON.stringify(updated));
+      setSavedWords(updated);
+      setTimeout(() => {
+        window.dispatchEvent(new Event('storage'));
+      }, 0);
+    } catch (e) {
+      console.warn('Failed to auto-collect word:', e);
+    }
+  };
+
   const handleSpeak = (textToSpeak?: string) => {
     const targetWord = textToSpeak || result?.word || searchWord;
     if (targetWord) {
@@ -288,12 +308,17 @@ export const DictionaryModal: React.FC<Props> = ({ isOpen, onClose, initialWord 
     }
   };
 
-  const fetchDefinition = async (wordToSearch: string) => {
+  const fetchDefinition = async (wordToSearch: string, isAutoCollect: boolean = true) => {
     const clean = cleanWordToken(wordToSearch);
     if (!clean) return;
 
     setSearchWord(clean);
     setIsDetailsExpanded(false);
+
+    // Auto-save queried word from Radio or Video mode into the shared vocabulary collection
+    if (isAutoCollect) {
+      autoCollectQueriedWord(clean);
+    }
 
     // Immediately trigger instant pronunciation for the word so user hears it right away
     if (lastSpokenWordRef.current !== clean) {
@@ -534,11 +559,11 @@ export const DictionaryModal: React.FC<Props> = ({ isOpen, onClose, initialWord 
       if (initialWord) {
         const cleaned = cleanWordToken(initialWord);
         setSearchWord(cleaned);
-        fetchDefinition(cleaned);
+        fetchDefinition(cleaned, true);
       } else if (!searchWord && COMMON_BROADCAST_WORDS.length > 0) {
         const defaultWord = COMMON_BROADCAST_WORDS[0];
         setSearchWord(defaultWord);
-        fetchDefinition(defaultWord);
+        fetchDefinition(defaultWord, false);
       }
     } else {
       stopSpeech();
@@ -548,6 +573,9 @@ export const DictionaryModal: React.FC<Props> = ({ isOpen, onClose, initialWord 
   }, [isOpen, initialWord]);
 
   const toggleSaveWord = (word: string) => {
+    const clean = cleanWordToken(word);
+    if (!clean) return;
+
     let currentSaved: string[] = [];
     try {
       const saved = getPersistentItem('saved_dict_words');
@@ -556,8 +584,10 @@ export const DictionaryModal: React.FC<Props> = ({ isOpen, onClose, initialWord 
       currentSaved = [];
     }
 
-    const isSaved = currentSaved.includes(word);
-    const updated = isSaved ? currentSaved.filter((w) => w !== word) : [...currentSaved, word];
+    const isSaved = currentSaved.some((w) => w.toLowerCase() === clean.toLowerCase());
+    const updated = isSaved
+      ? currentSaved.filter((w) => w.toLowerCase() !== clean.toLowerCase())
+      : [clean, ...currentSaved.filter((w) => w.toLowerCase() !== clean.toLowerCase())];
     setSavedWords(updated);
     try {
       setPersistentItem('saved_dict_words', JSON.stringify(updated));
@@ -642,7 +672,7 @@ export const DictionaryModal: React.FC<Props> = ({ isOpen, onClose, initialWord 
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                fetchDefinition(searchWord);
+                fetchDefinition(searchWord, true);
               }}
               className="flex items-center gap-2"
             >
@@ -671,7 +701,7 @@ export const DictionaryModal: React.FC<Props> = ({ isOpen, onClose, initialWord 
               {COMMON_BROADCAST_WORDS.map((w) => (
                 <button
                   key={w}
-                  onClick={() => fetchDefinition(w)}
+                  onClick={() => fetchDefinition(w, true)}
                   className="px-2 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-400 rounded-lg text-slate-600 dark:text-slate-300 font-mono text-[11px] shrink-0 transition-colors cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
                 >
                   {w}
@@ -728,7 +758,7 @@ export const DictionaryModal: React.FC<Props> = ({ isOpen, onClose, initialWord 
                       title="收藏此單字"
                       className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-300 hover:text-amber-500 transition-colors cursor-pointer shadow-sm active:scale-95"
                     >
-                      {savedWords.includes(result.word) ? (
+                      {savedWords.some((w) => w.toLowerCase() === result.word.toLowerCase()) ? (
                         <BookmarkCheck className="w-5 h-5 text-amber-500 fill-amber-500" />
                       ) : (
                         <Bookmark className="w-5 h-5" />

@@ -38,6 +38,14 @@ class YouTubeNewsManager(
     private data class NewsChannel(val name: String, val id: String, val category: String)
 
     private val reputableChannels = listOf(
+        // American Talk Shows (熱門知名美語脫口秀 - JIMMY等，精選一年內影片)
+        NewsChannel("The Tonight Show Starring Jimmy Fallon", "UC8-Th83bH_thdKZDJCrn88g", "TalkShow"),
+        NewsChannel("Jimmy Kimmel Live", "UCa6vGFO9ty8v5KZJXQxdhaw", "TalkShow"),
+        NewsChannel("The Late Show with Stephen Colbert", "UCMtFAi84ehTSYSE9XoHefig", "TalkShow"),
+        NewsChannel("Late Night with Seth Meyers", "UCVTyTA7-g9nopHeHbeuvpRA", "TalkShow"),
+        NewsChannel("The Daily Show", "UCwWhs_6x42TyRM4Wstoq8HA", "TalkShow"),
+        NewsChannel("Team Coco (Conan O'Brien)", "UCi7GJNg51C3jgmYTUwqoUXA", "TalkShow"),
+
         // Knowledge, Science & Education
         NewsChannel("TED", "UCsT0YIqwnpJCM-mx7-gSA4Q", "Knowledge"),
         NewsChannel("TED-Ed", "UCsooa4yRKGN_zEE8iknghZA", "Knowledge"),
@@ -91,6 +99,7 @@ class YouTubeNewsManager(
     suspend fun fetchRecentNews(forceRefresh: Boolean = false): String = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
         val oneWeekAgoMs = now - (7L * 24 * 60 * 60 * 1000)
+        val oneYearAgoMs = now - (365L * 24 * 60 * 60 * 1000L)
 
         // 1. Check in-memory cache
         val currentCache = memoryCache
@@ -123,7 +132,8 @@ class YouTubeNewsManager(
                         client.newCall(req).execute().use { response ->
                             if (!response.isSuccessful) return@async emptyList<RawNewsItem>()
                             val xml = response.body?.string() ?: return@async emptyList<RawNewsItem>()
-                            parseChannelFeedXml(xml, channel, oneWeekAgoMs, now, isoFormat, isoFormatFallback)
+                            val minTimeMs = if (channel.category == "TalkShow") oneYearAgoMs else oneWeekAgoMs
+                            parseChannelFeedXml(xml, channel, minTimeMs, now, isoFormat, isoFormatFallback)
                         }
                     } catch (e: Exception) {
                         Log.w(TAG, "Feed fetch failed for ${channel.name}: ${e.message}")
@@ -239,8 +249,8 @@ class YouTubeNewsManager(
             }
         }
 
-        // Balance categories so all categories (World, US, Business, Technology, Knowledge, Breaking) are well-represented
-        val categoryOrder = listOf("World", "US", "Business", "Technology", "Knowledge", "Breaking")
+        // Balance categories so all categories (TalkShow, Knowledge, Technology, Business, World, US, Breaking) are well-represented
+        val categoryOrder = listOf("TalkShow", "Knowledge", "Technology", "Business", "World", "US", "Breaking")
         val balancedVideos = mutableListOf<EnrichedNewsItem>()
         val selectedIds = mutableSetOf<String>()
 
@@ -380,6 +390,15 @@ class YouTubeNewsManager(
 
     private fun categorize(title: String, channelTitle: String, defaultCategory: String): String {
         val lower = title.lowercase(Locale.ROOT)
+        val lowerCh = channelTitle.lowercase(Locale.ROOT)
+        if (defaultCategory == "TalkShow" ||
+            lowerCh.contains("jimmy fallon") || lowerCh.contains("fallontonight") ||
+            lowerCh.contains("jimmy kimmel") || lowerCh.contains("colbert") ||
+            lowerCh.contains("seth meyers") || lowerCh.contains("daily show") ||
+            lowerCh.contains("team coco") || lowerCh.contains("conan") ||
+            Regex("\\b(talk show|tonight show|late night|monologue|interview|jimmy fallon|jimmy kimmel|stephen colbert|seth meyers|conan o'brien|daily show)\\b", RegexOption.IGNORE_CASE).containsMatchIn(lower)) {
+            return "TalkShow"
+        }
         if (channelTitle.contains("TED") || channelTitle.contains("Kurzgesagt") ||
             channelTitle.contains("CrashCourse") || channelTitle.contains("National Geographic") ||
             channelTitle.contains("Veritasium") || channelTitle.contains("Learning English") ||

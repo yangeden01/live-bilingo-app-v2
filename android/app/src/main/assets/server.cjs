@@ -1151,6 +1151,13 @@ var defaultTranscriptProvider = new YoutubeTranscriptPlusProvider();
 
 // server/youtubeNewsDiscoveryService.ts
 var REPUTABLE_NEWS_CHANNELS = [
+  // Popular American Talk Shows (熱門知名美語脫口秀 - JIMMY等，精選一年內精彩對話與訪談)
+  { name: "The Tonight Show Starring Jimmy Fallon", id: "UC8-Th83bH_thdKZDJCrn88g", category: "TalkShow" },
+  { name: "Jimmy Kimmel Live", id: "UCa6vGFO9ty8v5KZJXQxdhaw", category: "TalkShow" },
+  { name: "The Late Show with Stephen Colbert", id: "UCMtFAi84ehTSYSE9XoHefig", category: "TalkShow" },
+  { name: "Late Night with Seth Meyers", id: "UCVTyTA7-g9nopHeHbeuvpRA", category: "TalkShow" },
+  { name: "The Daily Show", id: "UCwWhs_6x42TyRM4Wstoq8HA", category: "TalkShow" },
+  { name: "Team Coco (Conan O'Brien)", id: "UCi7GJNg51C3jgmYTUwqoUXA", category: "TalkShow" },
   // Knowledge, Science & Education (知識科普與深度學習)
   { name: "TED", id: "UCsT0YIqwnpJCM-mx7-gSA4Q", category: "Knowledge" },
   { name: "TED-Ed", id: "UCsooa4yRKGN_zEE8iknghZA", category: "Knowledge" },
@@ -1204,6 +1211,10 @@ function formatRelativeTimeZh(publishedAt) {
 }
 function categorizeNewsVideo(title, channelTitle, defaultCat = "World") {
   const lower = title.toLowerCase();
+  const lowerCh = channelTitle.toLowerCase();
+  if (lowerCh.includes("jimmy fallon") || lowerCh.includes("fallontonight") || lowerCh.includes("jimmy kimmel") || lowerCh.includes("colbert") || lowerCh.includes("seth meyers") || lowerCh.includes("daily show") || lowerCh.includes("team coco") || lowerCh.includes("conan") || defaultCat === "TalkShow" || /\b(talk show|tonight show|late night|monologue|interview|jimmy fallon|jimmy kimmel|stephen colbert|seth meyers|conan o'brien|daily show)\b/i.test(lower)) {
+    return "TalkShow";
+  }
   if (channelTitle.includes("TED") || channelTitle.includes("Kurzgesagt") || channelTitle.includes("CrashCourse") || channelTitle.includes("National Geographic") || channelTitle.includes("Veritasium") || channelTitle.includes("Learning English") || channelTitle.includes("Vox") || /\b(science|space|universe|biology|physics|history|psychology|brain|evolution|planet|learn|lesson|grammar|vocabulary)\b/i.test(lower)) {
     return "Knowledge";
   }
@@ -1233,21 +1244,26 @@ function isNewsContent(title, channelTitle) {
   if (!isEnglish) {
     return false;
   }
-  const bannedKeywords = [
-    "vlog",
-    "gaming",
-    "gameplay",
-    "highlights",
-    "music video",
-    "trailer",
-    "official audio",
-    "teaser",
-    "remix",
-    "unboxing",
-    "comedy sketch",
-    "reaction video"
-  ];
-  return !bannedKeywords.some((kw) => lower.includes(kw));
+  const isTalkShow = channelTitle && (channelTitle.includes("Fallon") || channelTitle.includes("Kimmel") || channelTitle.includes("Colbert") || channelTitle.includes("Meyers") || channelTitle.includes("Daily Show") || channelTitle.includes("Coco"));
+  if (!isTalkShow) {
+    const bannedKeywords = [
+      "vlog",
+      "gaming",
+      "gameplay",
+      "highlights",
+      "music video",
+      "trailer",
+      "official audio",
+      "teaser",
+      "remix",
+      "unboxing",
+      "reaction video"
+    ];
+    if (bannedKeywords.some((kw) => lower.includes(kw))) {
+      return false;
+    }
+  }
+  return true;
 }
 function deduplicateNewsVideos(videos) {
   const result = [];
@@ -1310,9 +1326,10 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
           const thumb = block.match(/<media:thumbnail[^>]+url=["']([^"']+)["']/)?.[1] || (vId ? `https://i.ytimg.com/vi/${vId}/hqdefault.jpg` : "");
           if (!vId || !titleRaw || !published) continue;
           const pubMs = new Date(published).getTime();
-          if (pubMs < oneWeekAgoMs || pubMs > now) continue;
+          const minPubMs = ch.category === "TalkShow" ? now - 365 * 24 * 60 * 60 * 1e3 : oneWeekAgoMs;
+          if (pubMs < minPubMs || pubMs > now) continue;
           const title = titleRaw.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-          if (!isNewsContent(title)) continue;
+          if (!isNewsContent(title, ch.name)) continue;
           const cat = categorizeNewsVideo(title, ch.name, ch.category);
           items.push({
             videoId: vId,
@@ -1454,11 +1471,12 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
   );
   const deduplicated = deduplicateNewsVideos(candidateVideos);
   const categoryOrder = [
+    "TalkShow",
+    "Knowledge",
+    "Technology",
+    "Business",
     "World",
     "US",
-    "Business",
-    "Technology",
-    "Knowledge",
     "Breaking"
   ];
   const selectedVideos = [];

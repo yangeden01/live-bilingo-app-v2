@@ -38,6 +38,7 @@ import {
   Plus,
   RotateCcw,
   SlidersHorizontal,
+  Play,
 } from 'lucide-react';
 import { ReadingModeAndFontToolbar } from './ReadingModeAndFontToolbar';
 import { YouTubeNewsDiscoveryModal } from './YouTubeNewsDiscoveryModal';
@@ -941,6 +942,9 @@ export const YouTubeBilingualView: React.FC<Props> = ({
 
   const filteredSubtitles = subtitles;
 
+  const inputParsedVideoId = urlInput.trim() ? extractYouTubeVideoId(urlInput.trim()) : null;
+  const isNewInputUrl = Boolean(inputParsedVideoId && inputParsedVideoId !== activeVideoId);
+
   return (
     <div className="space-y-6">
       {/* Top YouTube URL Input & Search Bar */}
@@ -981,34 +985,61 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                 setUrlInput(e.target.value);
                 if (urlInputError) setUrlInputError(null);
               }}
+              onPaste={(e) => {
+                const pasted = e.clipboardData?.getData('text') || '';
+                const parsedId = extractYouTubeVideoId(pasted);
+                if (parsedId) {
+                  setUrlInput(pasted.trim());
+                  if (urlInputError) setUrlInputError(null);
+                  setTimeout(() => {
+                    startLoadingVideoWithAutoPlay(parsedId, pasted.trim());
+                  }, 120);
+                }
+              }}
               onFocus={() => {
                 if (urlHistory.length > 0) setShowHistoryDropdown(true);
               }}
               placeholder="貼上 YouTube 影片或直播網址 (例如: watch?v=..., youtu.be, /live/...)"
               className={`w-full rounded-xl pl-10 ${
-                urlInput ? 'pr-20' : 'pr-12'
+                urlInput ? 'pr-28 sm:pr-32' : 'pr-12'
               } py-2.5 text-xs sm:text-sm border focus:outline-none transition-colors ${inputBgClass} ${
                 urlInputError ? 'border-rose-500 ring-1 ring-rose-500/40' : ''
               }`}
             />
-            <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+            <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
               {urlInput && (
-                <button
-                  type="button"
-                  id="youtube-url-clear-btn"
-                  onClick={handleClearUrlInput}
-                  aria-label="清除網址"
-                  title="清除網址"
-                  className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
-                    currentTheme === 'paper'
-                      ? 'text-[#7A6853] hover:text-[#3B2E1E] hover:bg-[#EFE5CE]'
-                      : currentTheme === 'light'
-                      ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800 active:bg-slate-700'
-                  }`}
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <>
+                  <button
+                    type="submit"
+                    id="youtube-url-inline-play-btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleLoadVideo();
+                    }}
+                    aria-label="載入播放"
+                    title="點擊載入並播放此 YouTube 網址"
+                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 shadow-sm transition-all active:scale-95 cursor-pointer shrink-0"
+                  >
+                    <Play className="w-3 h-3 fill-white" />
+                    <span className="hidden xs:inline font-bold">播放</span>
+                  </button>
+                  <button
+                    type="button"
+                    id="youtube-url-clear-btn"
+                    onClick={handleClearUrlInput}
+                    aria-label="清除網址"
+                    title="清除網址"
+                    className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
+                      currentTheme === 'paper'
+                        ? 'text-[#7A6853] hover:text-[#3B2E1E] hover:bg-[#EFE5CE]'
+                        : currentTheme === 'light'
+                        ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800 active:bg-slate-700'
+                    }`}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </>
               )}
               <button
                 type="button"
@@ -1016,7 +1047,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                 onClick={() => setShowHistoryDropdown((prev) => !prev)}
                 aria-label="展開歷史輸入網址"
                 title="歷史輸入網址清單"
-                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
+                className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
                   showHistoryDropdown
                     ? currentTheme === 'paper'
                       ? 'bg-[#E5D9BE] text-[#3B2E1E]'
@@ -1030,7 +1061,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                     : 'text-slate-400 hover:text-white hover:bg-slate-800 active:bg-slate-700'
                 }`}
               >
-                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showHistoryDropdown ? 'rotate-180 text-rose-500' : ''}`} />
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showHistoryDropdown ? 'rotate-180 text-rose-500' : ''}`} />
               </button>
             </div>
 
@@ -1193,62 +1224,86 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                 </span>
               )}
             </button>
-            {/* If loading, translating, or progress is active, show the live Progress Indicator bar */}
-            {(isProgressActive || status === 'loading' || status === 'translating') ? (
-              <div
-                id="youtube-caption-progress-bar"
-                role="progressbar"
-                aria-valuenow={progress.percent || 15}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                className={`relative overflow-hidden rounded-xl border flex items-center justify-between px-2.5 py-1.5 min-h-[36px] flex-1 min-w-0 shadow-sm transition-all select-none ${
-                  effectiveTheme === 'paper'
-                    ? 'bg-[#FAF4E8] border-[#CDB58A] text-[#3B2E1E]'
-                    : effectiveTheme === 'light'
-                    ? 'bg-white border-slate-300 text-slate-800'
-                    : 'bg-slate-900/90 border-emerald-500/40 text-white'
-                }`}
-              >
-                {/* Animated Background Progress Fill */}
+            {/* Interactive Subtitle Preparation Status Button & URL Input Submit Key (字幕準備狀態與網址輸入鍵 - 附圖1) */}
+            <button
+              type="submit"
+              id="youtube-caption-input-submit-btn"
+              aria-label={
+                isNewInputUrl
+                  ? '載入播放此網址 (點擊送出)'
+                  : (status === 'loading' || status === 'translating')
+                  ? `字幕載入中 ${progress.percent || 15}%`
+                  : status === 'ready'
+                  ? '雙語字幕就緒 (點擊重新載入/播放)'
+                  : '載入雙語字幕 (點擊送出)'
+              }
+              title={
+                isNewInputUrl
+                  ? '立即載入並播放輸入的 YouTube 網址'
+                  : status === 'ready'
+                  ? '點擊重新播放或重新載入字幕'
+                  : '點擊載入並播放'
+              }
+              disabled={!urlInput.trim() && status === 'idle'}
+              className={`relative overflow-hidden rounded-xl border flex items-center justify-between px-2.5 py-1.5 min-h-[36px] flex-1 min-w-0 shadow-sm transition-all cursor-pointer active:scale-95 select-none ${
+                isNewInputUrl
+                  ? 'bg-gradient-to-r from-emerald-600/30 via-teal-600/30 to-emerald-500/40 border-emerald-400 ring-2 ring-emerald-500/30 hover:border-emerald-300 animate-pulse'
+                  : effectiveTheme === 'paper'
+                  ? 'bg-[#FAF4E8] hover:bg-[#F5ECD7] border-[#CDB58A] text-[#3B2E1E]'
+                  : effectiveTheme === 'light'
+                  ? 'bg-white hover:bg-slate-50 border-slate-300 text-slate-800'
+                  : 'bg-slate-900/90 hover:bg-slate-800 border-emerald-500/40 text-white'
+              }`}
+            >
+              {/* Animated Background Progress Fill when active/loading or ready */}
+              {(isProgressActive || status === 'loading' || status === 'translating' || (status === 'ready' && !isNewInputUrl)) && (
                 <div
-                  className={`absolute inset-y-0 left-0 transition-all duration-300 ease-out ${
+                  className={`absolute inset-y-0 left-0 transition-all duration-300 ease-out pointer-events-none ${
                     (progress.percent >= 100 || status === 'ready')
-                      ? 'bg-gradient-to-r from-emerald-600/40 via-emerald-500/50 to-teal-400/50'
+                      ? 'bg-gradient-to-r from-emerald-600/30 via-emerald-500/40 to-teal-400/40'
                       : 'bg-gradient-to-r from-rose-500/25 via-amber-500/25 to-emerald-500/30'
                   }`}
-                  style={{ width: `${Math.max(12, Math.min(100, progress.percent || (status === 'loading' ? 25 : 60)))}%` }}
+                  style={{ width: `${isNewInputUrl ? 100 : Math.max(12, Math.min(100, progress.percent || (status === 'loading' ? 25 : 60)))}%` }}
                 />
+              )}
 
-                {/* Left: Indicator & Stage Description */}
-                <div className="relative z-10 flex items-center gap-1.5 min-w-0 pr-1">
-                  {(progress.percent >= 100 || status === 'ready') ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 animate-in zoom-in-75 duration-200" />
-                  ) : (
-                    <Loader2 className="w-3.5 h-3.5 text-emerald-400 animate-spin shrink-0" />
-                  )}
-                  <span className="text-[11px] sm:text-xs font-semibold truncate">
-                    {(progress.percent >= 100 || status === 'ready')
-                      ? '雙語字幕就緒'
-                      : progress.message || (status === 'loading' ? '擷取英文字幕...' : '雙語字幕生成中...')}
-                  </span>
-                </div>
-
-                {/* Right: Percentage */}
-                <div className="relative z-10 font-mono text-[11px] sm:text-xs font-bold text-emerald-400 shrink-0 pl-1">
-                  {(progress.percent >= 100 || status === 'ready') ? 100 : (progress.percent || (status === 'loading' ? 25 : 60))}%
-                </div>
+              {/* Left: Status Icon & Action Prompt */}
+              <div className="relative z-10 flex items-center gap-1.5 min-w-0 pr-1">
+                {isNewInputUrl ? (
+                  <Play className="w-3.5 h-3.5 fill-emerald-400 text-emerald-400 shrink-0 animate-bounce" />
+                ) : (status === 'loading' || status === 'translating') ? (
+                  <Loader2 className="w-3.5 h-3.5 text-emerald-400 animate-spin shrink-0" />
+                ) : status === 'ready' ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 animate-in zoom-in-75 duration-200" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                )}
+                <span className={`text-[11px] sm:text-xs font-semibold truncate ${isNewInputUrl ? 'text-emerald-300 font-bold' : ''}`}>
+                  {isNewInputUrl
+                    ? '載入播放此網址'
+                    : (progress.percent >= 100 || status === 'ready')
+                    ? '雙語字幕就緒'
+                    : progress.message || (status === 'loading' ? '擷取英文字幕...' : '雙語字幕生成中...')}
+                </span>
               </div>
-            ) : (
-              <button
-                type="submit"
-                id="youtube-load-btn"
-                disabled={!urlInput.trim()}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 min-h-[36px] rounded-xl text-xs sm:text-sm font-semibold bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white shadow-sm transition-all shrink-0 cursor-pointer whitespace-nowrap active:scale-95"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>{status === 'ready' ? '重新載入' : '載入字幕'}</span>
-              </button>
-            )}
+
+              {/* Right: Percentage or Action Badge */}
+              <div className="relative z-10 font-mono text-[11px] sm:text-xs font-bold text-emerald-400 shrink-0 pl-1 flex items-center gap-1">
+                {isNewInputUrl ? (
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-sans font-bold">
+                    播放 ▶
+                  </span>
+                ) : (status === 'loading' || status === 'translating') ? (
+                  <span>{(progress.percent || (status === 'loading' ? 25 : 60))}%</span>
+                ) : status === 'ready' ? (
+                  <span>100%</span>
+                ) : (
+                  <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-sans font-bold">
+                    GO ▶
+                  </span>
+                )}
+              </div>
+            </button>
           </div>
         </form>
 

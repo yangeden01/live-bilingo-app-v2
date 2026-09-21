@@ -110,7 +110,14 @@ export type YouTubeErrorCode =
   | 'PLAYER_LOAD_FAILED'
   | 'YOUTUBE_API_UNAVAILABLE';
 
-export type YouTubeNewsCategory = 'Breaking' | 'World' | 'US' | 'Business' | 'Technology' | 'Knowledge';
+export type YouTubeNewsCategory =
+  | 'TalkShow'
+  | 'Knowledge'
+  | 'Technology'
+  | 'Business'
+  | 'World'
+  | 'US'
+  | 'Breaking';
 
 export interface YouTubeNewsVideo {
   videoId: string;

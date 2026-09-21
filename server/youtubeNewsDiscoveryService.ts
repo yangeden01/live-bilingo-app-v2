@@ -5,7 +5,7 @@ export interface YouTubeNewsItem {
   title: string;
   titleZh?: string;
   channelTitle: string;
-  channelId: string;
+  channelId?: string;
   publishedAt: string;
   publishedRelative: string;
   durationFormatted: string;
@@ -13,7 +13,7 @@ export interface YouTubeNewsItem {
   thumbnailUrl: string;
   hasCaptions: boolean;
   captionBadge: string;
-  category: 'Breaking' | 'World' | 'US' | 'Business' | 'Technology' | 'Knowledge';
+  category: 'Breaking' | 'World' | 'US' | 'Business' | 'Technology' | 'Knowledge' | 'TalkShow';
 }
 
 export interface YouTubeNewsDiscoveryResult {
@@ -26,8 +26,16 @@ export interface YouTubeNewsDiscoveryResult {
   message?: string;
 }
 
-// Trusted reputable English channels prioritized for discovery (spanning Knowledge, Tech, Business, and World)
+// Trusted reputable English channels prioritized for discovery (spanning TalkShow, Knowledge, Tech, Business, and World)
 export const REPUTABLE_NEWS_CHANNELS = [
+  // Popular American Talk Shows (熱門知名美語脫口秀 - JIMMY等，精選一年內精彩對話與訪談)
+  { name: 'The Tonight Show Starring Jimmy Fallon', id: 'UC8-Th83bH_thdKZDJCrn88g', category: 'TalkShow' },
+  { name: 'Jimmy Kimmel Live', id: 'UCa6vGFO9ty8v5KZJXQxdhaw', category: 'TalkShow' },
+  { name: 'The Late Show with Stephen Colbert', id: 'UCMtFAi84ehTSYSE9XoHefig', category: 'TalkShow' },
+  { name: 'Late Night with Seth Meyers', id: 'UCVTyTA7-g9nopHeHbeuvpRA', category: 'TalkShow' },
+  { name: 'The Daily Show', id: 'UCwWhs_6x42TyRM4Wstoq8HA', category: 'TalkShow' },
+  { name: 'Team Coco (Conan O\'Brien)', id: 'UCi7GJNg51C3jgmYTUwqoUXA', category: 'TalkShow' },
+
   // Knowledge, Science & Education (知識科普與深度學習)
   { name: 'TED', id: 'UCsT0YIqwnpJCM-mx7-gSA4Q', category: 'Knowledge' },
   { name: 'TED-Ed', id: 'UCsooa4yRKGN_zEE8iknghZA', category: 'Knowledge' },
@@ -106,9 +114,24 @@ export function formatRelativeTimeZh(publishedAt: string): string {
 export function categorizeNewsVideo(
   title: string,
   channelTitle: string,
-  defaultCat: 'Breaking' | 'World' | 'US' | 'Business' | 'Technology' | 'Knowledge' = 'World'
-): 'Breaking' | 'World' | 'US' | 'Business' | 'Technology' | 'Knowledge' {
+  defaultCat: 'Breaking' | 'World' | 'US' | 'Business' | 'Technology' | 'Knowledge' | 'TalkShow' = 'World'
+): 'Breaking' | 'World' | 'US' | 'Business' | 'Technology' | 'Knowledge' | 'TalkShow' {
   const lower = title.toLowerCase();
+  const lowerCh = channelTitle.toLowerCase();
+  if (
+    lowerCh.includes('jimmy fallon') ||
+    lowerCh.includes('fallontonight') ||
+    lowerCh.includes('jimmy kimmel') ||
+    lowerCh.includes('colbert') ||
+    lowerCh.includes('seth meyers') ||
+    lowerCh.includes('daily show') ||
+    lowerCh.includes('team coco') ||
+    lowerCh.includes('conan') ||
+    defaultCat === 'TalkShow' ||
+    /\b(talk show|tonight show|late night|monologue|interview|jimmy fallon|jimmy kimmel|stephen colbert|seth meyers|conan o'brien|daily show)\b/i.test(lower)
+  ) {
+    return 'TalkShow';
+  }
   if (
     channelTitle.includes('TED') ||
     channelTitle.includes('Kurzgesagt') ||
@@ -173,21 +196,35 @@ function isNewsContent(title: string, channelTitle?: string): boolean {
     return false;
   }
 
-  const bannedKeywords = [
-    'vlog',
-    'gaming',
-    'gameplay',
-    'highlights',
-    'music video',
-    'trailer',
-    'official audio',
-    'teaser',
-    'remix',
-    'unboxing',
-    'comedy sketch',
-    'reaction video',
-  ];
-  return !bannedKeywords.some((kw) => lower.includes(kw));
+  const isTalkShow = channelTitle && (
+    channelTitle.includes('Fallon') ||
+    channelTitle.includes('Kimmel') ||
+    channelTitle.includes('Colbert') ||
+    channelTitle.includes('Meyers') ||
+    channelTitle.includes('Daily Show') ||
+    channelTitle.includes('Coco')
+  );
+
+  if (!isTalkShow) {
+    const bannedKeywords = [
+      'vlog',
+      'gaming',
+      'gameplay',
+      'highlights',
+      'music video',
+      'trailer',
+      'official audio',
+      'teaser',
+      'remix',
+      'unboxing',
+      'reaction video',
+    ];
+    if (bannedKeywords.some((kw) => lower.includes(kw))) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
@@ -293,11 +330,12 @@ export async function discoverLiveEnglishNews(
           if (!vId || !titleRaw || !published) continue;
 
           const pubMs = new Date(published).getTime();
-          // Strict 1-week publication window check
-          if (pubMs < oneWeekAgoMs || pubMs > now) continue;
+          // For TalkShow, allow 1 year (365 days) publication window as requested by user; for news keep 1 week
+          const minPubMs = ch.category === 'TalkShow' ? now - 365 * 24 * 60 * 60 * 1000 : oneWeekAgoMs;
+          if (pubMs < minPubMs || pubMs > now) continue;
 
           const title = titleRaw.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-          if (!isNewsContent(title)) continue;
+          if (!isNewsContent(title, ch.name)) continue;
 
           const cat = categorizeNewsVideo(title, ch.name, ch.category as any);
 
@@ -468,9 +506,9 @@ export async function discoverLiveEnglishNews(
   // Deduplicate near-identical stories
   const deduplicated = deduplicateNewsVideos(candidateVideos);
 
-  // Balance categories so all categories (World, US, Business, Technology, Knowledge, Breaking) have representation
-  const categoryOrder: Array<'World' | 'US' | 'Business' | 'Technology' | 'Knowledge' | 'Breaking'> = [
-    'World', 'US', 'Business', 'Technology', 'Knowledge', 'Breaking'
+  // Balance categories so all categories (TalkShow, Knowledge, Technology, Business, World, US, Breaking) have representation
+  const categoryOrder: Array<'TalkShow' | 'Knowledge' | 'Technology' | 'Business' | 'World' | 'US' | 'Breaking'> = [
+    'TalkShow', 'Knowledge', 'Technology', 'Business', 'World', 'US', 'Breaking'
   ];
   const selectedVideos: YouTubeNewsItem[] = [];
   const selectedIds = new Set<string>();

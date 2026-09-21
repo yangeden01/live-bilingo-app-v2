@@ -17,6 +17,7 @@ import {
   Star,
   Trash2,
   Radio,
+  Mic2,
 } from 'lucide-react';
 import { getApiUrl } from '../utils/apiUrl';
 import {
@@ -43,6 +44,7 @@ interface YouTubeNewsDiscoveryModalProps {
 
 const CATEGORY_TABS: { key: NewsModalCategoryTab; label: string; icon: React.FC<{ className?: string }> }[] = [
   { key: 'ALL', label: '全部', icon: Compass },
+  { key: 'TalkShow', label: '美語脫口秀', icon: Mic2 },
   { key: 'Knowledge', label: '知識科普', icon: BookOpen },
   { key: 'Technology', label: '科技前沿', icon: Cpu },
   { key: 'Business', label: '商業財經', icon: Building2 },
@@ -54,6 +56,7 @@ const CATEGORY_TABS: { key: NewsModalCategoryTab; label: string; icon: React.FC<
 
 export const CATEGORY_NAMES_ZH: Record<string, string> = {
   ALL: '全部',
+  TalkShow: '美語脫口秀',
   Knowledge: '知識科普',
   Technology: '科技創新',
   Business: '商業財經',
@@ -644,7 +647,9 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span
                         className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
-                          video.category === 'Breaking'
+                          video.category === 'TalkShow'
+                            ? 'bg-pink-500/15 text-pink-400 border border-pink-500/20'
+                            : video.category === 'Breaking'
                             ? 'bg-rose-500/15 text-rose-400 border border-rose-500/20'
                             : video.category === 'Technology'
                             ? 'bg-purple-500/15 text-purple-400 border border-purple-500/20'

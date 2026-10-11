@@ -91,7 +91,8 @@ echo "=== 4. Staging and Committing Changes ==="
 git add -A
 git commit -m "$COMMIT_MSG" || echo "No changes to commit"
 
-echo "=== 5. Pushing to GitHub Main Branch to Trigger APK Release ==="
-git push origin main || git push --force origin main
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+echo "=== 5. Pushing to GitHub Branch: $CURRENT_BRANCH to Trigger APK Release ==="
+git push origin "$CURRENT_BRANCH" || git push --force origin "$CURRENT_BRANCH"
 
 echo "=== Deployment & Verification Completed Successfully ==="

@@ -9,7 +9,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.bilingo.radio"
+        applicationId = "com.bilingo.radio.internal"
         minSdk = 24
         targetSdk = 36
         versionCode = 255

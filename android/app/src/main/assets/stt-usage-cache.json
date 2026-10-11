@@ -1,7 +1,7 @@
 {
   "groqRequestsHistory": [],
   "groqRecentRequestLogs": [],
-  "groqCurrentUtcDay": "2026-09-21",
+  "groqCurrentUtcDay": "2026-10-11",
   "groqTodayRequests": 0,
   "groqTotalRequestsEver": 0,
   "groqLastHeaders": {
@@ -30,7 +30,7 @@
     }
   },
   "deepgramRequestsHistory": [],
-  "deepgramCurrentUtcDay": "2026-09-21",
+  "deepgramCurrentUtcDay": "2026-10-11",
   "deepgramTodayRequests": 0,
   "deepgramTotalRequestsEver": 0
 }

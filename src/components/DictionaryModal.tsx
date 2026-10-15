@@ -566,6 +566,20 @@ export const DictionaryModal: React.FC<Props> = ({ isOpen, onClose, initialWord 
     setSavedWords(updated);
     try {
       setPersistentItem('saved_dict_words', JSON.stringify(updated));
+
+      // Synchronize Chinese translation & details to vocab_translations_cache
+      if (!isSaved && result?.chineseTranslation) {
+        const rawCache = getPersistentItem('vocab_translations_cache');
+        const cache = rawCache ? JSON.parse(rawCache) : {};
+        cache[clean.toLowerCase()] = {
+          zh: result.chineseTranslation,
+          pos: detailedMeanings[0]?.partOfSpeech || '詞彙',
+          def: detailedMeanings[0]?.definition,
+          example: detailedMeanings[0]?.example,
+        };
+        setPersistentItem('vocab_translations_cache', JSON.stringify(cache));
+      }
+
       setTimeout(() => {
         window.dispatchEvent(new Event('storage'));
       }, 0);

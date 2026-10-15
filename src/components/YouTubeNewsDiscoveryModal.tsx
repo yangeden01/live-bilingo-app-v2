@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   X,
   Newspaper,
@@ -18,6 +18,7 @@ import {
   Trash2,
   Radio,
   Mic2,
+  Sparkles,
 } from 'lucide-react';
 import { getApiUrl } from '../utils/apiUrl';
 import {
@@ -27,8 +28,18 @@ import {
   YouTubeSavedUrl,
   ReadingMode,
 } from '../types';
+import { EVERGREEN_SEED_VIDEOS } from '../data/evergreenYouTubeVideos';
 
-export type NewsModalCategoryTab = 'ALL' | YouTubeNewsCategory | 'Favorites';
+
+export type NewsModalCategoryTab =
+  | 'ALL'
+  | 'News'
+  | 'TED'
+  | 'Technology'
+  | 'Entertainment'
+  | 'Knowledge'
+  | 'Business'
+  | 'Favorites';
 
 interface YouTubeNewsDiscoveryModalProps {
   isOpen: boolean;
@@ -44,25 +55,95 @@ interface YouTubeNewsDiscoveryModalProps {
 
 const CATEGORY_TABS: { key: NewsModalCategoryTab; label: string; icon: React.FC<{ className?: string }> }[] = [
   { key: 'ALL', label: '全部', icon: Compass },
-  { key: 'TalkShow', label: '美語脫口秀 (1年精選)', icon: Mic2 },
+  { key: 'News', label: '即時新聞', icon: Newspaper },
+  { key: 'TED', label: 'TED 演講', icon: Sparkles },
+  { key: 'Technology', label: '3C 科技', icon: Cpu },
+  { key: 'Entertainment', label: '美語娛樂', icon: Mic2 },
   { key: 'Knowledge', label: '知識科普', icon: BookOpen },
-  { key: 'Technology', label: '科技前沿', icon: Cpu },
   { key: 'Business', label: '商業財經', icon: Building2 },
-  { key: 'World', label: '國際視野', icon: Globe },
-  { key: 'US', label: '美國焦點', icon: Landmark },
-  { key: 'Breaking', label: '焦點', icon: Flame },
   { key: 'Favorites', label: '收藏影片', icon: Star },
 ];
 
+export function normalizeCategory(category?: string, title: string = '', channelTitle: string = ''): NewsModalCategoryTab {
+  const cat = (category || '').trim();
+  const lowerTitle = (title || '').toLowerCase();
+  const lowerCh = (channelTitle || '').toLowerCase();
+
+  if (cat === 'TED' || lowerCh.includes('ted') || lowerTitle.includes('ted talk') || lowerTitle.includes('ted-ed')) {
+    return 'TED';
+  }
+  if (
+    cat === 'Entertainment' ||
+    cat === 'TalkShow' ||
+    lowerCh.includes('fallon') ||
+    lowerCh.includes('kimmel') ||
+    lowerCh.includes('colbert') ||
+    lowerCh.includes('meyers') ||
+    lowerCh.includes('daily show') ||
+    lowerCh.includes('coco')
+  ) {
+    return 'Entertainment';
+  }
+  if (
+    cat === 'Technology' ||
+    lowerCh.includes('the verge') ||
+    lowerCh.includes('marques brownlee') ||
+    lowerCh.includes('mkbhd') ||
+    lowerCh.includes('cnet') ||
+    lowerCh.includes('wired') ||
+    lowerTitle.includes('nvidia') ||
+    lowerTitle.includes('artificial intelligence') ||
+    lowerTitle.includes('ai data center') ||
+    lowerTitle.includes('steve jobs') ||
+    lowerTitle.includes('chipmaker') ||
+    lowerTitle.includes('semiconductor') ||
+    lowerTitle.includes('internet was weeks away')
+  ) {
+    return 'Technology';
+  }
+  if (
+    cat === 'Knowledge' ||
+    lowerCh.includes('kurzgesagt') ||
+    lowerCh.includes('crashcourse') ||
+    lowerCh.includes('national geographic') ||
+    lowerCh.includes('veritasium') ||
+    lowerCh.includes('learning english') ||
+    lowerCh.includes('vox')
+  ) {
+    return 'Knowledge';
+  }
+  if (
+    cat === 'Business' ||
+    lowerCh.includes('bloomberg') ||
+    lowerCh.includes('cnbc') ||
+    lowerCh.includes('wall street journal') ||
+    lowerCh.includes('financial times')
+  ) {
+    return 'Business';
+  }
+  if (
+    cat === 'News' ||
+    cat === 'World' ||
+    cat === 'US' ||
+    cat === 'Breaking'
+  ) {
+    return 'News';
+  }
+  return 'News';
+}
+
 export const CATEGORY_NAMES_ZH: Record<string, string> = {
   ALL: '全部',
-  TalkShow: '美語脫口秀',
+  News: '即時新聞',
+  TED: 'TED 演講',
+  Technology: '3C 科技',
+  Entertainment: '美語娛樂',
   Knowledge: '知識科普',
-  Technology: '科技創新',
   Business: '商業財經',
-  World: '全球國際',
-  US: '美國時事',
-  Breaking: '焦點快訊',
+  TalkShow: '美語娛樂',
+  World: '即時新聞',
+  US: '即時新聞',
+  Breaking: '即時新聞',
 };
 
 async function translateEnToZh(text: string): Promise<string> {
@@ -93,6 +174,8 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
   const [error, setError] = useState<string | null>(null);
   const [cached, setCached] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [devToastMessage, setDevToastMessage] = useState<string | null>(null);
+  const devClicksRef = useRef<number[]>([]);
 
   useEffect(() => {
     if (initialCategory) {
@@ -177,16 +260,37 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
       }
 
       if (data && data.success && Array.isArray(data.videos) && data.videos.length > 0) {
-        // Filter out live streams and ensure only videos with closed captions are shown
+        // Filter out live streams, raw footage, and non-English speech videos
         const validVideos = data.videos.filter((v: YouTubeNewsVideo) => {
           if (!v || !v.videoId) return false;
           if (/^(?:live:|\(live\)|\[live\]|\|\s*live)/i.test(v.title || '')) return false;
           if (/\b(?:live stream|streaming live|watch live)\b/i.test(v.title || '')) return false;
+          if (/^(?:raw:|raw video:|no comment)/i.test(v.title || '')) return false;
+          if (/\b(?:auf deutsch|en español|en français|in russian|in french|in german|in spanish|in hindi|in arabic)\b/i.test(v.title || '')) return false;
+          if (/[\u0400-\u04FF\u0600-\u06FF\u0900-\u097F]/.test(v.title || '')) return false;
           return v.hasCaptions !== false;
         });
 
+        // Ensure every learning category (TED, 3C Technology, Knowledge, Business, Entertainment) has baseline representation
+        const combined = [...validVideos];
+        const existingIds = new Set(validVideos.map((v) => v.videoId));
+        const neededCategories: NewsModalCategoryTab[] = ['TED', 'Technology', 'Knowledge', 'Business', 'Entertainment'];
+        for (const cat of neededCategories) {
+          const inCat = combined.filter((v) => normalizeCategory(v.category, v.title, v.channelTitle) === cat);
+          if (inCat.length < 6) {
+            const seeds = EVERGREEN_SEED_VIDEOS.filter(
+              (s) => normalizeCategory(s.category, s.title, s.channelTitle) === cat && !existingIds.has(s.videoId)
+            );
+            for (const s of seeds) {
+              if (combined.filter((v) => normalizeCategory(v.category, v.title, v.channelTitle) === cat).length >= 8) break;
+              existingIds.add(s.videoId);
+              combined.push(s);
+            }
+          }
+        }
+
         // Strict sort: newest first (由最新開始排)
-        const sorted = [...validVideos].sort(
+        const sorted = combined.sort(
           (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
         );
         setVideos(sorted);
@@ -239,18 +343,69 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
           }
         }
       } else {
-        const msg = data?.message || '最近 7 天暫時找不到可用英文字幕的新聞影片';
-        setError(msg);
+        // Fallback to EVERGREEN_SEED_VIDEOS so user is never faced with an empty screen
+        setVideos(EVERGREEN_SEED_VIDEOS);
+        setCached(true);
+        setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       }
     } catch (err: any) {
       console.warn('[YouTubeNewsModal] Unexpected error during news discovery:', err);
-      setError('搜尋暫時逾時，請點擊「重新搜尋」再試一次');
+      // Fallback to EVERGREEN_SEED_VIDEOS so the user still has full access to TED, Technology, etc.
+      setVideos(EVERGREEN_SEED_VIDEOS);
+      setCached(true);
+      setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Fetch when opened if empty
+  // Local blacklist for videos reported without captions
+  const [localBlacklist, setLocalBlacklist] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('bilingo_no_caption_blacklist');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Reload blacklist whenever modal opens
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        const stored = localStorage.getItem('bilingo_no_caption_blacklist');
+        if (stored) {
+          setLocalBlacklist(new Set(JSON.parse(stored)));
+        }
+      } catch (_) {}
+    }
+  }, [isOpen]);
+
+  
+  // Developer Easter Egg: 連續點擊「當日精選」狀態標籤 5 次觸發強制重新搜尋
+  const handleStatusBadgeClick = () => {
+    const now = Date.now();
+    devClicksRef.current = devClicksRef.current.filter((t) => now - t < 3000);
+    devClicksRef.current.push(now);
+
+    if (devClicksRef.current.length >= 5) {
+      devClicksRef.current = [];
+      setDevToastMessage('🔓 開發者權限已解鎖：正在強制重新向 YouTube 檢索最新精選清單...');
+      setTimeout(() => setDevToastMessage(null), 4000);
+      fetchNews(true);
+    } else {
+      const remaining = 5 - devClicksRef.current.length;
+      if (remaining <= 3) {
+        setDevToastMessage();
+        setTimeout(() => setDevToastMessage(null), 1500);
+      } else {
+        setDevToastMessage('已是今日最新精選影片（全體共用雲端快照，每日自動更新）');
+        setTimeout(() => setDevToastMessage(null), 2000);
+      }
+    }
+  };
+
+// Fetch when opened if empty
   useEffect(() => {
     if (isOpen && videos.length === 0 && !isLoading) {
       fetchNews(false);
@@ -269,11 +424,59 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Valid videos with captions
+  const validCaptionedVideos = useMemo(() => {
+    return videos.filter((v) => {
+      if (!v || !v.videoId) return false;
+      if (localBlacklist.has(v.videoId)) return false;
+      if (v.hasCaptions === false) return false;
+
+      const lower = (v.title || '').toLowerCase();
+      if (lower.startsWith('raw:') || lower.startsWith('raw video:') || lower.includes('no comment') || lower.includes('raw footage')) return false;
+      if (/\b(?:auf deutsch|en español|en français|in russian|in french|in german|in spanish|in hindi|in arabic)\b/i.test(lower)) return false;
+      if (/[\u0400-\u04FF\u0600-\u06FF\u0900-\u097F]/.test(v.title || '')) return false;
+
+      return true;
+    });
+  }, [videos, localBlacklist]);
+
+  // Video count map per category
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      ALL: validCaptionedVideos.length,
+      Favorites: savedUrls?.length ?? 0,
+    };
+    for (const v of validCaptionedVideos) {
+      const norm = normalizeCategory(v.category, v.title, v.channelTitle);
+      counts[norm] = (counts[norm] || 0) + 1;
+    }
+    const standardCategories: NewsModalCategoryTab[] = ['TED', 'Technology', 'Knowledge', 'Business', 'Entertainment'];
+    for (const cat of standardCategories) {
+      if (!counts[cat] || counts[cat] === 0) {
+        const seedCount = EVERGREEN_SEED_VIDEOS.filter(
+          (v) => normalizeCategory(v.category, v.title, v.channelTitle) === cat
+        ).length;
+        if (seedCount > 0) {
+          counts[cat] = seedCount;
+        }
+      }
+    }
+    return counts;
+  }, [validCaptionedVideos, savedUrls]);
+
   // Filtered videos based on category tab
   const filteredVideos = useMemo(() => {
-    if (selectedCategory === 'ALL') return videos;
-    return videos.filter((v) => v.category === selectedCategory);
-  }, [videos, selectedCategory]);
+    if (selectedCategory === 'ALL') return validCaptionedVideos;
+    if (selectedCategory === 'Favorites') return [];
+    const directMatches = validCaptionedVideos.filter(
+      (v) => normalizeCategory(v.category, v.title, v.channelTitle) === selectedCategory
+    );
+    if (directMatches.length > 0) return directMatches;
+    // Guaranteed fallback from evergreen seeds so user never gets an empty category
+    return EVERGREEN_SEED_VIDEOS.filter(
+      (v) => normalizeCategory(v.category, v.title, v.channelTitle) === selectedCategory
+    );
+  }, [validCaptionedVideos, selectedCategory]);
 
   if (!isOpen) return null;
 
@@ -336,12 +539,18 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
                 <h3 id="youtube-news-modal-title" className="text-base sm:text-lg font-bold truncate">
                   美語精選頻道
                 </h3>
-                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
-                  完整英文字幕 • 雙語對齊
-                </span>
+                <button
+                  type="button"
+                  onClick={handleStatusBadgeClick}
+                  title="點擊查看狀態（連續點擊 5 次解鎖開發者強制重新整理）"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap hover:bg-emerald-500/20 transition-all cursor-pointer active:scale-95 select-none"
+                >
+                  <Sparkles className="w-3 h-3 text-emerald-400" />
+                  <span>當日精選清單 • 雙語對齊</span>
+                </button>
               </div>
               <p className={`text-xs truncate ${secondaryTextClass}`}>
-                時事外電（7天即時）與美語脫口秀（1年精選）• 點擊即刻啟動雙語學習
+                美語精選頻道 • 100% 官方英文字幕 • 點擊即刻啟動雙語學習
                 {lastUpdated && ` (更新於 ${lastUpdated}${cached ? '，快取模式' : ''})`}
               </p>
             </div>
@@ -353,7 +562,7 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
               id="youtube-news-refresh-btn"
               onClick={() => fetchNews(true)}
               disabled={isLoading}
-              title="強制重新搜尋最新一週影片"
+              title="重新整理精選影片清單"
               aria-label="重新搜尋"
               className={`p-2 rounded-xl border border-transparent transition-all cursor-pointer ${
                 isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-500/10'
@@ -379,7 +588,7 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
           {CATEGORY_TABS.map((tab) => {
             const Icon = tab.icon;
             const isSelected = selectedCategory === tab.key;
-            const count = tab.key === 'Favorites' ? (savedUrls?.length ?? 0) : null;
+            const count = categoryCounts[tab.key] ?? null;
             return (
               <button
                 key={tab.key}
@@ -554,12 +763,10 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
               <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
               <div className="space-y-1">
                 <p className="text-sm font-semibold">
-                  {selectedCategory === 'TalkShow' ? '正在搜尋最近 1 年美語脫口秀精選...' : '正在搜尋美語精選新聞與脫口秀...'}
+                  正在搜尋美語精選頻道與字幕清單...
                 </p>
                 <p className={`text-xs ${secondaryTextClass}`}>
-                  {selectedCategory === 'TalkShow'
-                    ? '依序檢索 Fallon, Kimmel, Colbert, Seth Meyers, Daily Show, Conan 等熱門脫口秀經典對話'
-                    : '檢索權威外電與熱門美語脫口秀，並確認英文字幕雙語對齊'}
+                  檢索權威外電、TED 演講、科技與熱門脫口秀，並經由字幕探針確認具備完整雙語字幕
                 </p>
               </div>
             </div>
@@ -574,7 +781,7 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
               <div className="space-y-1 max-w-md mx-auto">
                 <h4 className="text-sm font-semibold">{error}</h4>
                 <p className={`text-xs ${secondaryTextClass}`}>
-                  新聞影片嚴格篩選最近 7 天即時發布，美語脫口秀則精選 1 年內經典訪談對話，皆確認具備英文字幕。
+                  嚴格篩選官方與權威頻道影片，並確認具備完整英文字幕，點擊即可暢享雙語對齊學習。
                 </p>
               </div>
               <button
@@ -593,7 +800,7 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
           {!isLoading && !error && filteredVideos.length === 0 && (
             <div className={`p-8 rounded-2xl border text-center space-y-3 ${cardBgClass}`}>
               <p className="text-sm font-semibold">
-                {selectedCategory === 'TalkShow' ? '美語脫口秀在最近 1 年暫無影片' : '此分類在最近 7 天暫無影片'}
+                此分類目前暫無影片
               </p>
               <button
                 type="button"
@@ -666,7 +873,7 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
                             : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
                         }`}
                       >
-                        {CATEGORY_NAMES_ZH[video.category] || video.category}
+                        {CATEGORY_NAMES_ZH[normalizeCategory(video.category, video.title, video.channelTitle)] || video.category}
                       </span>
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                         <ShieldCheck className="w-3 h-3" />
@@ -724,7 +931,15 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
             關閉
           </button>
         </div>
-      </div>
+      
+        {/* 開發者權限 / 狀態 Toast 提示 */}
+        {devToastMessage && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-slate-900/95 text-emerald-400 border border-emerald-500/40 shadow-2xl text-xs sm:text-sm font-medium flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200 pointer-events-none">
+            <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{devToastMessage}</span>
+          </div>
+        )}
+</div>
     </div>
   );
 };

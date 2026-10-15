@@ -144,6 +144,20 @@ export function useYouTubeSubtitles(
       setDuration(videoDuration);
 
       if (rawSegments.length === 0) {
+        try {
+          fetch(getApiUrl('/api/youtube/report-no-caption'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videoId: targetVideoId }),
+          }).catch(() => {});
+          const stored = localStorage.getItem('bilingo_no_caption_blacklist');
+          const list = stored ? JSON.parse(stored) : [];
+          if (!list.includes(targetVideoId)) {
+            list.push(targetVideoId);
+            localStorage.setItem('bilingo_no_caption_blacklist', JSON.stringify(list));
+          }
+        } catch (_) {}
+
         setError({
           code: 'CAPTIONS_NOT_AVAILABLE',
           message: '此影片未提供英文字幕 (English captions are not available)',
@@ -394,6 +408,11 @@ export function useYouTubeSubtitles(
       if (currentMs >= prev.startMs && currentMs - prev.endMs <= 1500) {
         foundIndex = low - 1;
       }
+    }
+
+    // At the beginning of playback or video loop replay (before or during first sentence)
+    if (foundIndex === -1 && low === 0 && list.length > 0 && currentMs <= (list[0].endMs || 0) + 1000) {
+      foundIndex = 0;
     }
 
     if (foundIndex !== -1 && foundIndex !== activeSubtitleIndex) {

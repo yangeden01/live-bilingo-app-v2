@@ -39,9 +39,18 @@ import {
   RotateCcw,
   SlidersHorizontal,
   Play,
+  Pause,
+  Crown,
+  Download,
+  FileText,
+  BookMarked,
+  Radio,
+  GraduationCap,
 } from 'lucide-react';
 import { ReadingModeAndFontToolbar } from './ReadingModeAndFontToolbar';
 import { YouTubeNewsDiscoveryModal } from './YouTubeNewsDiscoveryModal';
+import { NotesExportModal } from './NotesExportModal';
+import { VocabularyNotebookModal } from './VocabularyNotebookModal';
 
 interface Props {
   onOpenDictionary?: (word?: string) => void;
@@ -97,23 +106,8 @@ const getSavedYouTubeHistory = (): YouTubeHistoryItem[] => {
   ];
 };
 
-// Helper to retrieve saved progress for a specific video ID
-const getSavedProgressForVideo = (vid: string): number => {
-  try {
-    const specific = getPersistentItem(`youtube_progress_${vid}`);
-    if (specific) {
-      const p = parseFloat(specific);
-      if (!isNaN(p) && p > 0) return p;
-    }
-    const lastVid = getPersistentItem('youtube_last_video_id');
-    if (lastVid === vid) {
-      const lastTime = getPersistentItem('youtube_last_time');
-      if (lastTime) {
-        const p = parseFloat(lastTime);
-        if (!isNaN(p) && p > 0) return p;
-      }
-    }
-  } catch (_) {}
+// Videos must always start from time zero (0:00) from the very beginning
+const getSavedProgressForVideo = (_vid: string): number => {
   return 0;
 };
 
@@ -172,6 +166,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
   });
 
   const currentTheme = effectiveTheme || (readingMode === 'paper' ? 'paper' : readingMode === 'light' ? 'light' : 'dark');
+  const isLightOrPaper = currentTheme === 'paper' || currentTheme === 'light';
 
   const cardBgClass =
     currentTheme === 'paper'
@@ -189,10 +184,10 @@ export const YouTubeBilingualView: React.FC<Props> = ({
 
   const testBtnClass =
     currentTheme === 'paper'
-      ? 'bg-[#EFE5CE] hover:bg-[#E5D9BE] active:bg-[#DBCFB3] text-emerald-800 border-[#CDB58A]'
+      ? 'bg-[#EFE5CE] hover:bg-[#E5D9BE] active:bg-[#DBCFB3] text-[#18181B] border-[#C0AA7F]'
       : currentTheme === 'light'
-      ? 'bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-800 border-emerald-200'
-      : 'bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/50 shadow-sm';
+      ? 'bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-[#09090B] border-slate-300'
+      : 'bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white border border-emerald-500/30 hover:border-emerald-500/50 shadow-sm';
 
   const statusCardBgClass =
     currentTheme === 'paper'
@@ -221,14 +216,8 @@ export const YouTubeBilingualView: React.FC<Props> = ({
       : currentTheme === 'light'
       ? 'bg-slate-100'
       : 'bg-slate-950';
-  const [initialTimeSeconds, setInitialTimeSeconds] = useState<number>(() => {
-    const initialVid = getPersistentItem('youtube_last_video_id') || VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.id;
-    return getSavedProgressForVideo(initialVid);
-  });
-  const [currentTimeSeconds, setCurrentTimeSeconds] = useState<number>(() => {
-    const initialVid = getPersistentItem('youtube_last_video_id') || VERIFIED_YOUTUBE_CAPTION_TEST_VIDEO.id;
-    return getSavedProgressForVideo(initialVid);
-  });
+  const [initialTimeSeconds, setInitialTimeSeconds] = useState<number>(0);
+  const [currentTimeSeconds, setCurrentTimeSeconds] = useState<number>(0);
 
   const {
     subtitles,
@@ -252,17 +241,58 @@ export const YouTubeBilingualView: React.FC<Props> = ({
   const [urlHistory, setUrlHistory] = useState<YouTubeHistoryItem[]>(() => getSavedYouTubeHistory());
   const [showHistoryDropdown, setShowHistoryDropdown] = useState<boolean>(false);
   const [showNewsModal, setShowNewsModal] = useState<boolean>(false);
+  const [showVocabModal, setShowVocabModal] = useState<boolean>(false);
+  const [showNotesExportModal, setShowNotesExportModal] = useState<boolean>(false);
   const historyDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  // Vocabulary words count synced with persistent storage
+  const [savedWordsCount, setSavedWordsCount] = useState<number>(() => {
+    try {
+      const saved = getPersistentItem('saved_dict_words');
+      return saved ? JSON.parse(saved).length : 0;
+    } catch (e) {
+      return 0;
+    }
+  });
+
+  useEffect(() => {
+    const syncSavedWordsCount = () => {
+      try {
+        const saved = getPersistentItem('saved_dict_words');
+        setSavedWordsCount(saved ? JSON.parse(saved).length : 0);
+      } catch (e) {
+        setSavedWordsCount(0);
+      }
+    };
+    syncSavedWordsCount();
+    window.addEventListener('storage', syncSavedWordsCount);
+    window.addEventListener('focus', syncSavedWordsCount);
+    return () => {
+      window.removeEventListener('storage', syncSavedWordsCount);
+      window.removeEventListener('focus', syncSavedWordsCount);
+    };
+  }, []);
 
   // Saved / Favorite URLs state
   const [savedUrls, setSavedUrls] = useState<YouTubeSavedUrl[]>(() => getSavedYouTubeUrls());
   const [saveToast, setSaveToast] = useState<string | null>(null);
+
+  // Option C Monetization: VIP Ad-Free Status & Rewarded Unlock Handlers
+
+  const handleExportNotes = () => {
+    if (subtitles.length === 0) {
+      setUrlInputError("尚無可供匯出的字幕內容，請先播放影片");
+      return;
+    }
+    setShowNotesExportModal(true);
+  };
 
   const playerRef = useRef<YouTubePlayerRef | null>(null);
   const subtitleContainerRef = useRef<HTMLDivElement | null>(null);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const lastSavedTimeRef = useRef<number>(0);
   const isLoopSeekingRef = useRef<boolean>(false);
+  const handleLoopReplayRef = useRef<() => void>(() => {});
 
   // Close history dropdown when clicking outside
   useEffect(() => {
@@ -282,12 +312,12 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     };
   }, [showHistoryDropdown]);
 
-  // Update initial time and current time when active video ID changes
+  // Always reset initial time and current time to 0:00 when active video ID changes
   useEffect(() => {
     if (!activeVideoId) return;
-    const saved = getSavedProgressForVideo(activeVideoId);
-    setInitialTimeSeconds(saved);
-    setCurrentTimeSeconds(saved);
+    setInitialTimeSeconds(0);
+    setCurrentTimeSeconds(0);
+    lastSavedTimeRef.current = 0;
   }, [activeVideoId]);
 
   // Persist URL input so whatever the user typed or pasted is preserved across modes
@@ -299,6 +329,13 @@ export const YouTubeBilingualView: React.FC<Props> = ({
 
   // Throttled time updater that persists playback progress and handles segment repeating loop
   const handleTimeUpdate = useCallback((secs: number) => {
+    // Detect video rewind / loop restart:
+    // If playback time drops from near the end to the beginning (e.g. was > 5s and now < 1.5s)
+    if (isVideoLoopEnabled && lastSavedTimeRef.current > 5 && secs < 1.5) {
+      handleLoopReplayRef.current();
+      return;
+    }
+
     setCurrentTimeSeconds(secs);
 
     // Segment repeat looping logic:
@@ -510,47 +547,93 @@ export const YouTubeBilingualView: React.FC<Props> = ({
 
   // Unified loader when a video is selected (via news modal, saved urls, history, or input)
   const startLoadingVideoWithAutoPlay = useCallback((targetVid: string, targetUrl: string, targetTitle?: string) => {
+    // If switching from an existing video to a different one, check interstitial ad frequency cap
+    if (activeVideoId && activeVideoId !== targetVid) {
+          }
     setUrlInput(targetUrl);
     setUrlInputError(null);
     setIsAutoPlayPending(true);
     setIsProgressActive(true);
-    setActiveVideoId(targetVid);
     setPersistentItem('youtube_last_url', targetUrl);
     setPersistentItem('youtube_last_video_id', targetVid);
     saveUrlToHistory(targetUrl, targetVid, targetTitle);
     setShowNewsModal(false);
     setShowHistoryDropdown(false);
-  }, [saveUrlToHistory]);
 
-  // When subtitles are ready and autoPlay was requested, automatically play video, scroll to reading mode, and start live subtitles
+    // 1. Immediately auto-adjust to best reading view (video 置頂)
+    scrollToYouTubeReadingMode();
+    window.dispatchEvent(new CustomEvent('scroll-to-youtube-reading'));
+    vibrateDetentTick();
+    setTimeout(scrollToYouTubeReadingMode, 150);
+    setTimeout(scrollToYouTubeReadingMode, 450);
+    setTimeout(scrollToYouTubeReadingMode, 850);
+
+    // 2. Reset subtitle stream and scroll to top
+    setAutoScroll(true);
+    setIsUserScrolledAway(false);
+    setActiveSubtitleRelativePos(null);
+    if (subtitleContainerRef.current) {
+      subtitleContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // 3. Immediately start video playback
+    const startPlayback = () => {
+      try {
+        if (playerRef.current) {
+          playerRef.current.play();
+          setPlayerState('playing');
+          onPlaybackStateChange?.('playing');
+        }
+      } catch (_) {}
+    };
+
+    if (activeVideoId === targetVid) {
+      try {
+        playerRef.current?.seekTo(0);
+        startPlayback();
+        handleLoopReplayRef.current();
+      } catch (_) {}
+    } else {
+      setPersistentItem('youtube_last_time', '0');
+      setPersistentItem(`youtube_progress_${targetVid}`, '0');
+      lastSavedTimeRef.current = 0;
+      setCurrentTimeSeconds(0);
+      setActiveVideoId(targetVid);
+      startPlayback();
+      setTimeout(startPlayback, 200);
+      setTimeout(startPlayback, 600);
+    }
+  }, [saveUrlToHistory, activeVideoId, scrollToYouTubeReadingMode, onPlaybackStateChange]);
+
+  // When subtitles are ready or autoPlay was requested, automatically play video, scroll to reading mode, and start live subtitles
   useEffect(() => {
     if (!isAutoPlayPending) return;
+
+    // Resilient play attempts
+    const startPlayback = () => {
+      try {
+        if (playerRef.current) {
+          playerRef.current.play();
+          setPlayerState('playing');
+          onPlaybackStateChange?.('playing');
+        }
+      } catch (_) {}
+    };
+
+    startPlayback();
+    const t1 = setTimeout(startPlayback, 200);
+    const t2 = setTimeout(startPlayback, 550);
+    const t3 = setTimeout(startPlayback, 1000);
+
+    const scrollTimer = setTimeout(() => {
+      scrollToYouTubeReadingMode();
+      window.dispatchEvent(new CustomEvent('scroll-to-youtube-reading'));
+      vibrateDetentTick();
+    }, 250);
 
     if (status === 'ready' && subtitles.length > 0) {
       setIsAutoPlayPending(false);
 
-      // 1. Automatically start video playback with resilient retry intervals
-      const startPlayback = () => {
-        try {
-          playerRef.current?.play();
-          setPlayerState('playing');
-          onPlaybackStateChange?.('playing');
-        } catch (_) {}
-      };
-
-      startPlayback();
-      const t1 = setTimeout(startPlayback, 200);
-      const t2 = setTimeout(startPlayback, 550);
-      const t3 = setTimeout(startPlayback, 1000);
-
-      // 2. Automatically glide screen into reading mode (video placed directly under header)
-      const scrollTimer = setTimeout(() => {
-        scrollToYouTubeReadingMode();
-        window.dispatchEvent(new CustomEvent('scroll-to-youtube-reading'));
-        vibrateDetentTick();
-      }, 350);
-
-      // 3. Automatically execute synchronized bilingual subtitles
       setAutoScroll(true);
       setIsUserScrolledAway(false);
       setActiveSubtitleRelativePos(null);
@@ -574,6 +657,13 @@ export const YouTubeBilingualView: React.FC<Props> = ({
       setIsAutoPlayPending(false);
       setIsProgressActive(false);
     }
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(scrollTimer);
+    };
   }, [status, isAutoPlayPending, subtitles.length, onPlaybackStateChange, scrollToYouTubeReadingMode]);
 
   // Select a saved URL from the Saved URLs modal
@@ -645,6 +735,60 @@ export const YouTubeBilingualView: React.FC<Props> = ({
       startLoadingVideoWithAutoPlay(id, urlInput.trim(), title);
     }
   };
+
+  // Merged play action & subtitle readiness status handler:
+  // Controls play/pause, shows subtitle progress, and automatically aligns screen to best reading view (video 置頂)
+  const handleMergedPlayAndStatusClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+
+    const inputVid = urlInput.trim() ? extractYouTubeVideoId(urlInput.trim()) : null;
+    const isNew = Boolean(inputVid && inputVid !== activeVideoId);
+
+    // 1. If user typed a new URL or different URL, load it and auto-glide to reading view
+    if (isNew) {
+      handleLoadVideo();
+      setTimeout(() => {
+        scrollToYouTubeReadingMode();
+        window.dispatchEvent(new CustomEvent('scroll-to-youtube-reading'));
+        vibrateDetentTick();
+      }, 300);
+      return;
+    }
+
+    // 2. If video is currently loaded
+    if (activeVideoId) {
+      if (playerState === 'playing') {
+        playerRef.current?.pause();
+        setPlayerState('paused');
+        onPlaybackStateChange?.('paused');
+      } else {
+        // If video had ended or was near the end, rewind to start and reset subtitles
+        const currentT = playerRef.current?.getCurrentTime() || currentTimeSeconds;
+        const totalDur = playerRef.current?.getDuration() || duration;
+        if (totalDur > 0 && currentT >= totalDur - 1) {
+          playerRef.current?.seekTo(0);
+          handleLoopReplayRef.current();
+        }
+        // Start playing
+        playerRef.current?.play();
+        setPlayerState('playing');
+        onPlaybackStateChange?.('playing');
+        // 一旦按下播放，螢幕就自動調整到最佳閱讀畫面（video 置頂）
+        scrollToYouTubeReadingMode();
+        window.dispatchEvent(new CustomEvent('scroll-to-youtube-reading'));
+        vibrateDetentTick();
+      }
+      return;
+    }
+
+    // 3. Fallback: load video & align
+    handleLoadVideo();
+    setTimeout(() => {
+      scrollToYouTubeReadingMode();
+      window.dispatchEvent(new CustomEvent('scroll-to-youtube-reading'));
+      vibrateDetentTick();
+    }, 300);
+  }, [urlInput, activeVideoId, playerState, handleLoadVideo, scrollToYouTubeReadingMode, onPlaybackStateChange]);
 
   // Select a URL from the history dropdown
   const handleSelectHistoryItem = (item: YouTubeHistoryItem) => {
@@ -755,17 +899,24 @@ export const YouTubeBilingualView: React.FC<Props> = ({
 
   // Calculate effective active index considering videoSyncOffset
   const effectiveActiveIndex = useMemo(() => {
-    if (activeSubtitleIndex < 0 || subtitles.length === 0) return -1;
+    if (subtitles.length === 0) return -1;
+    if (activeSubtitleIndex < 0) {
+      if (currentTimeSeconds <= 3) return 0;
+      return -1;
+    }
     const targetIdx = activeSubtitleIndex - videoSyncOffset;
     return Math.max(0, Math.min(subtitles.length - 1, targetIdx));
-  }, [activeSubtitleIndex, videoSyncOffset, subtitles.length]);
+  }, [activeSubtitleIndex, videoSyncOffset, subtitles.length, currentTimeSeconds]);
 
   const effectiveActiveId = useMemo(() => {
     if (effectiveActiveIndex >= 0 && effectiveActiveIndex < subtitles.length) {
       return subtitles[effectiveActiveIndex].id;
     }
+    if (currentTimeSeconds <= 3 && subtitles.length > 0) {
+      return subtitles[0].id;
+    }
     return activeSubtitleId;
-  }, [effectiveActiveIndex, subtitles, activeSubtitleId]);
+  }, [effectiveActiveIndex, subtitles, activeSubtitleId, currentTimeSeconds]);
 
   // Ahead Subtitles (for pre-reading when voice is delayed by videoSyncOffset > 0)
   const aheadSubtitles = useMemo(() => {
@@ -834,6 +985,11 @@ export const YouTubeBilingualView: React.FC<Props> = ({
   useEffect(() => {
     const container = subtitleContainerRef.current;
 
+    let touchStartY = 0;
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0]?.clientY || 0;
+    };
+
     const handleUserScrollOrTouch = () => {
       if (!isProgrammaticScrollRef.current) {
         setIsUserScrolledAway(true);
@@ -841,18 +997,40 @@ export const YouTubeBilingualView: React.FC<Props> = ({
       scheduleCheck();
     };
 
+    const handleTouchMove = (e: TouchEvent) => {
+      handleUserScrollOrTouch();
+      if (container && container.scrollTop <= 0) {
+        const currentY = e.touches[0]?.clientY || 0;
+        const delta = currentY - touchStartY;
+        // If user pulls down while already at the top of subtitle stream, scroll window up to reveal video & controls
+        if (delta > 8 && window.scrollY > 0) {
+          window.scrollBy({ top: -delta * 0.85, behavior: 'auto' });
+        }
+      }
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      handleUserScrollOrTouch();
+      // If user scrolls up while at top of subtitle stream, propagate scroll to the window to view top controls & video
+      if (container && container.scrollTop <= 0 && e.deltaY < 0 && window.scrollY > 0) {
+        window.scrollBy({ top: e.deltaY, behavior: 'auto' });
+      }
+    };
+
+    container?.addEventListener('touchstart', handleTouchStart, { passive: true });
     container?.addEventListener('scroll', handleUserScrollOrTouch, { passive: true });
-    container?.addEventListener('wheel', handleUserScrollOrTouch, { passive: true });
-    container?.addEventListener('touchmove', handleUserScrollOrTouch, { passive: true });
+    container?.addEventListener('wheel', handleWheel, { passive: true });
+    container?.addEventListener('touchmove', handleTouchMove, { passive: true });
     window.addEventListener('scroll', handleUserScrollOrTouch, { passive: true });
     window.addEventListener('resize', scheduleCheck, { passive: true });
 
     scheduleCheck();
 
     return () => {
+      container?.removeEventListener('touchstart', handleTouchStart);
       container?.removeEventListener('scroll', handleUserScrollOrTouch);
-      container?.removeEventListener('wheel', handleUserScrollOrTouch);
-      container?.removeEventListener('touchmove', handleUserScrollOrTouch);
+      container?.removeEventListener('wheel', handleWheel);
+      container?.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('scroll', handleUserScrollOrTouch);
       window.removeEventListener('resize', scheduleCheck);
       if (rafCheckId.current) cancelAnimationFrame(rafCheckId.current);
@@ -871,6 +1049,20 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     const container = subtitleContainerRef.current;
     const cardEl = document.getElementById(`yt-card-${targetId}`);
     if (!cardEl) return;
+
+    // If it's the very first subtitle paragraph (index 0), scroll smoothly directly to top: 0
+    if (effectiveActiveIndex === 0 || (subtitles.length > 0 && targetId === subtitles[0].id)) {
+      isProgrammaticScrollRef.current = true;
+      container.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      });
+      const timer = setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+        scheduleCheck();
+      }, 450);
+      return () => clearTimeout(timer);
+    }
 
     // Calculate position of the active card relative to the subtitle container
     const containerRect = container.getBoundingClientRect();
@@ -893,7 +1085,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     }, 450);
 
     return () => clearTimeout(timer);
-  }, [effectiveActiveId, activeSubtitleId, autoScroll, isUserScrolledAway, scheduleCheck]);
+  }, [effectiveActiveId, activeSubtitleId, effectiveActiveIndex, subtitles, autoScroll, isUserScrolledAway, scheduleCheck]);
 
   // Handler to return to currently active subtitle segment
   const handleReturnToLiveSubtitle = useCallback(() => {
@@ -940,6 +1132,36 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     }, 550);
   }, [effectiveActiveId, activeSubtitleId, subtitles, scheduleCheck]);
 
+  // Handler when loop playback replays video from start:
+  // Reset subtitle paragraphs back to the very front, corresponding with the replaying video
+  const handleLoopReplay = useCallback(() => {
+    // 1. Reset saved progress and current time back to 0
+    if (activeVideoId) {
+      setPersistentItem('youtube_last_time', '0');
+      setPersistentItem(`youtube_progress_${activeVideoId}`, '0');
+    }
+    lastSavedTimeRef.current = 0;
+    setCurrentTimeSeconds(0);
+
+    // 2. Clear scrolled-away states and position indicator FAB
+    setIsUserScrolledAway(false);
+    setActiveSubtitleRelativePos(null);
+    setAutoScroll(true);
+
+    // 3. Subtitle paragraph returns to the very beginning (subtitles[0])
+    isProgrammaticScrollRef.current = true;
+    if (subtitleContainerRef.current) {
+      subtitleContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+      scheduleCheck();
+    }, 450);
+  }, [activeVideoId, scheduleCheck]);
+
+  handleLoopReplayRef.current = handleLoopReplay;
+
   const filteredSubtitles = subtitles;
 
   const inputParsedVideoId = urlInput.trim() ? extractYouTubeVideoId(urlInput.trim()) : null;
@@ -949,7 +1171,152 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     <div className="space-y-6">
       {/* Top YouTube URL Input & Search Bar */}
       <div className={`backdrop-blur-md rounded-2xl p-4 sm:p-5 border transition-colors duration-200 shadow-xl space-y-3 ${cardBgClass}`}>
-        <form onSubmit={handleLoadVideo} className="space-y-3">
+        <form onSubmit={handleLoadVideo} className="space-y-2.5">
+          {/* Row 1: Action Controls (美語精選頻道, 生字本 & 播放/字幕狀態) placed ABOVE URL input to prevent dropdown list from blocking them */}
+          {/* Row 1: Action Controls (精選, 生字本, 播放鍵) evenly distributed across the row */}
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 w-full min-w-0">
+            {/* Button 1: 精選 */}
+            <button
+              type="button"
+              id="youtube-live-news-btn"
+              onClick={() => setShowNewsModal(true)}
+              aria-label="精選"
+              title="探索權威美語頻道影片與收藏影片"
+              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 py-2 min-h-[38px] w-full rounded-xl text-xs sm:text-sm font-bold border shadow-sm transition-all cursor-pointer whitespace-nowrap active:scale-95 ${testBtnClass}`}
+            >
+              <Newspaper className={`w-4 h-4 shrink-0 ${isLightOrPaper ? 'text-emerald-700' : 'text-emerald-400'}`} />
+              <span className={`font-black tracking-tight truncate ${isLightOrPaper ? 'text-[#09090B]' : 'text-white'}`}>
+                精選
+              </span>
+              {savedUrls.length > 0 && (
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black flex items-center gap-0.5 border shrink-0 ${
+                  isLightOrPaper
+                    ? 'bg-amber-100/90 text-[#09090B] border-amber-300'
+                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                }`}>
+                  <Star className={`w-2.5 h-2.5 ${isLightOrPaper ? 'fill-amber-600 text-amber-600' : 'fill-amber-500 text-amber-500'}`} />
+                  {savedUrls.length}
+                </span>
+              )}
+            </button>
+
+            {/* Button 2: 生字本 (Vocabulary Notebook with Flashcard Quiz) */}
+            <button
+              type="button"
+              id="youtube-vocab-notebook-btn"
+              onClick={() => setShowVocabModal(true)}
+              aria-label="生字本"
+              title="查看已收藏生字並啟動測試卡翻牌測驗 (Flashcard Quiz)"
+              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 py-2 min-h-[38px] w-full rounded-xl text-xs sm:text-sm font-bold border shadow-sm transition-all cursor-pointer whitespace-nowrap active:scale-95 ${testBtnClass}`}
+            >
+              <BookMarked className={`w-4 h-4 shrink-0 ${isLightOrPaper ? 'text-indigo-700' : 'text-indigo-400'}`} />
+              <span className={`font-black tracking-tight truncate ${isLightOrPaper ? 'text-[#09090B]' : 'text-white'}`}>
+                生字本
+              </span>
+              {savedWordsCount > 0 && (
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black border shrink-0 ${
+                  isLightOrPaper
+                    ? 'bg-indigo-100/90 text-[#09090B] border-indigo-300'
+                    : 'bg-indigo-500/25 text-indigo-300 border-indigo-500/40'
+                }`}>
+                  {savedWordsCount}
+                </span>
+              )}
+            </button>
+
+            {/* Button 3: 播放鍵 (取消「字幕」兩字，只留百分比，圖示完整顯現) */}
+            <button
+              type="button"
+              id="youtube-caption-input-submit-btn"
+              onClick={handleMergedPlayAndStatusClick}
+              aria-label={
+                isNewInputUrl
+                  ? '載入播放此網址並進入最佳閱讀畫面'
+                  : playerState === 'playing'
+                  ? '暫停影音播放'
+                  : '播放影音並自動調整至最佳閱讀畫面'
+              }
+              title={
+                isNewInputUrl
+                  ? '立即載入並播放輸入的 YouTube 網址，螢幕將自動調整至最佳閱讀畫面（影片置頂）'
+                  : playerState === 'playing'
+                  ? '點擊暫停播放'
+                  : '點擊播放影音，螢幕將自動調整至最佳閱讀畫面（影片置頂）'
+              }
+              disabled={!urlInput.trim() && status === 'idle'}
+              className={`relative overflow-hidden flex items-center justify-center gap-1 sm:gap-1.5 px-2 py-2 min-h-[38px] w-full rounded-xl text-xs sm:text-sm font-bold border shadow-sm transition-all cursor-pointer whitespace-nowrap active:scale-95 select-none ${
+                isNewInputUrl
+                  ? isLightOrPaper
+                    ? 'bg-emerald-100 hover:bg-emerald-200 border-emerald-500 ring-2 ring-emerald-500/30 animate-pulse'
+                    : 'bg-gradient-to-r from-emerald-600/30 via-teal-600/30 to-emerald-500/40 border-emerald-500 ring-2 ring-emerald-500/30 hover:border-emerald-400 animate-pulse'
+                  : playerState === 'playing'
+                  ? currentTheme === 'paper'
+                    ? 'bg-[#EAE0CA] hover:bg-[#E2D4B9] border-[#C0AA7F]'
+                    : currentTheme === 'light'
+                    ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-400'
+                    : 'bg-gradient-to-r from-emerald-600/25 to-teal-600/25 border-emerald-400 ring-2 ring-emerald-500/25'
+                  : currentTheme === 'paper'
+                  ? 'bg-[#FAF4E8] hover:bg-[#F5ECD7] border-[#C0AA7F]'
+                  : currentTheme === 'light'
+                  ? 'bg-white hover:bg-slate-50 border-slate-300'
+                  : 'bg-slate-800 hover:bg-slate-700 border-emerald-500/40'
+              }`}
+            >
+              {/* Animated Background Progress Fill when active/loading or ready */}
+              {(isProgressActive || status === 'loading' || status === 'translating' || (status === 'ready' && !isNewInputUrl)) && (
+                <div
+                  className={`absolute inset-y-0 left-0 transition-all duration-300 ease-out pointer-events-none ${
+                    (progress.percent >= 100 || status === 'ready')
+                      ? isLightOrPaper
+                        ? 'bg-emerald-500/15'
+                        : 'bg-gradient-to-r from-emerald-600/30 via-emerald-500/40 to-teal-400/40'
+                      : isLightOrPaper
+                      ? 'bg-amber-500/15'
+                      : 'bg-gradient-to-r from-rose-500/25 via-amber-500/25 to-emerald-500/30'
+                  }`}
+                  style={{ width: `${isNewInputUrl ? 100 : Math.max(12, Math.min(100, progress.percent || (status === 'loading' ? 25 : 60)))}%` }}
+                />
+              )}
+
+              {/* Single Clear State: Play/Pause action + Subtitle % */}
+              <div className="relative z-10 flex items-center justify-center gap-1 sm:gap-1.5 min-w-0">
+                {isNewInputUrl ? (
+                  <Play className={`w-4 h-4 shrink-0 ${isLightOrPaper ? 'fill-emerald-700 text-emerald-700' : 'fill-emerald-400 text-emerald-400'}`} />
+                ) : playerState === 'playing' ? (
+                  <Pause className={`w-4 h-4 shrink-0 ${isLightOrPaper ? 'fill-amber-700 text-amber-700' : 'fill-amber-400 text-amber-400'}`} />
+                ) : (
+                  <Play className={`w-4 h-4 shrink-0 ml-0.5 ${isLightOrPaper ? 'fill-emerald-700 text-emerald-700' : 'fill-emerald-400 text-emerald-400'}`} />
+                )}
+                <span className={`font-black tracking-tight truncate ${isLightOrPaper ? 'text-[#09090B]' : 'text-white'}`}>
+                  {isNewInputUrl ? '播放' : playerState === 'playing' ? '暫停' : '播放'}
+                </span>
+
+                {/* Subtitle Progress Badge: Only percentage without 字幕 */}
+                {(status === 'loading' || status === 'translating' || (status === 'ready' && !isNewInputUrl)) && (
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black border shrink-0 flex items-center gap-0.5 ${
+                    status === 'loading' || status === 'translating'
+                      ? currentTheme === 'paper'
+                        ? 'bg-[#E4D5B8] text-[#18181B] border-[#C0AA7F]'
+                        : currentTheme === 'light'
+                        ? 'bg-emerald-100 text-[#09090B] border-emerald-400'
+                        : 'bg-emerald-950/80 text-emerald-200 border-emerald-500/40'
+                      : currentTheme === 'paper'
+                      ? 'bg-[#E4D5B8] text-[#18181B] border-[#C0AA7F]'
+                      : currentTheme === 'light'
+                      ? 'bg-emerald-100 text-[#09090B] border-emerald-400'
+                      : 'bg-emerald-950/80 text-emerald-200 border-emerald-500/40'
+                  }`}>
+                    {(status === 'loading' || status === 'translating') && (
+                      <Loader2 className="w-2.5 h-2.5 animate-spin inline" />
+                    )}
+                    {status === 'ready' ? '100%' : `${progress.percent || (status === 'loading' ? 25 : 60)}%`}
+                  </span>
+                )}
+              </div>
+            </button>
+          </div>
+
+          {/* Row 2: Star Icon Button + YouTube URL Input & History Dropdown */}
           <div className="flex items-center gap-2">
             {/* Star Icon Button for saving URL - placed BEFORE input */}
             <button
@@ -1001,45 +1368,29 @@ export const YouTubeBilingualView: React.FC<Props> = ({
               }}
               placeholder="貼上 YouTube 影片或直播網址 (例如: watch?v=..., youtu.be, /live/...)"
               className={`w-full rounded-xl pl-10 ${
-                urlInput ? 'pr-28 sm:pr-32' : 'pr-12'
+                urlInput ? 'pr-18 sm:pr-20' : 'pr-10'
               } py-2.5 text-xs sm:text-sm border focus:outline-none transition-colors ${inputBgClass} ${
                 urlInputError ? 'border-rose-500 ring-1 ring-rose-500/40' : ''
               }`}
             />
             <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
               {urlInput && (
-                <>
-                  <button
-                    type="submit"
-                    id="youtube-url-inline-play-btn"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleLoadVideo();
-                    }}
-                    aria-label="載入播放"
-                    title="點擊載入並播放此 YouTube 網址"
-                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 shadow-sm transition-all active:scale-95 cursor-pointer shrink-0"
-                  >
-                    <Play className="w-3 h-3 fill-white" />
-                    <span className="hidden xs:inline font-bold">播放</span>
-                  </button>
-                  <button
-                    type="button"
-                    id="youtube-url-clear-btn"
-                    onClick={handleClearUrlInput}
-                    aria-label="清除網址"
-                    title="清除網址"
-                    className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
-                      currentTheme === 'paper'
-                        ? 'text-[#7A6853] hover:text-[#3B2E1E] hover:bg-[#EFE5CE]'
-                        : currentTheme === 'light'
-                        ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800 active:bg-slate-700'
-                    }`}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </>
+                <button
+                  type="button"
+                  id="youtube-url-clear-btn"
+                  onClick={handleClearUrlInput}
+                  aria-label="清除網址"
+                  title="清除網址"
+                  className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
+                    currentTheme === 'paper'
+                      ? 'text-[#7A6853] hover:text-[#3B2E1E] hover:bg-[#EFE5CE]'
+                      : currentTheme === 'light'
+                      ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800 active:bg-slate-700'
+                  }`}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               )}
               <button
                 type="button"
@@ -1206,105 +1557,6 @@ export const YouTubeBilingualView: React.FC<Props> = ({
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2 w-full min-w-0">
-            <button
-              type="button"
-              id="youtube-live-news-btn"
-              onClick={() => setShowNewsModal(true)}
-              aria-label="美語精選頻道"
-              title="探索權威美語頻道影片與收藏影片"
-              className={`flex items-center justify-center gap-1.5 px-3 py-2 min-h-[36px] rounded-xl text-xs sm:text-sm font-semibold border shadow-sm transition-all shrink-0 cursor-pointer whitespace-nowrap ${testBtnClass}`}
-            >
-              <Newspaper className="w-3.5 h-3.5 text-emerald-400" />
-              <span>美語精選頻道</span>
-              {savedUrls.length > 0 && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-500 font-bold flex items-center gap-0.5">
-                  <Star className="w-2.5 h-2.5 fill-amber-500" />
-                  {savedUrls.length}
-                </span>
-              )}
-            </button>
-            {/* Interactive Subtitle Preparation Status Button & URL Input Submit Key (字幕準備狀態與網址輸入鍵 - 附圖1) */}
-            <button
-              type="submit"
-              id="youtube-caption-input-submit-btn"
-              aria-label={
-                isNewInputUrl
-                  ? '載入播放此網址 (點擊送出)'
-                  : (status === 'loading' || status === 'translating')
-                  ? `字幕載入中 ${progress.percent || 15}%`
-                  : status === 'ready'
-                  ? '雙語字幕就緒 (點擊重新載入/播放)'
-                  : '載入雙語字幕 (點擊送出)'
-              }
-              title={
-                isNewInputUrl
-                  ? '立即載入並播放輸入的 YouTube 網址'
-                  : status === 'ready'
-                  ? '點擊重新播放或重新載入字幕'
-                  : '點擊載入並播放'
-              }
-              disabled={!urlInput.trim() && status === 'idle'}
-              className={`relative overflow-hidden rounded-xl border flex items-center justify-between px-2.5 py-1.5 min-h-[36px] flex-1 min-w-0 shadow-sm transition-all cursor-pointer active:scale-95 select-none ${
-                isNewInputUrl
-                  ? 'bg-gradient-to-r from-emerald-600/30 via-teal-600/30 to-emerald-500/40 border-emerald-400 ring-2 ring-emerald-500/30 hover:border-emerald-300 animate-pulse'
-                  : effectiveTheme === 'paper'
-                  ? 'bg-[#FAF4E8] hover:bg-[#F5ECD7] border-[#CDB58A] text-[#3B2E1E]'
-                  : effectiveTheme === 'light'
-                  ? 'bg-white hover:bg-slate-50 border-slate-300 text-slate-800'
-                  : 'bg-slate-900/90 hover:bg-slate-800 border-emerald-500/40 text-white'
-              }`}
-            >
-              {/* Animated Background Progress Fill when active/loading or ready */}
-              {(isProgressActive || status === 'loading' || status === 'translating' || (status === 'ready' && !isNewInputUrl)) && (
-                <div
-                  className={`absolute inset-y-0 left-0 transition-all duration-300 ease-out pointer-events-none ${
-                    (progress.percent >= 100 || status === 'ready')
-                      ? 'bg-gradient-to-r from-emerald-600/30 via-emerald-500/40 to-teal-400/40'
-                      : 'bg-gradient-to-r from-rose-500/25 via-amber-500/25 to-emerald-500/30'
-                  }`}
-                  style={{ width: `${isNewInputUrl ? 100 : Math.max(12, Math.min(100, progress.percent || (status === 'loading' ? 25 : 60)))}%` }}
-                />
-              )}
-
-              {/* Left: Status Icon & Action Prompt */}
-              <div className="relative z-10 flex items-center gap-1.5 min-w-0 pr-1">
-                {isNewInputUrl ? (
-                  <Play className="w-3.5 h-3.5 fill-emerald-400 text-emerald-400 shrink-0 animate-bounce" />
-                ) : (status === 'loading' || status === 'translating') ? (
-                  <Loader2 className="w-3.5 h-3.5 text-emerald-400 animate-spin shrink-0" />
-                ) : status === 'ready' ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 animate-in zoom-in-75 duration-200" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                )}
-                <span className={`text-[11px] sm:text-xs font-semibold truncate ${isNewInputUrl ? 'text-emerald-300 font-bold' : ''}`}>
-                  {isNewInputUrl
-                    ? '載入播放此網址'
-                    : (progress.percent >= 100 || status === 'ready')
-                    ? '雙語字幕就緒'
-                    : progress.message || (status === 'loading' ? '擷取英文字幕...' : '雙語字幕生成中...')}
-                </span>
-              </div>
-
-              {/* Right: Percentage or Action Badge */}
-              <div className="relative z-10 font-mono text-[11px] sm:text-xs font-bold text-emerald-400 shrink-0 pl-1 flex items-center gap-1">
-                {isNewInputUrl ? (
-                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-sans font-bold">
-                    播放 ▶
-                  </span>
-                ) : (status === 'loading' || status === 'translating') ? (
-                  <span>{(progress.percent || (status === 'loading' ? 25 : 60))}%</span>
-                ) : status === 'ready' ? (
-                  <span>100%</span>
-                ) : (
-                  <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-sans font-bold">
-                    GO ▶
-                  </span>
-                )}
-              </div>
-            </button>
-          </div>
         </form>
 
         {/* Save Toast Feedback */}
@@ -1321,6 +1573,50 @@ export const YouTubeBilingualView: React.FC<Props> = ({
             <span>{urlInputError}</span>
           </div>
         )}
+
+        {/* Option C Monetization Bar: VIP Pass Status & Export Notes (平均分配橫行，icon 與按鈕樣式一致) */}
+        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-700/30 text-xs w-full">
+          {/* Left: Return to Radio Mode */}
+          {onSwitchToRadioMode ? (
+            <button
+              type="button"
+              onClick={onSwitchToRadioMode}
+              className={`flex items-center justify-center gap-1.5 px-2.5 py-2 min-h-[38px] w-full rounded-xl font-bold text-xs sm:text-sm transition-all border shadow-sm cursor-pointer whitespace-nowrap active:scale-95 ${
+                currentTheme === "paper"
+                  ? "bg-[#EFE5CE] hover:bg-[#E5D9BE] border-[#C0AA7F] text-[#3B2E1E]"
+                  : currentTheme === "light"
+                  ? "bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-800"
+                  : "bg-blue-950/60 hover:bg-blue-900/80 border-blue-800/80 text-blue-200 hover:text-blue-100"
+              }`}
+              title="切換回 24/7 雙語廣播電台模式"
+            >
+              <Radio className="w-4 h-4 shrink-0 text-blue-400" />
+              <span className="truncate">收聽廣播電台</span>
+            </button>
+          ) : (
+            <div />
+          )}
+
+          {/* Right: Export Subtitles / Notes */}
+          <button
+            type="button"
+            onClick={handleExportNotes}
+            disabled={subtitles.length === 0}
+            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 min-h-[38px] w-full rounded-xl font-bold text-xs sm:text-sm transition-all border shadow-sm cursor-pointer whitespace-nowrap active:scale-95 ${
+              subtitles.length === 0
+                ? 'opacity-40 cursor-not-allowed bg-stone-900 border-stone-800 text-stone-500'
+                : currentTheme === 'paper'
+                ? 'bg-[#EFE5CE] hover:bg-[#E5D9BE] border-[#C0AA7F] text-[#3B2E1E]'
+                : currentTheme === 'light'
+                ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
+                : 'bg-stone-800/80 hover:bg-stone-800 border-stone-700 text-stone-200 hover:text-sky-300'
+            }`}
+            title="匯出當前影片的雙語對照字幕與筆記"
+          >
+            <Download className="w-4 h-4 shrink-0 text-sky-400" />
+            <span className="truncate">匯出雙語筆記</span>
+          </button>
+        </div>
 
         {/* Bottom Utility Bar: Reading Mode, Chinese Variant, Subtitle Font Size & CEFR Difficulty Controls */}
         <ReadingModeAndFontToolbar
@@ -1340,7 +1636,38 @@ export const YouTubeBilingualView: React.FC<Props> = ({
       {/* Main Learning Interface: Video Player & Subtitles Grid */}
       <div id="youtube-player-section" className="grid grid-cols-1 lg:grid-cols-12 gap-1.5 sm:gap-4 lg:gap-6 items-start">
         {/* Left Column: Player (Clean fixed/sticky reading mode) */}
-        <div className="lg:col-span-5 space-y-2 lg:space-y-4 lg:sticky lg:top-20">
+        <div className="lg:col-span-5 space-y-2 lg:space-y-3 lg:sticky lg:top-20">
+          {/* Live Stream Notice: Guide to Curated Channels (Moved above video player to preserve optimal reading layout) */}
+          {isCurrentLiveVideo && (
+            <div className={`p-3 sm:p-3.5 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-2.5 transition-colors duration-200 shadow-sm ${
+              currentTheme === 'paper'
+                ? 'bg-[#FAF4E8] border-[#E2D2B0] text-[#3B2E1E]'
+                : currentTheme === 'light'
+                ? 'bg-amber-50 border-amber-200 text-amber-950'
+                : 'bg-amber-950/30 border-amber-500/30 text-amber-200'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                </span>
+                <span className="text-xs font-medium leading-relaxed">
+                  此影片為 24/7 即時直播新聞，受限於 YouTube 平台限制無逐句時間軸字幕。建議點擊「📰 美語精選頻道」探索 100% 具備英文字幕與雙語對照的優質影音！
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => setShowNewsModal(true)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition-colors cursor-pointer shadow-sm flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                >
+                  <Newspaper className="w-3.5 h-3.5" />
+                  <span>探索精選頻道</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           <div id="youtube-player-anchor" className={`sticky top-[56px] z-20 sm:static pb-0 transition-colors duration-200 ${playerAnchorBg}`}>
             <YouTubeBilingualPlayer
               ref={playerRef}
@@ -1351,6 +1678,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
               hideActionControls
               isLoopEnabled={isVideoLoopEnabled}
               autoPlay={isAutoPlayPending}
+              onLoopReplay={handleLoopReplay}
             />
           </div>
         </div>
@@ -1414,47 +1742,20 @@ export const YouTubeBilingualView: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Live Stream Notice: Guide to Radio or Curated Channels */}
-          {isCurrentLiveVideo && (
-            <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 ${
-              currentTheme === 'paper'
-                ? 'bg-[#FAF4E8] border-[#E2D2B0] text-[#3B2E1E]'
-                : currentTheme === 'light'
-                ? 'bg-amber-50 border-amber-200 text-amber-950'
-                : 'bg-amber-950/30 border-amber-500/30 text-amber-200'
-            }`}>
-              <div className="flex items-center gap-2.5">
-                <span className="relative flex h-2.5 w-2.5 shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-                </span>
-                <span className="text-xs font-medium">
-                  此影片為 24/7 即時直播新聞，受限於平台限制無逐句時間軸字幕。建議切換至「📻 廣播電台」享受原音即時雙語，或探索「📰 美語精選頻道」！
-                </span>
+          {/* Live Stream Status in Subtitle Section (Clean & minimal, doesn't disrupt reading layout) */}
+          {isCurrentLiveVideo && subtitles.length === 0 && status !== 'loading' && status !== 'translating' && (
+            <div className={`p-6 sm:p-8 rounded-2xl border flex flex-col items-center justify-center text-center space-y-2.5 transition-colors duration-200 ${statusCardBgClass}`}>
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                <Tv className="w-5 h-5" />
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {onSwitchToRadioMode && (
-                  <button
-                    type="button"
-                    onClick={onSwitchToRadioMode}
-                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors cursor-pointer shadow-sm flex items-center gap-1.5"
-                  >
-                    <span>收聽廣播電台 ➔</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowNewsModal(true)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer shadow-sm flex items-center gap-1.5"
-                >
-                  <Newspaper className="w-3.5 h-3.5" />
-                  <span>精選頻道</span>
-                </button>
-              </div>
+              <h4 className={`text-sm font-semibold ${statusTitleClass}`}>24/7 即時新聞直播播放中</h4>
+              <p className={`text-xs max-w-sm leading-relaxed ${statusDescClass}`}>
+                本頻道為 24/7 直播串流，YouTube 官方英文即時字幕於上方畫面自動呈現。若需逐句英漢對照與筆記匯出，歡迎點擊上方精選頻道切換。
+              </p>
             </div>
           )}
 
-          {/* Error State for non-live videos (Handled cleanly with Radio & Curated News alternatives) */}
+          {/* Error State for non-live videos (Handled cleanly with Curated News alternatives) */}
           {!isCurrentLiveVideo && status === 'error' && error && (
             <div className="bg-rose-950/20 border border-rose-800/40 rounded-2xl p-6 text-center space-y-3">
               <AlertCircle className="w-8 h-8 text-rose-400 mx-auto" />
@@ -1480,26 +1781,17 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                     推薦學習方案:
                   </p>
                   <p className="text-slate-400 text-[11px] leading-relaxed">
-                    本影片無預先內嵌的 YouTube 官方字幕。您可以點擊「📰 美語精選頻道」觀看 100% 具備英文字幕的優質短片，或切換至「📻 廣播電台」由 Groq AI 即時雙語轉譯！
+                    本影片無預先內嵌的 YouTube 官方英文字幕。您可以點擊「📰 美語精選頻道」觀看 100% 具備英文字幕的優質脫口秀與知識影片，或貼上其他具英文字幕之影片網址！
                   </p>
                   <div className="flex gap-2 pt-1">
                     <button
                       type="button"
                       onClick={() => setShowNewsModal(true)}
-                      className="flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                      className="flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
                     >
                       <Newspaper className="w-3.5 h-3.5" />
                       <span>探索美語精選頻道</span>
                     </button>
-                    {onSwitchToRadioMode && (
-                      <button
-                        type="button"
-                        onClick={onSwitchToRadioMode}
-                        className="py-2 px-3 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-                      >
-                        <span>收聽廣播</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               )}
@@ -1647,7 +1939,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
 
               <div
                 ref={subtitleContainerRef}
-                className="space-y-2.5 max-h-[calc(100dvh-210px)] sm:max-h-[calc(100dvh-230px)] lg:max-h-[calc(100vh-140px)] overflow-y-auto overscroll-contain pr-1 pb-36 sm:pb-44 scrollbar-thin scrollbar-thumb-slate-800"
+                className="space-y-2.5 max-h-[calc(100dvh-210px)] sm:max-h-[calc(100dvh-230px)] lg:max-h-[calc(100vh-140px)] overflow-y-auto overscroll-y-auto pr-1 pb-36 sm:pb-44 scrollbar-thin scrollbar-thumb-slate-800"
               >
                 {filteredSubtitles.map((ytItem, idx) => {
                   const subItem = toSubtitleItem(ytItem, idx);
@@ -1669,7 +1961,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                       onClick={() => handleSeekToSentence(ytItem.startMs)}
                       className={`transition-all duration-200 cursor-pointer rounded-2xl ${
                         isActive
-                          ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-500/10 scale-[1.01]'
+                          ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-background shadow-xl shadow-blue-500/15'
                           : 'hover:opacity-95'
                       }`}
                     >
@@ -1760,6 +2052,25 @@ export const YouTubeBilingualView: React.FC<Props> = ({
         activeVideoId={activeVideoId}
         onSelectSavedUrl={handleSelectSavedUrl}
         onDeleteSavedUrl={handleDeleteSavedUrl}
+      />
+
+      {/* Vocabulary Notebook & Flashcard Quiz Modal */}
+      <VocabularyNotebookModal
+        isOpen={showVocabModal}
+        onClose={() => setShowVocabModal(false)}
+        theme={currentTheme as 'dark' | 'light' | 'paper'}
+        chineseVariant={chineseVariant}
+        onOpenDictionary={onOpenDictionary}
+      />
+
+      {/* Bilingual Notes Export & Preview Modal */}
+      <NotesExportModal
+        isOpen={showNotesExportModal}
+        onClose={() => setShowNotesExportModal(false)}
+        videoTitle={title || '當前影片中英對照學習筆記'}
+        videoUrl={urlInput}
+        videoId={activeVideoId}
+        subtitles={subtitles}
       />
     </div>
   );

@@ -131,7 +131,7 @@ export const ReadingModeAndFontToolbar: React.FC<ReadingModeAndFontToolbarProps>
           {/* Mechanical Sliding Traditional / Simplified Chinese Switcher (繁 / 簡) */}
           <div
             id={`${prefix}chinese-variant-switcher`}
-            className="relative inline-flex items-center p-0.5 rounded-lg border border-black/5 dark:border-white/5 bg-black/5 dark:bg-black/20 flex-1 shadow-inner select-none"
+            className="relative inline-flex items-center p-0.5 rounded-lg border border-black/5 dark:border-white/5 bg-black/5 dark:bg-black/20 flex-1 sm:flex-[1.2] shadow-inner select-none"
           >
             {(() => {
               const variants: ChineseVariant[] = ['traditional', 'simplified'];
@@ -189,7 +189,7 @@ export const ReadingModeAndFontToolbar: React.FC<ReadingModeAndFontToolbarProps>
           {/* Mechanical Sliding Font Size Switcher (小 / 中 / 大 / 特大) */}
           <div
             id={`${prefix}font-size-switcher`}
-            className="relative inline-flex items-center p-0.5 rounded-lg border border-black/5 dark:border-white/5 bg-black/5 dark:bg-black/20 flex-[2] shadow-inner select-none"
+            className="relative inline-flex items-center p-0.5 rounded-lg border border-black/5 dark:border-white/5 bg-black/5 dark:bg-black/20 flex-[2] sm:flex-[2.5] shadow-inner select-none"
           >
             {(() => {
               const fontSizes: SubtitleFontSize[] = ['small', 'medium', 'large', 'xlarge'];
@@ -251,32 +251,7 @@ export const ReadingModeAndFontToolbar: React.FC<ReadingModeAndFontToolbarProps>
             </div>
           </div>
 
-          {/* CEFR Difficulty Highlight Toggle Button */}
-          {onHighlightDifficultyChange && (
-            <button
-              id={`${prefix}difficulty-toggle-btn`}
-              type="button"
-              onClick={() => {
-                onHighlightDifficultyChange(!highlightDifficulty);
-                setTimeout(playBeanWallImpactSound, 135);
-              }}
-              title={highlightDifficulty ? '點擊關閉 CEFR 難字標註' : '點擊開啟 CEFR 難字標註（多益/雅思/B2/C1高階詞）'}
-              className={`h-7 px-2 sm:px-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-sm select-none shrink-0 active:scale-95 ${
-                highlightDifficulty
-                  ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40 ring-1 ring-amber-400/40 font-black'
-                  : currentTheme === 'paper'
-                  ? 'bg-[#F4EBD9] text-[#7A6853] border-[#DFD1BA] hover:bg-[#EAE0CD]'
-                  : currentTheme === 'light'
-                  ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span className="hidden xs:inline sm:inline">難字標註</span>
-              <span className="inline xs:hidden sm:hidden">難字</span>
-            </button>
-          )}
-        </div>
+          </div>
       </div>
     </div>
   );

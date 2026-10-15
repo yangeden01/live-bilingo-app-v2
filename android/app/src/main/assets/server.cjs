@@ -34,8 +34,8 @@ __export(server_exports, {
 module.exports = __toCommonJS(server_exports);
 var import_config = require("dotenv/config");
 var import_express = __toESM(require("express"), 1);
-var import_path = __toESM(require("path"), 1);
-var import_fs = __toESM(require("fs"), 1);
+var import_path2 = __toESM(require("path"), 1);
+var import_fs2 = __toESM(require("fs"), 1);
 var import_http = __toESM(require("http"), 1);
 var import_vite = require("vite");
 var import_ws = __toESM(require("ws"), 1);
@@ -512,7 +512,286 @@ var BUILTIN_DICT = {
   "security": { word: "security", phonetic: "/s\u0259\u02C8kj\u028Ar.\u0259.t\u032Ci/", pos: "n.", zh: "\u5B89\u5168\u3001\u4FDD\u5168\u3001\u4FDD\u969C\u3001\u9632\u885B", def: "The state of being free from danger or threat." },
   "experience": { word: "experience", phonetic: "/\u026Ak\u02C8sp\u026Ar.i.\u0259ns/", pos: "n./v.", zh: "\u7D93\u9A57\u3001\u9AD4\u9A57\u3001\u7D93\u6B77", def: "Practical contact with and observation of facts or events." },
   "decision": { word: "decision", phonetic: "/d\u026A\u02C8s\u026A\u0292.\u0259n/", pos: "n.", zh: "\u6C7A\u5B9A\u3001\u6C7A\u7B56\u3001\u5224\u6C7A", def: "A conclusion or resolution reached after consideration." },
-  "decisions": { word: "decisions", phonetic: "/d\u026A\u02C8s\u026A\u0292.\u0259nz/", pos: "n. (\u8907\u6578)", zh: "\u6C7A\u5B9A\u3001\u653F\u7B56\u65B9\u91DD\uFF08\u8907\u6578\uFF09", def: "Plural of decision." }
+  "decisions": { word: "decisions", phonetic: "/d\u026A\u02C8s\u026A\u0292.\u0259nz/", pos: "n. (\u8907\u6578)", zh: "\u6C7A\u5B9A\u3001\u653F\u7B56\u65B9\u91DD\uFF08\u8907\u6578\uFF09", def: "Plural of decision." },
+  // User Highlighted & High-Frequency Words
+  "trade": { word: "trade", phonetic: "/tre\u026Ad/", pos: "n./v.", zh: "\u8CBF\u6613\u3001\u5546\u696D\u3001\u4EA4\u6613\uFF1B\u9032\u884C\u8CB7\u8CE3", def: "The action of buying and selling goods and services." },
+  "traded": { word: "traded", phonetic: "/tre\u026Ad\u026Ad/", pos: "v. (\u904E\u53BB\u5F0F)", zh: "\u9032\u884C\u4E86\u4EA4\u6613\u3001\u8CB7\u8CE3\u4E86\uFF08trade \u7684\u904E\u53BB\u5F0F\uFF09", def: "Past tense of trade." },
+  "trading": { word: "trading", phonetic: "/\u02C8tre\u026A.d\u026A\u014B/", pos: "n./v.", zh: "\u4EA4\u6613\u6D3B\u52D5\u3001\u5546\u696D\u8CB7\u8CE3\uFF1B\u9032\u884C\u8CBF\u6613\u4E2D", def: "The activity of buying and selling goods and services." },
+  "comment": { word: "comment", phonetic: "/\u02C8k\u0251\u02D0.ment/", pos: "n./v.", zh: "\u8A55\u8AD6\u3001\u610F\u898B\u3001\u767C\u8868\u610F\u898B\u3001\u8A3B\u89E3", def: "A verbal or written remark expressing an opinion or reaction." },
+  "comments": { word: "comments", phonetic: "/\u02C8k\u0251\u02D0.ments/", pos: "n. (\u8907\u6578) / v.", zh: "\u8A55\u8AD6\u3001\u5404\u65B9\u610F\u898B\u3001\u7559\u8A00\u8A3B\u89E3\uFF08\u8907\u6578\uFF09", def: "Plural of comment; remarks expressing an opinion." },
+  "commented": { word: "commented", phonetic: "/\u02C8k\u0251\u02D0.men.t\u026Ad/", pos: "v. (\u904E\u53BB\u5F0F)", zh: "\u767C\u8868\u4E86\u8A55\u8AD6\u3001\u8868\u9054\u4E86\u610F\u898B\uFF08comment \u7684\u904E\u53BB\u5F0F\uFF09", def: "Past tense of comment." },
+  "commenting": { word: "commenting", phonetic: "/\u02C8k\u0251\u02D0.men.t\u026A\u014B/", pos: "v. (\u9032\u884C\u5F0F)", zh: "\u6B63\u5728\u8A55\u8AD6\u3001\u767C\u8868\u610F\u898B\u4E2D", def: "Present participle of comment." },
+  "man": { word: "man", phonetic: "/m\xE6n/", pos: "n./v.", zh: "\u7537\u4EBA\u3001\u4EBA\u985E\u3001\u4EBA\u54E1\uFF1B\u914D\u7F6E\u4EBA\u54E1", def: "An adult human male; a human being or worker." },
+  "men": { word: "men", phonetic: "/men/", pos: "n. (\u8907\u6578)", zh: "\u7537\u4EBA\u3001\u5927\u773E\u4EBA\u54E1\uFF08man \u7684\u8907\u6578\uFF09", def: "Plural of man." },
+  "woman": { word: "woman", phonetic: "/\u02C8w\u028Am.\u0259n/", pos: "n.", zh: "\u5973\u4EBA\u3001\u5973\u6027", def: "An adult female human being." },
+  "women": { word: "women", phonetic: "/\u02C8w\u026Am.\u026An/", pos: "n. (\u8907\u6578)", zh: "\u5973\u4EBA\u3001\u5973\u6027\u7FA4\u9AD4\uFF08woman \u7684\u8907\u6578\uFF09", def: "Plural of woman." },
+  "child": { word: "child", phonetic: "/t\u0283a\u026Ald/", pos: "n.", zh: "\u5152\u7AE5\u3001\u5C0F\u5B69\u3001\u5B69\u5B50", def: "A young human being below the age of puberty." },
+  "children": { word: "children", phonetic: "/\u02C8t\u0283\u026Al.dr\u0259n/", pos: "n. (\u8907\u6578)", zh: "\u5152\u7AE5\u3001\u5B69\u5B50\u5011\uFF08child \u7684\u8907\u6578\uFF09", def: "Plural of child." },
+  "avocation": { word: "avocation", phonetic: "/\u02CC\xE6v.\u0259\u02C8ke\u026A.\u0283\u0259n/", pos: "n.", zh: "\u526F\u696D\u3001\u696D\u9918\u55DC\u597D\u3001\u4F11\u9592\u611B\u597D", def: "A hobby or minor occupation." },
+  "avocations": { word: "avocations", phonetic: "/\u02CC\xE6v.\u0259\u02C8ke\u026A.\u0283\u0259nz/", pos: "n. (\u8907\u6578)", zh: "\u526F\u696D\u3001\u696D\u9918\u55DC\u597D\uFF08\u8907\u6578\uFF09", def: "Plural of avocation." },
+  "agriculture": { word: "agriculture", phonetic: "/\u02C8\xE6\u0261.r\u0259.k\u028Cl.t\u0283\u025A/", pos: "n.", zh: "\u8FB2\u696D\u3001\u8FB2\u85DD\u3001\u8FB2\u8015", def: "The science or practice of farming." },
+  "agricultural": { word: "agricultural", phonetic: "/\u02CC\xE6\u0261.r\u0259\u02C8k\u028Cl.t\u0283\u025A.\u0259l/", pos: "adj.", zh: "\u8FB2\u696D\u7684\u3001\u8FB2\u5B78\u7684\u3001\u8FB2\u7522\u7684", def: "Relating to agriculture or farming." },
+  "farmer": { word: "farmer", phonetic: "/\u02C8f\u0251\u02D0r.m\u025A/", pos: "n.", zh: "\u8FB2\u6C11\u3001\u8FB2\u5834\u4E3B", def: "A person who owns or manages a farm." },
+  "farmers": { word: "farmers", phonetic: "/\u02C8f\u0251\u02D0r.m\u025Az/", pos: "n. (\u8907\u6578)", zh: "\u8FB2\u6C11\u7FA4\u9AD4\uFF08\u8907\u6578\uFF09", def: "Plural of farmer." },
+  "farm": { word: "farm", phonetic: "/f\u0251\u02D0rm/", pos: "n./v.", zh: "\u8FB2\u5834\u3001\u8FB2\u838A\uFF1B\u8015\u7A2E", def: "An area of land devoted to agricultural processes." },
+  "farming": { word: "farming", phonetic: "/\u02C8f\u0251\u02D0r.m\u026A\u014B/", pos: "n.", zh: "\u8FB2\u696D\u751F\u7522\u3001\u8015\u7A2E\u8015\u4F5C", def: "The activity of growing crops and raising livestock." },
+  "stunt": { word: "stunt", phonetic: "/st\u028Cnt/", pos: "n./v.", zh: "\u7279\u6280\u3001\u5671\u982D\u3001\u5F15\u4EBA\u6CE8\u76EE\u7684\u82B1\u62DB\uFF1B\u963B\u7919\u6210\u9577", def: "An action displaying spectacular skill or daring; to slow down growth." },
+  "stunts": { word: "stunts", phonetic: "/st\u028Cnts/", pos: "n. (\u8907\u6578) / v.", zh: "\u7279\u6280\u3001\u5BA3\u50B3\u5671\u982D\uFF08\u8907\u6578\uFF09\uFF1B\u8868\u6F14\u7279\u6280", def: "Plural of stunt; spectacular daring performances or publicity moves." },
+  "stunted": { word: "stunted", phonetic: "/\u02C8st\u028Cn.t\u026Ad/", pos: "adj./v.", zh: "\u767C\u80B2\u53D7\u963B\u7684\u3001\u53D7\u58D3\u6291\u7684\uFF08stunt \u7684\u904E\u53BB\u5F0F/\u5F62\u5BB9\u8A5E\uFF09", def: "Prevented from growing or developing properly." },
+  "business": { word: "business", phonetic: "/\u02C8b\u026Az.n\u026As/", pos: "n.", zh: "\u5546\u696D\u3001\u4E8B\u696D\u3001\u4F01\u696D\u3001\u5546\u52D9", def: "Commercial activity or an enterprise." },
+  "company": { word: "company", phonetic: "/\u02C8k\u028Cm.p\u0259.ni/", pos: "n.", zh: "\u516C\u53F8\u3001\u4F01\u696D\u3001\u966A\u4F34", def: "A commercial business." },
+  "companies": { word: "companies", phonetic: "/\u02C8k\u028Cm.p\u0259.niz/", pos: "n. (\u8907\u6578)", zh: "\u516C\u53F8\u3001\u4F01\u696D\uFF08\u8907\u6578\uFF09", def: "Plural of company." },
+  "work": { word: "work", phonetic: "/w\u025D\u02D0k/", pos: "n./v.", zh: "\u5DE5\u4F5C\u3001\u8077\u696D\u3001\u8457\u4F5C\uFF1B\u904B\u4F5C\u3001\u52AA\u529B", def: "Activity involving mental or physical effort." },
+  "worker": { word: "worker", phonetic: "/\u02C8w\u025D\u02D0.k\u025A/", pos: "n.", zh: "\u52DE\u5DE5\u3001\u5F9E\u696D\u4EBA\u54E1\u3001\u54E1\u5DE5", def: "A person who does a specified type of work." },
+  "workers": { word: "workers", phonetic: "/\u02C8w\u025D\u02D0.k\u025Az/", pos: "n. (\u8907\u6578)", zh: "\u52DE\u5DE5\u3001\u5DE5\u4F5C\u4EBA\u54E1\uFF08\u8907\u6578\uFF09", def: "Plural of worker." },
+  "money": { word: "money", phonetic: "/\u02C8m\u028Cn.i/", pos: "n.", zh: "\u91D1\u9322\u3001\u8CA8\u5E63\u3001\u8CC7\u91D1", def: "A medium of exchange in the form of coins and banknotes." },
+  "price": { word: "price", phonetic: "/pra\u026As/", pos: "n./v.", zh: "\u50F9\u683C\u3001\u4EE3\u50F9\uFF1B\u5B9A\u50F9", def: "The amount of money expected or required in payment." },
+  "prices": { word: "prices", phonetic: "/\u02C8pra\u026A.s\u026Az/", pos: "n. (\u8907\u6578)", zh: "\u7269\u50F9\u3001\u50F9\u683C\u884C\u60C5\uFF08\u8907\u6578\uFF09", def: "Plural of price." },
+  "cost": { word: "cost", phonetic: "/k\u0254\u02D0st/", pos: "n./v.", zh: "\u6210\u672C\u3001\u82B1\u8CBB\u3001\u4EE3\u50F9\uFF1B\u9700\u82B1\u8CBB", def: "An amount that has to be paid or given up." },
+  "costs": { word: "costs", phonetic: "/k\u0254\u02D0sts/", pos: "n. (\u8907\u6578)", zh: "\u5404\u9805\u6210\u672C\u3001\u5404\u9805\u652F\u51FA\uFF08\u8907\u6578\uFF09", def: "Plural of cost." },
+  "bank": { word: "bank", phonetic: "/b\xE6\u014Bk/", pos: "n./v.", zh: "\u9280\u884C\u3001\u5CB8\u908A\uFF1B\u5728\u9280\u884C\u958B\u6236", def: "A financial establishment." },
+  "banks": { word: "banks", phonetic: "/b\xE6\u014Bks/", pos: "n. (\u8907\u6578)", zh: "\u9280\u884C\u9AD4\u7CFB\uFF08\u8907\u6578\uFF09", def: "Plural of bank." },
+  "policy": { word: "policy", phonetic: "/\u02C8p\u0251\u02D0.l\u0259.si/", pos: "n.", zh: "\u653F\u7B56\u3001\u65B9\u91DD\u3001\u4FDD\u55AE", def: "A course or principle of action adopted by a government." },
+  "policies": { word: "policies", phonetic: "/\u02C8p\u0251\u02D0.l\u0259.siz/", pos: "n. (\u8907\u6578)", zh: "\u5404\u9805\u653F\u7B56\u65B9\u91DD\uFF08\u8907\u6578\uFF09", def: "Plural of policy." },
+  "law": { word: "law", phonetic: "/l\u0254\u02D0/", pos: "n.", zh: "\u6CD5\u5F8B\u3001\u6CD5\u5247\u3001\u6CD5\u898F", def: "The system of rules which a particular country recognizes." },
+  "laws": { word: "laws", phonetic: "/l\u0254\u02D0z/", pos: "n. (\u8907\u6578)", zh: "\u6CD5\u898F\u3001\u6CD5\u5F8B\u689D\u6587\uFF08\u8907\u6578\uFF09", def: "Plural of law." },
+  "rule": { word: "rule", phonetic: "/ru\u02D0l/", pos: "n./v.", zh: "\u898F\u5247\u3001\u6E96\u5247\uFF1B\u7D71\u6CBB\u3001\u88C1\u6C7A", def: "One of a set of explicit regulations or principles." },
+  "rules": { word: "rules", phonetic: "/ru\u02D0lz/", pos: "n. (\u8907\u6578) / v.", zh: "\u898F\u5247\u3001\u898F\u7AE0\uFF08\u8907\u6578\uFF09\uFF1B\u7D71\u6CBB", def: "Plural of rule." },
+  "water": { word: "water", phonetic: "/\u02C8w\u0251\u02D0.t\u032C\u025A/", pos: "n./v.", zh: "\u6C34\u3001\u6C34\u8CC7\u6E90\uFF1B\u6F86\u6C34", def: "A transparent fluid forming lakes, streams, and rain." },
+  "food": { word: "food", phonetic: "/fu\u02D0d/", pos: "n.", zh: "\u98DF\u7269\u3001\u7CE7\u98DF\u3001\u990A\u5206", def: "Any nutritious substance that people or animals eat." },
+  "energy": { word: "energy", phonetic: "/\u02C8en.\u025A.d\u0292i/", pos: "n.", zh: "\u80FD\u6E90\u3001\u80FD\u91CF\u3001\u6D3B\u529B", def: "The strength and vitality required for sustained activity." },
+  "oil": { word: "oil", phonetic: "/\u0254\u026Al/", pos: "n./v.", zh: "\u77F3\u6CB9\u3001\u539F\u6CB9\u3001\u6CB9\u54C1\uFF1B\u4E0A\u6CB9", def: "A viscous liquid derived from petroleum." },
+  "gas": { word: "gas", phonetic: "/\u0261\xE6s/", pos: "n.", zh: "\u5929\u7136\u6C23\u3001\u6C7D\u6CB9\u3001\u6C23\u9AD4", def: "An air-like fluid substance or petroleum fuel." },
+  "power": { word: "power", phonetic: "/\u02C8pa\u028A.\u025A/", pos: "n./v.", zh: "\u96FB\u529B\u3001\u6B0A\u529B\u3001\u529B\u91CF\uFF1B\u63D0\u4F9B\u52D5\u529B", def: "The ability to do something or electrical energy." },
+  "city": { word: "city", phonetic: "/\u02C8s\u026At.i/", pos: "n.", zh: "\u57CE\u5E02\u3001\u90FD\u5E02\u3001\u5E02\u5340", def: "A large town." },
+  "cities": { word: "cities", phonetic: "/\u02C8s\u026At.iz/", pos: "n. (\u8907\u6578)", zh: "\u57CE\u5E02\u7FA4\u3001\u5404\u5927\u90FD\u6703\uFF08\u8907\u6578\uFF09", def: "Plural of city." },
+  "state": { word: "state", phonetic: "/ste\u026At/", pos: "n./v.", zh: "\u570B\u5BB6\u3001\u5DDE\u3001\u5DDE\u653F\u5E9C\u3001\u72C0\u614B\uFF1B\u9673\u8FF0", def: "A nation or territory; a condition." },
+  "states": { word: "states", phonetic: "/ste\u026Ats/", pos: "n. (\u8907\u6578) / v.", zh: "\u5404\u5DDE\u3001\u570B\u5BB6\uFF08\u8907\u6578\uFF09\uFF1B\u9673\u8FF0", def: "Plural of state." },
+  "nation": { word: "nation", phonetic: "/\u02C8ne\u026A.\u0283\u0259n/", pos: "n.", zh: "\u570B\u5BB6\u3001\u570B\u6C11\u3001\u6C11\u65CF", def: "A large body of people united by common descent or history." },
+  "country": { word: "country", phonetic: "/\u02C8k\u028Cn.tri/", pos: "n.", zh: "\u570B\u5BB6\u3001\u9109\u9593\u3001\u9109\u6751", def: "A nation with its own government." },
+  "world": { word: "world", phonetic: "/w\u025D\u02D0ld/", pos: "n.", zh: "\u4E16\u754C\u3001\u5168\u7403\u3001\u5929\u4E0B", def: "The earth, together with all of its countries and peoples." },
+  "global": { word: "global", phonetic: "/\u02C8\u0261lo\u028A.b\u0259l/", pos: "adj.", zh: "\u5168\u7403\u7684\u3001\u5168\u4E16\u754C\u7684\u3001\u5168\u9762\u7684", def: "Relating to the whole world; worldwide." },
+  "local": { word: "local", phonetic: "/\u02C8lo\u028A.k\u0259l/", pos: "adj./n.", zh: "\u7576\u5730\u7684\u3001\u672C\u571F\u7684\u3001\u5C40\u90E8\u7684\uFF1B\u5728\u5730\u4EBA", def: "Belonging or relating to a particular area or neighborhood." },
+  "public": { word: "public", phonetic: "/\u02C8p\u028Cb.l\u026Ak/", pos: "adj./n.", zh: "\u516C\u773E\u7684\u3001\u516C\u5171\u7684\uFF1B\u5927\u773E", def: "Concerning the people as a whole." },
+  "private": { word: "private", phonetic: "/\u02C8pra\u026A.v\u0259t/", pos: "adj.", zh: "\u79C1\u4EBA\u7684\u3001\u6C11\u71DF\u7684\u3001\u6A5F\u5BC6\u7684", def: "Belonging to or for the use of one particular person." },
+  "news": { word: "news", phonetic: "/nu\u02D0z/", pos: "n.", zh: "\u65B0\u805E\u3001\u6D88\u606F\u3001\u5373\u6642\u5831\u5C0E", def: "Newly received or noteworthy information." },
+  "story": { word: "story", phonetic: "/\u02C8st\u0254\u02D0r.i/", pos: "n.", zh: "\u6545\u4E8B\u3001\u65B0\u805E\u5831\u5C0E\u3001\u4E8B\u8E5F", def: "An account of imaginary or real people and events." },
+  "stories": { word: "stories", phonetic: "/\u02C8st\u0254\u02D0r.iz/", pos: "n. (\u8907\u6578)", zh: "\u65B0\u805E\u5831\u5C0E\u3001\u6545\u4E8B\u96C6\uFF08\u8907\u6578\uFF09", def: "Plural of story." },
+  "event": { word: "event", phonetic: "/\u026A\u02C8vent/", pos: "n.", zh: "\u4E8B\u4EF6\u3001\u6D3B\u52D5\u3001\u76DB\u4E8B", def: "A thing that happens, especially one of importance." },
+  "events": { word: "events", phonetic: "/\u026A\u02C8vents/", pos: "n. (\u8907\u6578)", zh: "\u5404\u9805\u91CD\u5927\u4E8B\u4EF6\u3001\u6D3B\u52D5\uFF08\u8907\u6578\uFF09", def: "Plural of event." },
+  "crisis": { word: "crisis", phonetic: "/\u02C8kra\u026A.s\u026As/", pos: "n.", zh: "\u5371\u6A5F\u3001\u7DCA\u6025\u95DC\u982D", def: "A time of intense difficulty, trouble, or danger." },
+  "issue": { word: "issue", phonetic: "/\u02C8\u026A\u0283.u\u02D0/", pos: "n./v.", zh: "\u8B70\u984C\u3001\u554F\u984C\u3001\u722D\u8B70\uFF1B\u767C\u884C", def: "An important topic or problem for debate or discussion." },
+  "issues": { word: "issues", phonetic: "/\u02C8\u026A\u0283.u\u02D0z/", pos: "n. (\u8907\u6578) / v.", zh: "\u91CD\u5927\u8B70\u984C\u3001\u722D\u8B70\u554F\u984C\uFF08\u8907\u6578\uFF09", def: "Plural of issue." },
+  "problem": { word: "problem", phonetic: "/\u02C8pr\u0251\u02D0.bl\u0259m/", pos: "n.", zh: "\u554F\u984C\u3001\u96E3\u984C\u3001\u56F0\u5883", def: "A matter or situation regarded as unwelcome." },
+  "problems": { word: "problems", phonetic: "/\u02C8pr\u0251\u02D0.bl\u0259mz/", pos: "n. (\u8907\u6578)", zh: "\u554F\u984C\u3001\u56F0\u5883\u6311\u6230\uFF08\u8907\u6578\uFF09", def: "Plural of problem." },
+  "solution": { word: "solution", phonetic: "/s\u0259\u02C8lu\u02D0.\u0283\u0259n/", pos: "n.", zh: "\u89E3\u6C7A\u65B9\u6848\u3001\u89E3\u7B54\u3001\u89E3\u6CD5", def: "A means of solving a problem or dealing with a difficult situation." },
+  "solutions": { word: "solutions", phonetic: "/s\u0259\u02C8lu\u02D0.\u0283\u0259nz/", pos: "n. (\u8907\u6578)", zh: "\u89E3\u6C7A\u8FA6\u6CD5\u3001\u56E0\u61C9\u5C0D\u7B56\uFF08\u8907\u6578\uFF09", def: "Plural of solution." },
+  "future": { word: "future", phonetic: "/\u02C8fju\u02D0.t\u0283\u025A/", pos: "n./adj.", zh: "\u672A\u4F86\u3001\u524D\u9014\uFF1B\u672A\u4F86\u7684", def: "At a later time; going to happen." },
+  "history": { word: "history", phonetic: "/\u02C8h\u026As.t\u0259r.i/", pos: "n.", zh: "\u6B77\u53F2\u3001\u53F2\u518A\u3001\u904E\u53BB\u7D93\u6B77", def: "The whole series of past events connected with someone or something." },
+  "school": { word: "school", phonetic: "/sku\u02D0l/", pos: "n.", zh: "\u5B78\u6821\u3001\u5B78\u9662\u3001\u5B78\u6D3E", def: "An institution for educating children." },
+  "student": { word: "student", phonetic: "/\u02C8stu\u02D0.d\u0259nt/", pos: "n.", zh: "\u5B78\u751F\u3001\u5B78\u8005\u3001\u7814\u7A76\u8005", def: "A person who is studying at a school or college." },
+  "students": { word: "students", phonetic: "/\u02C8stu\u02D0.d\u0259nts/", pos: "n. (\u8907\u6578)", zh: "\u5B78\u751F\u5011\u3001\u9752\u5E74\u5B78\u5B50\uFF08\u8907\u6578\uFF09", def: "Plural of student." },
+  "teacher": { word: "teacher", phonetic: "/\u02C8ti\u02D0.t\u0283\u025A/", pos: "n.", zh: "\u8001\u5E2B\u3001\u6559\u5E2B\u3001\u5C0E\u5E2B", def: "A person who teaches, especially in a school." },
+  "teachers": { word: "teachers", phonetic: "/\u02C8ti\u02D0.t\u0283\u025Az/", pos: "n. (\u8907\u6578)", zh: "\u6559\u5E2B\u5718\u968A\u3001\u8001\u5E2B\u5011\uFF08\u8907\u6578\uFF09", def: "Plural of teacher." },
+  "doctor": { word: "doctor", phonetic: "/\u02C8d\u0251\u02D0k.t\u025A/", pos: "n.", zh: "\u91AB\u751F\u3001\u91AB\u5E2B\u3001\u535A\u58EB", def: "A qualified practitioner of medicine." },
+  "doctors": { word: "doctors", phonetic: "/\u02C8d\u0251\u02D0k.t\u025Az/", pos: "n. (\u8907\u6578)", zh: "\u91AB\u5E2B\u5718\u968A\u3001\u91AB\u5E2B\u5011\uFF08\u8907\u6578\uFF09", def: "Plural of doctor." },
+  "hospital": { word: "hospital", phonetic: "/\u02C8h\u0251\u02D0.sp\u026A.t\u032C\u0259l/", pos: "n.", zh: "\u91AB\u9662\u3001\u91AB\u7642\u4E2D\u5FC3", def: "An institution providing medical treatment." },
+  "hospitals": { word: "hospitals", phonetic: "/\u02C8h\u0251\u02D0.sp\u026A.t\u032C\u0259lz/", pos: "n. (\u8907\u6578)", zh: "\u91AB\u9662\u6A5F\u69CB\uFF08\u8907\u6578\uFF09", def: "Plural of hospital." },
+  "patient": { word: "patient", phonetic: "/\u02C8pe\u026A.\u0283\u0259nt/", pos: "n./adj.", zh: "\u75C5\u60A3\u3001\u60A3\u8005\uFF1B\u8010\u5FC3\u7684", def: "A person receiving or registered to receive medical treatment." },
+  "patients": { word: "patients", phonetic: "/\u02C8pe\u026A.\u0283\u0259nts/", pos: "n. (\u8907\u6578)", zh: "\u75C5\u60A3\u7FA4\u9AD4\u3001\u60A3\u8005\u5011\uFF08\u8907\u6578\uFF09", def: "Plural of patient." },
+  "drug": { word: "drug", phonetic: "/dr\u028C\u0261/", pos: "n.", zh: "\u85E5\u7269\u3001\u85E5\u54C1\u3001\u6BD2\u54C1", def: "A medicine or other substance which has a physiological effect." },
+  "drugs": { word: "drugs", phonetic: "/dr\u028C\u0261z/", pos: "n. (\u8907\u6578)", zh: "\u85E5\u7269\u3001\u5404\u985E\u85E5\u54C1\uFF08\u8907\u6578\uFF09", def: "Plural of drug." },
+  "medicine": { word: "medicine", phonetic: "/\u02C8med.\u026A.s\u0259n/", pos: "n.", zh: "\u91AB\u5B78\u3001\u85E5\u7269\u3001\u91AB\u7642\u54C1", def: "The science or practice of the treatment of disease." },
+  "border": { word: "border", phonetic: "/\u02C8b\u0254\u02D0r.d\u025A/", pos: "n./v.", zh: "\u908A\u754C\u3001\u908A\u5883\u3001\u570B\u754C\uFF1B\u6BD7\u9130", def: "A line separating two countries or other areas." },
+  "borders": { word: "borders", phonetic: "/\u02C8b\u0254\u02D0r.d\u025Az/", pos: "n. (\u8907\u6578)", zh: "\u908A\u5883\u570B\u754C\uFF08\u8907\u6578\uFF09", def: "Plural of border." },
+  "military": { word: "military", phonetic: "/\u02C8m\u026Al.\u0259.ter.i/", pos: "n./adj.", zh: "\u8ECD\u968A\u3001\u8ECD\u65B9\uFF1B\u8ECD\u4E8B\u7684", def: "Relating to or characteristic of soldiers or armed forces." },
+  "war": { word: "war", phonetic: "/w\u0254\u02D0r/", pos: "n.", zh: "\u6230\u722D\u3001\u885D\u7A81\u3001\u4EA4\u6230", def: "A state of armed conflict between different nations." },
+  "peace": { word: "peace", phonetic: "/pi\u02D0s/", pos: "n.", zh: "\u548C\u5E73\u3001\u5B89\u5BE7\u3001\u505C\u6230", def: "Freedom from disturbance; tranquility." },
+  "election": { word: "election", phonetic: "/i\u02C8lek.\u0283\u0259n/", pos: "n.", zh: "\u9078\u8209\u3001\u5927\u9078\u3001\u6295\u7968\u6C7A\u5B9A", def: "A formal and organized choice by vote." },
+  "elections": { word: "elections", phonetic: "/i\u02C8lek.\u0283\u0259nz/", pos: "n. (\u8907\u6578)", zh: "\u5404\u9805\u9078\u8209\u3001\u516C\u6295\uFF08\u8907\u6578\uFF09", def: "Plural of election." },
+  "vote": { word: "vote", phonetic: "/vo\u028At/", pos: "n./v.", zh: "\u6295\u7968\u3001\u9078\u7968\uFF1B\u8868\u6C7A", def: "A formal indication of a choice between two or more candidates." },
+  "votes": { word: "votes", phonetic: "/vo\u028Ats/", pos: "n. (\u8907\u6578) / v.", zh: "\u5F97\u7968\u6578\u3001\u6295\u7968\uFF08\u8907\u6578\uFF09", def: "Plural of vote." },
+  "voted": { word: "voted", phonetic: "/\u02C8vo\u028A.t\u032C\u026Ad/", pos: "v. (\u904E\u53BB\u5F0F)", zh: "\u6295\u4E86\u7968\u3001\u8868\u6C7A\u4E86\uFF08vote \u7684\u904E\u53BB\u5F0F\uFF09", def: "Past tense of vote." },
+  "voting": { word: "voting", phonetic: "/\u02C8vo\u028A.t\u032C\u026A\u014B/", pos: "n./v.", zh: "\u6295\u7968\u9078\u8209\u3001\u8868\u6C7A\u884C\u52D5", def: "The act of casting a vote." },
+  "candidate": { word: "candidate", phonetic: "/\u02C8k\xE6n.d\u026A.d\u0259t/", pos: "n.", zh: "\u5019\u9078\u4EBA\u3001\u61C9\u8A66\u8005", def: "A person who applies for a job or is nominated for election." },
+  "candidates": { word: "candidates", phonetic: "/\u02C8k\xE6n.d\u026A.d\u0259ts/", pos: "n. (\u8907\u6578)", zh: "\u5019\u9078\u4EBA\u5011\uFF08\u8907\u6578\uFF09", def: "Plural of candidate." },
+  "leader": { word: "leader", phonetic: "/\u02C8li\u02D0.d\u025A/", pos: "n.", zh: "\u9818\u8896\u3001\u9818\u5C0E\u4EBA\u3001\u9996\u9577", def: "The person who leads or commands a group." },
+  "leaders": { word: "leaders", phonetic: "/\u02C8li\u02D0.d\u025Az/", pos: "n. (\u8907\u6578)", zh: "\u570B\u5BB6\u9996\u8166\u3001\u9818\u8896\u7FA4\uFF08\u8907\u6578\uFF09", def: "Plural of leader." },
+  "leadership": { word: "leadership", phonetic: "/\u02C8li\u02D0.d\u025A.\u0283\u026Ap/", pos: "n.", zh: "\u9818\u5C0E\u80FD\u529B\u3001\u9818\u5C0E\u968E\u5C64", def: "The action of leading a group of people." },
+  "warning": { word: "warning", phonetic: "/\u02C8w\u0254\u02D0r.n\u026A\u014B/", pos: "n./adj.", zh: "\u8B66\u544A\u3001\u8B66\u5831\u3001\u9810\u8B66", def: "A statement or event that indicates a possible or impending danger." },
+  "warnings": { word: "warnings", phonetic: "/\u02C8w\u0254\u02D0r.n\u026A\u014Bz/", pos: "n. (\u8907\u6578)", zh: "\u5404\u9805\u8B66\u5831\u3001\u544A\u8AA1\uFF08\u8907\u6578\uFF09", def: "Plural of warning." },
+  "danger": { word: "danger", phonetic: "/\u02C8de\u026An.d\u0292\u025A/", pos: "n.", zh: "\u5371\u96AA\u3001\u98A8\u96AA\u3001\u5A01\u8105", def: "The possibility of suffering harm or injury." },
+  "risk": { word: "risk", phonetic: "/r\u026Ask/", pos: "n./v.", zh: "\u98A8\u96AA\u3001\u96B1\u6182\uFF1B\u5192\u96AA", def: "A situation involving exposure to danger." },
+  "risks": { word: "risks", phonetic: "/r\u026Asks/", pos: "n. (\u8907\u6578)", zh: "\u5404\u985E\u98A8\u96AA\uFF08\u8907\u6578\uFF09", def: "Plural of risk." },
+  "safety": { word: "safety", phonetic: "/\u02C8se\u026Af.ti/", pos: "n.", zh: "\u5B89\u5168\u3001\u5E73\u5B89\u3001\u5B89\u5168\u6027", def: "The condition of being protected from or unlikely to cause danger." },
+  "safe": { word: "safe", phonetic: "/se\u026Af/", pos: "adj./n.", zh: "\u5B89\u5168\u7684\u3001\u5B89\u7136\u7121\u6059\u7684\uFF1B\u4FDD\u96AA\u7BB1", def: "Protected from or not exposed to danger." },
+  "storm": { word: "storm", phonetic: "/st\u0254\u02D0rm/", pos: "n./v.", zh: "\u98A8\u66B4\u3001\u66B4\u98A8\u96E8\uFF1B\u731B\u70C8\u653B\u64CA", def: "A violent disturbance of the atmosphere." },
+  "storms": { word: "storms", phonetic: "/st\u0254\u02D0rmz/", pos: "n. (\u8907\u6578)", zh: "\u66B4\u98A8\u96E8\u3001\u98A8\u66B4\u7FA4\uFF08\u8907\u6578\uFF09", def: "Plural of storm." },
+  "quake": { word: "quake", phonetic: "/kwe\u026Ak/", pos: "n./v.", zh: "\u5730\u9707\u3001\u9707\u52D5\uFF1B\u767C\u6296", def: "An earthquake; to shake or tremble." },
+  "earthquake": { word: "earthquake", phonetic: "/\u02C8\u025D\u02D0\u03B8.kwe\u026Ak/", pos: "n.", zh: "\u5730\u9707\u3001\u5730\u9707\u707D\u5BB3", def: "A sudden and violent shaking of the ground." },
+  "earthquakes": { word: "earthquakes", phonetic: "/\u02C8\u025D\u02D0\u03B8.kwe\u026Aks/", pos: "n. (\u8907\u6578)", zh: "\u591A\u6B21\u5730\u9707\uFF08\u8907\u6578\uFF09", def: "Plural of earthquake." },
+  "fire": { word: "fire", phonetic: "/fa\u026Ar/", pos: "n./v.", zh: "\u706B\u707D\u3001\u5927\u706B\uFF1B\u958B\u706B\u3001\u89E3\u50F1", def: "Combustion or burning; to dismiss from a job." },
+  "fires": { word: "fires", phonetic: "/fa\u026Arz/", pos: "n. (\u8907\u6578)", zh: "\u706B\u707D\u707D\u60C5\uFF08\u8907\u6578\uFF09", def: "Plural of fire." },
+  "wildfire": { word: "wildfire", phonetic: "/\u02C8wa\u026Ald.fa\u026Ar/", pos: "n.", zh: "\u91CE\u706B\u3001\u68EE\u6797\u5927\u706B\u3001\u5C71\u706B", def: "A large, destructive fire that spreads quickly over woodland or brush." },
+  "wildfires": { word: "wildfires", phonetic: "/\u02C8wa\u026Ald.fa\u026Arz/", pos: "n. (\u8907\u6578)", zh: "\u5C71\u6797\u91CE\u706B\uFF08\u8907\u6578\uFF09", def: "Plural of wildfire." },
+  "flood": { word: "flood", phonetic: "/fl\u028Cd/", pos: "n./v.", zh: "\u6D2A\u6C34\u3001\u6C34\u707D\uFF1B\u6DF9\u6C92\u3001\u5927\u91CF\u6E67\u5165", def: "An overflowing of a large amount of water." },
+  "floods": { word: "floods", phonetic: "/fl\u028Cdz/", pos: "n. (\u8907\u6578)", zh: "\u6D2A\u6F87\u6C34\u707D\uFF08\u8907\u6578\uFF09", def: "Plural of flood." },
+  "flooding": { word: "flooding", phonetic: "/\u02C8fl\u028Cd.\u026A\u014B/", pos: "n.", zh: "\u6DF9\u6C34\u3001\u6DF9\u6C34\u707D\u60C5\u3001\u7A4D\u6C34", def: "The covering or submerging of normally dry land with water." },
+  "rain": { word: "rain", phonetic: "/re\u026An/", pos: "n./v.", zh: "\u964D\u96E8\u3001\u96E8\u6C34\uFF1B\u4E0B\u96E8", def: "Moisture condensed from the atmosphere that falls visibly in separate drops." },
+  "wind": { word: "wind", phonetic: "/w\u026And/", pos: "n.", zh: "\u98A8\u3001\u6C23\u6D41", def: "The perceptible natural movement of the air." },
+  "winds": { word: "winds", phonetic: "/w\u026Andz/", pos: "n. (\u8907\u6578)", zh: "\u5F37\u98A8\u3001\u98A8\u52E2\uFF08\u8907\u6578\uFF09", def: "Plural of wind." },
+  "drive": { word: "drive", phonetic: "/dra\u026Av/", pos: "v./n.", zh: "\u958B\u8ECA\u3001\u99D5\u99DB\u3001\u9A45\u52D5\uFF1B\u8ECA\u7A0B\u3001\u904B\u52D5", def: "To operate and control the direction and speed of a motor vehicle." },
+  "driver": { word: "driver", phonetic: "/\u02C8dra\u026A.v\u025A/", pos: "n.", zh: "\u99D5\u99DB\u3001\u53F8\u6A5F", def: "A person who drives a vehicle." },
+  "drivers": { word: "drivers", phonetic: "/\u02C8dra\u026A.v\u025Az/", pos: "n. (\u8907\u6578)", zh: "\u99D5\u99DB\u4EBA\uFF08\u8907\u6578\uFF09", def: "Plural of driver." },
+  "road": { word: "road", phonetic: "/ro\u028Ad/", pos: "n.", zh: "\u9053\u8DEF\u3001\u516C\u8DEF\u3001\u99AC\u8DEF", def: "A wide way leading from one place to another." },
+  "roads": { word: "roads", phonetic: "/ro\u028Adz/", pos: "n. (\u8907\u6578)", zh: "\u9053\u8DEF\u8DEF\u7DB2\uFF08\u8907\u6578\uFF09", def: "Plural of road." },
+  "street": { word: "street", phonetic: "/stri\u02D0t/", pos: "n.", zh: "\u8857\u9053\u3001\u8857\u5340", def: "A public road in a city or town." },
+  "streets": { word: "streets", phonetic: "/stri\u02D0ts/", pos: "n. (\u8907\u6578)", zh: "\u5404\u8857\u9053\uFF08\u8907\u6578\uFF09", def: "Plural of street." },
+  "bridge": { word: "bridge", phonetic: "/br\u026Ad\u0292/", pos: "n./v.", zh: "\u6A4B\u6A11\u3001\u8DE8\u63A5\uFF1B\u67B6\u6A4B", def: "A structure carrying a road, path, railway over an obstacle." },
+  "bridges": { word: "bridges", phonetic: "/\u02C8br\u026Ad\u0292.\u026Az/", pos: "n. (\u8907\u6578)", zh: "\u6A4B\u6A11\u7FA4\uFF08\u8907\u6578\uFF09", def: "Plural of bridge." },
+  "airport": { word: "airport", phonetic: "/\u02C8er.p\u0254\u02D0rt/", pos: "n.", zh: "\u6A5F\u5834\u3001\u822A\u7A7A\u7AD9", def: "A complex of runways and buildings for the take-off and landing of aircraft." },
+  "flight": { word: "flight", phonetic: "/fla\u026At/", pos: "n.", zh: "\u73ED\u6A5F\u3001\u98DB\u884C\u822A\u7A0B", def: "The action or process of flying through the air." },
+  "flights": { word: "flights", phonetic: "/fla\u026Ats/", pos: "n. (\u8907\u6578)", zh: "\u822A\u73ED\u3001\u73ED\u6A5F\uFF08\u8907\u6578\uFF09", def: "Plural of flight." },
+  "tech": { word: "tech", phonetic: "/tek/", pos: "n./adj.", zh: "\u9AD8\u79D1\u6280\u3001\u79D1\u6280\u696D\uFF1B\u6280\u8853\u7684", def: "Short for technology." },
+  "technology": { word: "technology", phonetic: "/tek\u02C8n\u0251\u02D0.l\u0259.d\u0292i/", pos: "n.", zh: "\u79D1\u6280\u3001\u6280\u8853\u3001\u5DE5\u85DD", def: "The application of scientific knowledge for practical purposes." },
+  "technologies": { word: "technologies", phonetic: "/tek\u02C8n\u0251\u02D0.l\u0259.d\u0292iz/", pos: "n. (\u8907\u6578)", zh: "\u5404\u985E\u79D1\u6280\u6280\u8853\uFF08\u8907\u6578\uFF09", def: "Plural of technology." },
+  "phone": { word: "phone", phonetic: "/fo\u028An/", pos: "n./v.", zh: "\u624B\u6A5F\u3001\u96FB\u8A71\uFF1B\u6253\u96FB\u8A71", def: "A telephone." },
+  "phones": { word: "phones", phonetic: "/fo\u028Anz/", pos: "n. (\u8907\u6578)", zh: "\u884C\u52D5\u96FB\u8A71\uFF08\u8907\u6578\uFF09", def: "Plural of phone." },
+  "computer": { word: "computer", phonetic: "/k\u0259m\u02C8pju\u02D0.t\u032C\u025A/", pos: "n.", zh: "\u96FB\u8166\u3001\u8A08\u7B97\u6A5F", def: "An electronic device for storing and processing data." },
+  "computers": { word: "computers", phonetic: "/k\u0259m\u02C8pju\u02D0.t\u032C\u025Az/", pos: "n. (\u8907\u6578)", zh: "\u96FB\u8166\u8A2D\u5099\uFF08\u8907\u6578\uFF09", def: "Plural of computer." },
+  "data": { word: "data", phonetic: "/\u02C8de\u026A.t\u032C\u0259/", pos: "n.", zh: "\u6578\u64DA\u3001\u8CC7\u6599\u3001\u5927\u6578\u64DA", def: "Facts and statistics collected together for reference or analysis." },
+  "media": { word: "media", phonetic: "/\u02C8mi\u02D0.di.\u0259/", pos: "n.", zh: "\u65B0\u805E\u5A92\u9AD4\u3001\u50B3\u64AD\u5A92\u4ECB", def: "The main means of mass communication." },
+  "video": { word: "video", phonetic: "/\u02C8v\u026Ad.i.o\u028A/", pos: "n./adj.", zh: "\u5F71\u7247\u3001\u8996\u8A0A\u3001\u9304\u5F71\uFF1B\u8996\u8A0A\u7684", def: "The recording, reproducing, or broadcasting of moving visual images." },
+  "videos": { word: "videos", phonetic: "/\u02C8v\u026Ad.i.o\u028Az/", pos: "n. (\u8907\u6578)", zh: "\u5F71\u7247\uFF08\u8907\u6578\uFF09", def: "Plural of video." },
+  "study": { word: "study", phonetic: "/\u02C8st\u028Cd.i/", pos: "n./v.", zh: "\u7814\u7A76\u3001\u5B78\u8853\u8ABF\u67E5\u3001\u7814\u8B80\uFF1B\u7814\u7FD2", def: "The devotion of time and attention to acquiring knowledge." },
+  "studies": { word: "studies", phonetic: "/\u02C8st\u028Cd.iz/", pos: "n. (\u8907\u6578) / v.", zh: "\u5B78\u8853\u7814\u7A76\u5831\u544A\uFF08\u8907\u6578\uFF09\uFF1B\u7814\u8B80", def: "Plural of study." },
+  "stock": { word: "stock", phonetic: "/st\u0251\u02D0k/", pos: "n./v.", zh: "\u80A1\u7968\u3001\u5EAB\u5B58\u3001\u80A1\u6B0A\uFF1B\u9032\u8CA8", def: "The capital raised by a company through the issue and subscription of shares." },
+  "stocks": { word: "stocks", phonetic: "/st\u0251\u02D0ks/", pos: "n. (\u8907\u6578)", zh: "\u80A1\u5E02\u3001\u5404\u6A94\u80A1\u7968\uFF08\u8907\u6578\uFF09", def: "Plural of stock." },
+  "growth": { word: "growth", phonetic: "/\u0261ro\u028A\u03B8/", pos: "n.", zh: "\u6210\u9577\u3001\u7D93\u6FDF\u589E\u9577\u3001\u767C\u5C55", def: "The process of increasing in physical size or economic value." },
+  "tax": { word: "tax", phonetic: "/t\xE6ks/", pos: "n./v.", zh: "\u7A05\u91D1\u3001\u7A05\u52D9\u3001\u8CE6\u7A05\uFF1B\u8AB2\u7A05", def: "A compulsory contribution to state revenue." },
+  "taxes": { word: "taxes", phonetic: "/\u02C8t\xE6k.s\u026Az/", pos: "n. (\u8907\u6578)", zh: "\u5404\u9805\u7A05\u6536\u3001\u7A05\u6B3E\uFF08\u8907\u6578\uFF09", def: "Plural of tax." },
+  "tariff": { word: "tariff", phonetic: "/\u02C8ter.\u026Af/", pos: "n.", zh: "\u95DC\u7A05\u3001\u95DC\u7A05\u58C1\u58D8", def: "A tax or duty to be paid on a particular class of imports or exports." },
+  "tariffs": { word: "tariffs", phonetic: "/\u02C8ter.\u026Afs/", pos: "n. (\u8907\u6578)", zh: "\u95DC\u7A05\u63AA\u65BD\uFF08\u8907\u6578\uFF09", def: "Plural of tariff." },
+  "debt": { word: "debt", phonetic: "/det/", pos: "n.", zh: "\u50B5\u52D9\u3001\u570B\u50B5\u3001\u6B20\u6B3E", def: "A sum of money that is owed or due." },
+  "dollar": { word: "dollar", phonetic: "/\u02C8d\u0251\u02D0.l\u025A/", pos: "n.", zh: "\u7F8E\u5143\u3001\u5143", def: "The basic monetary unit of the US and other countries." },
+  "dollars": { word: "dollars", phonetic: "/\u02C8d\u0251\u02D0.l\u025Az/", pos: "n. (\u8907\u6578)", zh: "\u7F8E\u5143\uFF08\u8907\u6578\uFF09", def: "Plural of dollar." },
+  "loan": { word: "loan", phonetic: "/lo\u028An/", pos: "n./v.", zh: "\u8CB8\u6B3E\u3001\u501F\u6B3E\uFF1B\u501F\u51FA", def: "A thing that is borrowed, especially a sum of money that is expected to be paid back." },
+  "loans": { word: "loans", phonetic: "/lo\u028Anz/", pos: "n. (\u8907\u6578)", zh: "\u5404\u985E\u8CB8\u6B3E\uFF08\u8907\u6578\uFF09", def: "Plural of loan." },
+  "credit": { word: "credit", phonetic: "/\u02C8kred.\u026At/", pos: "n./v.", zh: "\u4FE1\u7528\u3001\u4FE1\u7528\u984D\u5EA6\u3001\u5B78\u5206\uFF1B\u6B78\u529F\u65BC", def: "The ability of a customer to obtain goods or services before payment." },
+  "housing": { word: "housing", phonetic: "/\u02C8ha\u028A.z\u026A\u014B/", pos: "n.", zh: "\u4F4F\u623F\u3001\u623F\u5730\u7522\u5E02\u5834\u3001\u4F4F\u5B85", def: "Houses and apartments considered collectively." },
+  "home": { word: "home", phonetic: "/ho\u028Am/", pos: "n./adj.", zh: "\u5BB6\u3001\u5BB6\u5EAD\u3001\u4F4F\u5BB6\uFF1B\u5C45\u5BB6\u7684", def: "The place where one lives permanently." },
+  "homes": { word: "homes", phonetic: "/ho\u028Amz/", pos: "n. (\u8907\u6578)", zh: "\u4F4F\u5B85\u623F\u5C4B\uFF08\u8907\u6578\uFF09", def: "Plural of home." },
+  "house": { word: "house", phonetic: "/ha\u028As/", pos: "n./v.", zh: "\u623F\u5B50\u3001\u623F\u5C4B\u3001\u8B70\u6703\uFF1B\u63D0\u4F9B\u4F4F\u6240", def: "A building for human habitation." },
+  "houses": { word: "houses", phonetic: "/\u02C8ha\u028A.z\u026Az/", pos: "n. (\u8907\u6578)", zh: "\u623F\u5C4B\uFF08\u8907\u6578\uFF09", def: "Plural of house." },
+  "rent": { word: "rent", phonetic: "/rent/", pos: "n./v.", zh: "\u79DF\u91D1\uFF1B\u51FA\u79DF\u3001\u627F\u79DF", def: "A tenant's regular payment to a landlord." },
+  "consumer": { word: "consumer", phonetic: "/k\u0259n\u02C8su\u02D0.m\u025A/", pos: "n.", zh: "\u6D88\u8CBB\u8005\u3001\u7528\u6236", def: "A person who purchases goods and services for personal use." },
+  "consumers": { word: "consumers", phonetic: "/k\u0259n\u02C8su\u02D0.m\u025Az/", pos: "n. (\u8907\u6578)", zh: "\u5EE3\u5927\u6D88\u8CBB\u8005\uFF08\u8907\u6578\uFF09", def: "Plural of consumer." },
+  "supply": { word: "supply", phonetic: "/s\u0259\u02C8pla\u026A/", pos: "n./v.", zh: "\u4F9B\u61C9\u3001\u4F9B\u7D66\u3001\u7269\u8CC7\uFF1B\u63D0\u4F9B", def: "A stock of a resource from which a person or place can be provided." },
+  "supplies": { word: "supplies", phonetic: "/s\u0259\u02C8pla\u026Az/", pos: "n. (\u8907\u6578)", zh: "\u5404\u9805\u88DC\u7D66\u7269\u8CC7\uFF08\u8907\u6578\uFF09", def: "Plural of supply." },
+  "chain": { word: "chain", phonetic: "/t\u0283e\u026An/", pos: "n./v.", zh: "\u93C8\u3001\u4F9B\u61C9\u93C8\u3001\u9023\u9396\u6A5F\u69CB\uFF1B\u93C8\u63A5", def: "A series of connected links; a sequence." },
+  "chains": { word: "chains", phonetic: "/t\u0283e\u026Anz/", pos: "n. (\u8907\u6578)", zh: "\u9023\u9396\u5E97\u3001\u93C8\u689D\uFF08\u8907\u6578\uFF09", def: "Plural of chain." },
+  "travel": { word: "travel", phonetic: "/\u02C8tr\xE6v.\u0259l/", pos: "v./n.", zh: "\u65C5\u884C\u3001\u51FA\u904A\u3001\u901A\u52E4\uFF1B\u65C5\u904A", def: "To make a journey, typically of some length." },
+  "tour": { word: "tour", phonetic: "/t\u028Ar/", pos: "n./v.", zh: "\u89C0\u5149\u3001\u5DE1\u8FF4\u6F14\u51FA\u3001\u53C3\u89C0\uFF1B\u5DE1\u8A2A", def: "A journey for pleasure in which several different places are visited." },
+  "hotel": { word: "hotel", phonetic: "/ho\u028A\u02C8tel/", pos: "n.", zh: "\u98EF\u5E97\u3001\u65C5\u9928\u3001\u65C5\u5E97", def: "An establishment providing accommodations." },
+  "hotels": { word: "hotels", phonetic: "/ho\u028A\u02C8telz/", pos: "n. (\u8907\u6578)", zh: "\u5404\u5927\u98EF\u5E97\u65C5\u9928\uFF08\u8907\u6578\uFF09", def: "Plural of hotel." },
+  "ticket": { word: "ticket", phonetic: "/\u02C8t\u026Ak.\u026At/", pos: "n./v.", zh: "\u7968\u5238\u3001\u5165\u5834\u5238\u3001\u6A5F\u7968\u3001\u7F70\u55AE\uFF1B\u958B\u7F70\u55AE", def: "A piece of paper or card that gives the holder a certain right." },
+  "tickets": { word: "tickets", phonetic: "/\u02C8t\u026Ak.\u026Ats/", pos: "n. (\u8907\u6578)", zh: "\u9580\u7968\u3001\u6A5F\u7968\uFF08\u8907\u6578\uFF09", def: "Plural of ticket." },
+  "cancel": { word: "cancel", phonetic: "/\u02C8k\xE6n.s\u0259l/", pos: "v.", zh: "\u53D6\u6D88\u3001\u5EE2\u6B62\u3001\u4F5C\u5EE2", def: "To decide or announce that a planned event will not take place." },
+  "canceled": { word: "canceled", phonetic: "/\u02C8k\xE6n.s\u0259ld/", pos: "v./adj.", zh: "\u5DF2\u53D6\u6D88\u3001\u88AB\u5EE2\u6B62\uFF08cancel \u7684\u904E\u53BB\u5F0F\uFF09", def: "Past tense of cancel; called off." },
+  "cancelling": { word: "cancelling", phonetic: "/\u02C8k\xE6n.s\u0259l.\u026A\u014B/", pos: "v.", zh: "\u6B63\u5728\u53D6\u6D88\u4E2D", def: "Present participle of cancel." },
+  "satellite": { word: "satellite", phonetic: "/\u02C8s\xE6t\u032C.\u0259l.a\u026At/", pos: "n.", zh: "\u4EBA\u9020\u885B\u661F\u3001\u885B\u661F\u901A\u8A0A", def: "An artificial body placed in orbit around the earth or moon." },
+  "satellites": { word: "satellites", phonetic: "/\u02C8s\xE6t\u032C.\u0259l.a\u026Ats/", pos: "n. (\u8907\u6578)", zh: "\u885B\u661F\u7FA4\uFF08\u8907\u6578\uFF09", def: "Plural of satellite." },
+  "space": { word: "space", phonetic: "/spe\u026As/", pos: "n.", zh: "\u592A\u7A7A\u3001\u7A7A\u9593\u3001\u7A7A\u5730", def: "The physical universe beyond the earth's atmosphere." },
+  "rocket": { word: "rocket", phonetic: "/\u02C8r\u0251\u02D0.k\u026At/", pos: "n./v.", zh: "\u706B\u7BAD\uFF1B\u98DB\u901F\u4E0A\u5347", def: "A cylindrical projectile that can be propelled to a great height." },
+  "rockets": { word: "rockets", phonetic: "/\u02C8r\u0251\u02D0.k\u026Ats/", pos: "n. (\u8907\u6578)", zh: "\u706B\u7BAD\u7FA4\uFF08\u8907\u6578\uFF09", def: "Plural of rocket." },
+  "launch": { word: "launch", phonetic: "/l\u0254\u02D0nt\u0283/", pos: "v./n.", zh: "\u767C\u5C04\u3001\u63A8\u51FA\u3001\u555F\u52D5\uFF1B\u65B0\u54C1\u767C\u8868\u6703", def: "To set in motion; to send a missile or spacecraft into the air." },
+  "launched": { word: "launched", phonetic: "/l\u0254\u02D0nt\u0283t/", pos: "v. (\u904E\u53BB\u5F0F)", zh: "\u767C\u5C04\u4E86\u3001\u555F\u52D5\u4E86\u3001\u63A8\u51FA\u4E86\uFF08launch \u7684\u904E\u53BB\u5F0F\uFF09", def: "Past tense of launch." },
+  "launches": { word: "launches", phonetic: "/\u02C8l\u0254\u02D0n.t\u0283\u026Az/", pos: "n. (\u8907\u6578) / v.", zh: "\u767C\u5C04\u4EFB\u52D9\u3001\u767C\u5E03\u6703\uFF08\u8907\u6578\uFF09", def: "Plural of launch." },
+  "science": { word: "science", phonetic: "/\u02C8sa\u026A.\u0259ns/", pos: "n.", zh: "\u79D1\u5B78\u3001\u81EA\u7136\u79D1\u5B78\u3001\u5B78\u79D1", def: "The systematic study of the structure and behavior of the physical world." },
+  "scientist": { word: "scientist", phonetic: "/\u02C8sa\u026A.\u0259n.t\u026Ast/", pos: "n.", zh: "\u79D1\u5B78\u5BB6\u3001\u5B78\u8005", def: "A person who is studying or has expert knowledge of science." },
+  "scientists": { word: "scientists", phonetic: "/\u02C8sa\u026A.\u0259n.t\u026Asts/", pos: "n. (\u8907\u6578)", zh: "\u79D1\u5B78\u5BB6\u5718\u968A\uFF08\u8907\u6578\uFF09", def: "Plural of scientist." },
+  "battery": { word: "battery", phonetic: "/\u02C8b\xE6t\u032C.\u025A.i/", pos: "n.", zh: "\u96FB\u6C60\u3001\u5132\u80FD\u96FB\u82AF\u3001\u4E00\u7D44", def: "A device that stores electrical energy." },
+  "batteries": { word: "batteries", phonetic: "/\u02C8b\xE6t\u032C.\u025A.iz/", pos: "n. (\u8907\u6578)", zh: "\u96FB\u6C60\u7D44\uFF08\u8907\u6578\uFF09", def: "Plural of battery." },
+  "ev": { word: "EV", phonetic: "/\u02CCi\u02D0\u02C8vi\u02D0/", pos: "n.", zh: "\u96FB\u52D5\u8ECA\uFF08Electric Vehicle\uFF09", def: "Electric Vehicle." },
+  "electric": { word: "electric", phonetic: "/i\u02C8lek.tr\u026Ak/", pos: "adj.", zh: "\u96FB\u529B\u7684\u3001\u96FB\u52D5\u7684\u3001\u96FB\u6C23\u7684", def: "Of, worked by, or producing electricity." },
+  "emergency": { word: "emergency", phonetic: "/\u026A\u02C8m\u025D\u02D0.d\u0292\u0259n.si/", pos: "n./adj.", zh: "\u7DCA\u6025\u72C0\u6CC1\u3001\u7A81\u767C\u4E8B\u614B\uFF1B\u7DCA\u6025\u7684", def: "A serious, unexpected, and often dangerous situation." },
+  "emergencies": { word: "emergencies", phonetic: "/\u026A\u02C8m\u025D\u02D0.d\u0292\u0259n.siz/", pos: "n. (\u8907\u6578)", zh: "\u5404\u985E\u7DCA\u6025\u4E8B\u614B\uFF08\u8907\u6578\uFF09", def: "Plural of emergency." },
+  "rescue": { word: "rescue", phonetic: "/\u02C8res.kju\u02D0/", pos: "v./n.", zh: "\u6551\u63F4\u3001\u641C\u6551\u3001\u62EF\u6551\uFF1B\u641C\u6551\u884C\u52D5", def: "To save someone from a dangerous or distressing situation." },
+  "rescued": { word: "rescued", phonetic: "/\u02C8res.kju\u02D0d/", pos: "v. (\u904E\u53BB\u5F0F)", zh: "\u88AB\u6551\u51FA\u3001\u7372\u6551\u4E86\uFF08rescue \u7684\u904E\u53BB\u5F0F\uFF09", def: "Past tense of rescue." },
+  "clinic": { word: "clinic", phonetic: "/\u02C8kl\u026An.\u026Ak/", pos: "n.", zh: "\u8A3A\u6240\u3001\u9580\u8A3A\u90E8", def: "An establishment or hospital department where outpatients are given medical treatment." },
+  "nurse": { word: "nurse", phonetic: "/n\u025D\u02D0s/", pos: "n./v.", zh: "\u8B77\u7406\u5E2B\u3001\u8B77\u58EB\uFF1B\u770B\u8B77\u7167\u6599", def: "A person trained to care for the sick or infirm." },
+  "nurses": { word: "nurses", phonetic: "/\u02C8n\u025D\u02D0.s\u026Az/", pos: "n. (\u8907\u6578)", zh: "\u8B77\u7406\u4EBA\u54E1\uFF08\u8907\u6578\uFF09", def: "Plural of nurse." },
+  "treatment": { word: "treatment", phonetic: "/\u02C8tri\u02D0t.m\u0259nt/", pos: "n.", zh: "\u6CBB\u7642\u3001\u7642\u6CD5\u3001\u8655\u7F6E\u3001\u5F85\u9047", def: "Medical care given to a patient for an illness or injury." },
+  "treatments": { word: "treatments", phonetic: "/\u02C8tri\u02D0t.m\u0259nts/", pos: "n. (\u8907\u6578)", zh: "\u5404\u9805\u6CBB\u7642\u65B9\u6848\uFF08\u8907\u6578\uFF09", def: "Plural of treatment." },
+  "cure": { word: "cure", phonetic: "/kj\u028Ar/", pos: "v./n.", zh: "\u6CBB\u7652\u3001\u6839\u6CBB\uFF1B\u6CBB\u7652\u65B9\u6CD5", def: "To relieve a person or animal of the symptoms of a disease." },
+  "vaccine": { word: "vaccine", phonetic: "/v\xE6k\u02C8si\u02D0n/", pos: "n.", zh: "\u75AB\u82D7\u3001\u514D\u75AB\u5291", def: "A substance used to stimulate the production of antibodies." },
+  "vaccines": { word: "vaccines", phonetic: "/v\xE6k\u02C8si\u02D0nz/", pos: "n. (\u8907\u6578)", zh: "\u75AB\u82D7\u5291\u91CF\uFF08\u8907\u6578\uFF09", def: "Plural of vaccine." },
+  "virus": { word: "virus", phonetic: "/\u02C8va\u026A.r\u0259s/", pos: "n.", zh: "\u75C5\u6BD2\u3001\u96FB\u8166\u75C5\u6BD2", def: "An infective agent that typically consists of a nucleic acid molecule." },
+  "viruses": { word: "viruses", phonetic: "/\u02C8va\u026A.r\u0259.s\u026Az/", pos: "n. (\u8907\u6578)", zh: "\u5404\u985E\u75C5\u6BD2\uFF08\u8907\u6578\uFF09", def: "Plural of virus." },
+  "symptom": { word: "symptom", phonetic: "/\u02C8s\u026Amp.t\u0259m/", pos: "n.", zh: "\u75C7\u72C0\u3001\u5FB5\u5146\u3001\u5FB5\u5019", def: "A physical or mental feature indicating a condition of disease." },
+  "symptoms": { word: "symptoms", phonetic: "/\u02C8s\u026Amp.t\u0259mz/", pos: "n. (\u8907\u6578)", zh: "\u5404\u9805\u75C7\u72C0\u5FB5\u5146\uFF08\u8907\u6578\uFF09", def: "Plural of symptom." },
+  "fitness": { word: "fitness", phonetic: "/\u02C8f\u026At.n\u0259s/", pos: "n.", zh: "\u5065\u8EAB\u3001\u9AD4\u9069\u80FD\u3001\u5065\u5EB7", def: "The condition of being physically fit and healthy." },
+  "diet": { word: "diet", phonetic: "/\u02C8da\u026A.\u0259t/", pos: "n./v.", zh: "\u98F2\u98DF\u3001\u7BC0\u98DF\uFF1B\u7BC0\u5236\u98F2\u98DF", def: "The kinds of food that a person, animal, or community habitually eats." },
+  "restaurant": { word: "restaurant", phonetic: "/\u02C8res.tr\u0251\u02D0nt/", pos: "n.", zh: "\u9910\u5EF3\u3001\u98EF\u9928\u3001\u9910\u9928", def: "A place where people pay to sit and eat meals." },
+  "restaurants": { word: "restaurants", phonetic: "/\u02C8res.tr\u0251\u02D0nts/", pos: "n. (\u8907\u6578)", zh: "\u9910\u5EF3\u5E97\u5BB6\uFF08\u8907\u6578\uFF09", def: "Plural of restaurant." },
+  "cafe": { word: "cafe", phonetic: "/k\xE6f\u02C8e\u026A/", pos: "n.", zh: "\u5496\u5561\u9928\u3001\u8F15\u98DF\u5E97", def: "A small restaurant selling light meals and drinks." },
+  "coffee": { word: "coffee", phonetic: "/\u02C8k\u0251\u02D0.fi/", pos: "n.", zh: "\u5496\u5561\u3001\u5496\u5561\u8C46", def: "A hot drink made from the roasted and ground seeds of a tropical shrub." },
+  "building": { word: "building", phonetic: "/\u02C8b\u026Al.d\u026A\u014B/", pos: "n.", zh: "\u5EFA\u7BC9\u7269\u3001\u5927\u6A13\u3001\u623F\u5C4B", def: "A structure with a roof and walls." },
+  "buildings": { word: "buildings", phonetic: "/\u02C8b\u026Al.d\u026A\u014Bz/", pos: "n. (\u8907\u6578)", zh: "\u5EFA\u7BC9\u7FA4\u3001\u5927\u6A13\uFF08\u8907\u6578\uFF09", def: "Plural of building." },
+  "office": { word: "office", phonetic: "/\u02C8\u0251\u02D0.f\u026As/", pos: "n.", zh: "\u8FA6\u516C\u5BA4\u3001\u8FA6\u4E8B\u8655\u3001\u8077\u52D9", def: "A room, set of rooms, or building used as a place for commercial work." },
+  "offices": { word: "offices", phonetic: "/\u02C8\u0251\u02D0.f\u026A.s\u026Az/", pos: "n. (\u8907\u6578)", zh: "\u5404\u8FA6\u516C\u5BA4\uFF08\u8907\u6578\uFF09", def: "Plural of office." },
+  "store": { word: "store", phonetic: "/st\u0254\u02D0r/", pos: "n./v.", zh: "\u5546\u5E97\u3001\u5E97\u92EA\u3001\u5132\u5099\uFF1B\u5132\u5B58", def: "A retail establishment selling items." },
+  "stores": { word: "stores", phonetic: "/st\u0254\u02D0rz/", pos: "n. (\u8907\u6578) / v.", zh: "\u5404\u5927\u5E97\u5BB6\u3001\u9580\u5E02\uFF08\u8907\u6578\uFF09", def: "Plural of store." },
+  "college": { word: "college", phonetic: "/\u02C8k\u0251\u02D0.l\u026Ad\u0292/", pos: "n.", zh: "\u5927\u5B78\u3001\u5B78\u9662", def: "An educational institution or establishment." },
+  "university": { word: "university", phonetic: "/\u02CCju\u02D0.n\u0259\u02C8v\u025D\u02D0.s\u0259.t\u032Ci/", pos: "n.", zh: "\u7D9C\u5408\u5927\u5B78\u3001\u9AD8\u7B49\u5B78\u5E9C", def: "A high-level educational institution." },
+  "universities": { word: "universities", phonetic: "/\u02CCju\u02D0.n\u0259\u02C8v\u025D\u02D0.s\u0259.t\u032Ciz/", pos: "n. (\u8907\u6578)", zh: "\u5404\u5927\u5C08\u9662\u6821\uFF08\u8907\u6578\uFF09", def: "Plural of university." },
+  "exam": { word: "exam", phonetic: "/\u026A\u0261\u02C8z\xE6m/", pos: "n.", zh: "\u8003\u8A66\u3001\u6E2C\u9A57\u3001\u5BE9\u67E5", def: "A formal test of a person's knowledge or proficiency in a subject." },
+  "exams": { word: "exams", phonetic: "/\u026A\u0261\u02C8z\xE6mz/", pos: "n. (\u8907\u6578)", zh: "\u5404\u5927\u8003\u8A66\uFF08\u8907\u6578\uFF09", def: "Plural of exam." },
+  "book": { word: "book", phonetic: "/b\u028Ak/", pos: "n./v.", zh: "\u66F8\u7C4D\u3001\u66F8\u672C\uFF1B\u9810\u8A02\u3001\u767B\u8A18", def: "A written or printed work consisting of pages." },
+  "books": { word: "books", phonetic: "/b\u028Aks/", pos: "n. (\u8907\u6578) / v.", zh: "\u66F8\u7C4D\uFF08\u8907\u6578\uFF09\uFF1B\u9810\u8A02", def: "Plural of book." },
+  "page": { word: "page", phonetic: "/pe\u026Ad\u0292/", pos: "n./v.", zh: "\u9801\u9762\u3001\u7DB2\u9801\uFF1B\u547C\u53EB", def: "One side of a sheet of paper in a collection of sheets." },
+  "pages": { word: "pages", phonetic: "/\u02C8pe\u026A.d\u0292\u026Az/", pos: "n. (\u8907\u6578)", zh: "\u5404\u9801\u9762\uFF08\u8907\u6578\uFF09", def: "Plural of page." },
+  "song": { word: "song", phonetic: "/s\u0254\u02D0\u014B/", pos: "n.", zh: "\u6B4C\u66F2\u3001\u6B4C\u8B20", def: "A short poem or other set of words set to music." },
+  "songs": { word: "songs", phonetic: "/s\u0254\u02D0\u014Bz/", pos: "n. (\u8907\u6578)", zh: "\u6B4C\u66F2\u66F2\u76EE\uFF08\u8907\u6578\uFF09", def: "Plural of song." },
+  "movie": { word: "movie", phonetic: "/\u02C8mu\u02D0.vi/", pos: "n.", zh: "\u96FB\u5F71\u3001\u5F71\u7247", def: "A cinema film." },
+  "movies": { word: "movies", phonetic: "/\u02C8mu\u02D0.viz/", pos: "n. (\u8907\u6578)", zh: "\u5404\u90E8\u96FB\u5F71\uFF08\u8907\u6578\uFF09", def: "Plural of movie." },
+  "film": { word: "film", phonetic: "/f\u026Alm/", pos: "n./v.", zh: "\u96FB\u5F71\u3001\u81A0\u5377\u3001\u8584\u819C\uFF1B\u62CD\u651D", def: "A motion picture." },
+  "films": { word: "films", phonetic: "/f\u026Almz/", pos: "n. (\u8907\u6578) / v.", zh: "\u96FB\u5F71\u4F5C\u54C1\uFF08\u8907\u6578\uFF09", def: "Plural of film." },
+  "actor": { word: "actor", phonetic: "/\u02C8\xE6k.t\u025A/", pos: "n.", zh: "\u6F14\u54E1\u3001\u7537\u6F14\u54E1", def: "A person whose profession is acting on the stage, in movies, or on television." },
+  "actors": { word: "actors", phonetic: "/\u02C8\xE6k.t\u025Az/", pos: "n. (\u8907\u6578)", zh: "\u6F14\u54E1\u7FA4\uFF08\u8907\u6578\uFF09", def: "Plural of actor." },
+  "actress": { word: "actress", phonetic: "/\u02C8\xE6k.tr\u0259s/", pos: "n.", zh: "\u5973\u6F14\u54E1", def: "A female actor." },
+  "actresses": { word: "actresses", phonetic: "/\u02C8\xE6k.tr\u0259.s\u026Az/", pos: "n. (\u8907\u6578)", zh: "\u5973\u6F14\u54E1\u7FA4\uFF08\u8907\u6578\uFF09", def: "Plural of actress." },
+  "award": { word: "award", phonetic: "/\u0259\u02C8w\u0254\u02D0rd/", pos: "n./v.", zh: "\u734E\u9805\u3001\u69AE\u8B7D\uFF1B\u9812\u767C\u3001\u6388\u4E88", def: "A prize or other mark of recognition given in honor of an achievement." },
+  "awards": { word: "awards", phonetic: "/\u0259\u02C8w\u0254\u02D0rdz/", pos: "n. (\u8907\u6578) / v.", zh: "\u734E\u9805\u5927\u734E\uFF08\u8907\u6578\uFF09", def: "Plural of award." },
+  "trophy": { word: "trophy", phonetic: "/\u02C8tro\u028A.fi/", pos: "n.", zh: "\u734E\u76C3\u3001\u6230\u5229\u54C1", def: "A cup or other decorative object awarded as a prize for a victory." },
+  "first": { word: "first", phonetic: "/f\u025D\u02D0st/", pos: "adj./adv./n.", zh: "\u7B2C\u4E00\u3001\u9996\u5148\u3001\u6700\u65E9\u7684", def: "Coming before all others in time or order." },
+  "second": { word: "second", phonetic: "/\u02C8sek.\u0259nd/", pos: "adj./n./v.", zh: "\u7B2C\u4E8C\uFF1B\u79D2\uFF1B\u652F\u6301", def: "Coming after the first in order or time; a 60th of a minute." },
+  "third": { word: "third", phonetic: "/\u03B8\u025D\u02D0d/", pos: "adj./n.", zh: "\u7B2C\u4E09\u3001\u4E09\u5206\u4E4B\u4E00", def: "Constituting number three in a sequence." },
+  "final": { word: "final", phonetic: "/\u02C8fa\u026A.n\u0259l/", pos: "adj./n.", zh: "\u6700\u7D42\u7684\u3001\u6700\u5F8C\u7684\uFF1B\u671F\u672B\u8003\u3001\u6C7A\u8CFD", def: "Coming at the end of a series." },
+  "start": { word: "start", phonetic: "/st\u0251\u02D0rt/", pos: "v./n.", zh: "\u958B\u59CB\u3001\u8D77\u6B65\u3001\u555F\u52D5\uFF1B\u958B\u982D", def: "To begin or be reckoned from a particular point in time or space." },
+  "started": { word: "started", phonetic: "/\u02C8st\u0251\u02D0r.t\u032C\u026Ad/", pos: "v. (\u904E\u53BB\u5F0F)", zh: "\u958B\u59CB\u4E86\u3001\u555F\u52D5\u4E86\uFF08start \u7684\u904E\u53BB\u5F0F\uFF09", def: "Past tense of start." },
+  "starting": { word: "starting", phonetic: "/\u02C8st\u0251\u02D0r.t\u032C\u026A\u014B/", pos: "n./v.", zh: "\u51FA\u767C\u3001\u8D77\u59CB\uFF1B\u8D77\u8DD1", def: "Present participle of start." },
+  "end": { word: "end", phonetic: "/end/", pos: "n./v.", zh: "\u7D50\u675F\u3001\u7D50\u5C3E\u3001\u7D42\u9EDE\uFF1B\u7D42\u6B62", def: "A final part of something." },
+  "ended": { word: "ended", phonetic: "/\u02C8en.d\u026Ad/", pos: "v. (\u904E\u53BB\u5F0F)", zh: "\u7D50\u675F\u4E86\u3001\u6536\u5C3E\u4E86\uFF08end \u7684\u904E\u53BB\u5F0F\uFF09", def: "Past tense of end." },
+  "ending": { word: "ending", phonetic: "/\u02C8en.d\u026A\u014B/", pos: "n./adj.", zh: "\u7D50\u5C40\u3001\u7D50\u5C3E\uFF1B\u7D50\u675F\u7684", def: "An end or final part of something." },
+  "clean": { word: "clean", phonetic: "/kli\u02D0n/", pos: "adj./v.", zh: "\u4E7E\u6DE8\u7684\u3001\u6F54\u6DE8\u7684\uFF1B\u6253\u6383\u6E05\u6F54", def: "Free from dirt, marks, or stains." },
+  "cleaned": { word: "cleaned", phonetic: "/kli\u02D0nd/", pos: "v. (\u904E\u53BB\u5F0F)", zh: "\u6E05\u7406\u4E86\u3001\u6253\u6383\u4E7E\u6DE8\u4E86\uFF08clean \u7684\u904E\u53BB\u5F0F\uFF09", def: "Past tense of clean." },
+  "dark": { word: "dark", phonetic: "/d\u0251\u02D0rk/", pos: "adj./n.", zh: "\u9ED1\u6697\u7684\u3001\u6DF1\u8272\u7684\uFF1B\u9ED1\u6697\u3001\u591C\u9593", def: "With little or no light." },
+  "light": { word: "light", phonetic: "/la\u026At/", pos: "n./adj./v.", zh: "\u5149\u7DDA\u3001\u71C8\u5149\uFF1B\u8F15\u76C8\u7684\u3001\u660E\u4EAE\u7684\uFF1B\u7167\u4EAE", def: "The natural agent that stimulates sight and makes things visible." },
+  "high": { word: "high", phonetic: "/ha\u026A/", pos: "adj./adv.", zh: "\u9AD8\u7684\u3001\u9AD8\u8655\u7684\uFF1B\u9AD8\u5EA6\u5730", def: "Of great vertical extent." },
+  "low": { word: "low", phonetic: "/lo\u028A/", pos: "adj./adv.", zh: "\u4F4E\u7684\u3001\u77EE\u7684\u3001\u4F4E\u5FAE\u7684\uFF1B\u4F4E\u4F4E\u5730", def: "Of less than average height from top to bottom." },
+  "big": { word: "big", phonetic: "/b\u026A\u0261/", pos: "adj.", zh: "\u5927\u7684\u3001\u91CD\u5927\u7684\u3001\u5E74\u9577\u7684", def: "Of considerable size, extent, or intensity." },
+  "small": { word: "small", phonetic: "/sm\u0251\u02D0l/", pos: "adj.", zh: "\u5C0F\u7684\u3001\u5C11\u91CF\u7684\u3001\u7D30\u5FAE\u7684", def: "Of a size that is less than normal or usual." },
+  "major": { word: "major", phonetic: "/\u02C8me\u026A.d\u0292\u025A/", pos: "adj./n./v.", zh: "\u4E3B\u8981\u7684\u3001\u91CD\u5927\u7684\uFF1B\u4E3B\u4FEE\u5C08\u696D\uFF1B\u4E3B\u4FEE", def: "Important, serious, or significant." },
+  "minor": { word: "minor", phonetic: "/\u02C8ma\u026A.n\u025A/", pos: "adj./n./v.", zh: "\u6B21\u8981\u7684\u3001\u8F15\u5FAE\u7684\uFF1B\u672A\u6210\u5E74\u4EBA\uFF1B\u526F\u4FEE", def: "Lesser in importance, seriousness, or significance." },
+  "simple": { word: "simple", phonetic: "/\u02C8s\u026Am.p\u0259l/", pos: "adj.", zh: "\u7C21\u55AE\u7684\u3001\u7D14\u6A38\u7684\u3001\u7C21\u6613\u7684", def: "Easily understood or done; presenting no difficulty." },
+  "hard": { word: "hard", phonetic: "/h\u0251\u02D0rd/", pos: "adj./adv.", zh: "\u56F0\u96E3\u7684\u3001\u5805\u786C\u7684\uFF1B\u52AA\u529B\u5730\u3001\u731B\u70C8\u5730", def: "Solid, firm, and rigid; not easily broken; requiring great effort." },
+  "easy": { word: "easy", phonetic: "/\u02C8i\u02D0.zi/", pos: "adj./adv.", zh: "\u5BB9\u6613\u7684\u3001\u8F15\u9B06\u7684\u3001\u8212\u9069\u7684\uFF1B\u5F9E\u5BB9\u5730", def: "Achieved without great effort; presenting few difficulties." },
+  "equal": { word: "equal", phonetic: "/\u02C8i\u02D0.kw\u0259l/", pos: "adj./n./v.", zh: "\u5E73\u7B49\u7684\u3001\u76F8\u7B49\u7684\uFF1B\u540C\u7B49\u7269\uFF1B\u7B49\u65BC", def: "Being the same in quantity, size, degree, or value." },
+  "same": { word: "same", phonetic: "/se\u026Am/", pos: "adj./pron.", zh: "\u76F8\u540C\u7684\u3001\u540C\u4E00\u7684\uFF1B\u540C\u6A23\u7684\u4E8B\u7269", def: "Identical; not different." },
+  "different": { word: "different", phonetic: "/\u02C8d\u026Af.\u025A.\u0259nt/", pos: "adj.", zh: "\u4E0D\u540C\u7684\u3001\u5DEE\u7570\u7684\u3001\u5404\u4E0D\u76F8\u540C\u7684", def: "Not the same as another or each other." },
+  "difference": { word: "difference", phonetic: "/\u02C8d\u026Af.\u025A.\u0259ns/", pos: "n.", zh: "\u5DEE\u7570\u3001\u5340\u5225\u3001\u5DEE\u984D", def: "A point or way in which people or things are not the same." },
+  "differences": { word: "differences", phonetic: "/\u02C8d\u026Af.\u025A.\u0259n.s\u026Az/", pos: "n. (\u8907\u6578)", zh: "\u5404\u9805\u5DEE\u7570\u8207\u4E0D\u540C\uFF08\u8907\u6578\uFF09", def: "Plural of difference." }
 };
 function lookupQuickWord(rawWord) {
   const clean = rawWord.trim().toLowerCase().replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
@@ -595,6 +874,34 @@ function lookupQuickWord(rawWord) {
         zh: `${base.zh}\uFF08\u8907\u6578/\u7B2C\u4E09\u4EBA\u7A31\uFF09`,
         def: base.def,
         example: base.example
+      };
+    }
+  }
+  if (clean.endsWith("ies") && clean.length > 4) {
+    const base = clean.slice(0, -3) + "y";
+    if (BUILTIN_DICT[base]) {
+      const entry = BUILTIN_DICT[base];
+      return {
+        word: clean,
+        phonetic: `/${clean}/`,
+        pos: "n. (\u8907\u6578)",
+        zh: `${entry.zh}\uFF08\u8907\u6578\uFF09`,
+        def: entry.def,
+        example: entry.example
+      };
+    }
+  }
+  if (clean.endsWith("ly") && clean.length > 4) {
+    const base = clean.slice(0, -2);
+    if (BUILTIN_DICT[base]) {
+      const entry = BUILTIN_DICT[base];
+      return {
+        word: clean,
+        phonetic: `/${clean}/`,
+        pos: "adv.",
+        zh: `${entry.zh}\u5730\uFF08\u526F\u8A5E\uFF09`,
+        def: entry.def,
+        example: entry.example
       };
     }
   }
@@ -1150,43 +1457,304 @@ var YoutubeTranscriptPlusProvider = class {
 var defaultTranscriptProvider = new YoutubeTranscriptPlusProvider();
 
 // server/youtubeNewsDiscoveryService.ts
+var import_fs = __toESM(require("fs"), 1);
+var import_path = __toESM(require("path"), 1);
 var REPUTABLE_NEWS_CHANNELS = [
-  // Popular American Talk Shows (熱門知名美語脫口秀 - JIMMY等，精選一年內精彩對話與訪談)
-  { name: "The Tonight Show Starring Jimmy Fallon", id: "UC8-Th83bH_thdKZDJCrn88g", category: "TalkShow" },
-  { name: "Jimmy Kimmel Live", id: "UCa6vGFO9ty8v5KZJXQxdhaw", category: "TalkShow" },
-  { name: "The Late Show with Stephen Colbert", id: "UCMtFAi84ehTSYSE9XoHefig", category: "TalkShow" },
-  { name: "Late Night with Seth Meyers", id: "UCVTyTA7-g9nopHeHbeuvpRA", category: "TalkShow" },
-  { name: "The Daily Show", id: "UCwWhs_6x42TyRM4Wstoq8HA", category: "TalkShow" },
-  { name: "Team Coco (Conan O'Brien)", id: "UCi7GJNg51C3jgmYTUwqoUXA", category: "TalkShow" },
-  // Knowledge, Science & Education (知識科普與深度學習)
-  { name: "TED", id: "UCsT0YIqwnpJCM-mx7-gSA4Q", category: "Knowledge" },
-  { name: "TED-Ed", id: "UCsooa4yRKGN_zEE8iknghZA", category: "Knowledge" },
+  // 1. 即時新聞 (News: 國際主流權威時事，100% 官方標配英文雙語字幕)
+  { name: "PBS NewsHour", id: "UC6ZFN9Tx6xh-skXCuRHCDpQ", category: "News" },
+  { name: "BBC News", id: "UC16niRr50-MSBwiO3YDb3RA", category: "News" },
+  { name: "Associated Press", id: "UC52XwA83_M4hDia5cCUMifA", category: "News" },
+  { name: "Sky News", id: "UCoMdktPbSTixAyNGwb-UYkQ", category: "News" },
+  { name: "Reuters", id: "UChqUTb7kYRX8-EiaN3XFrSQ", category: "News" },
+  { name: "ABC News", id: "UCBi2mrWuNuyYy4gbM6fU18Q", category: "News" },
+  { name: "NBC News", id: "UCeY0bbntWzzVIaj2z3QigXg", category: "News" },
+  { name: "CBS News", id: "UC8p1vwvWtl6T73JiExfWs1g", category: "News" },
+  { name: "CNN", id: "UCupvZG-5ko_eiXAupbDfxWw", category: "News" },
+  { name: "The Economist", id: "UCEbP6Y3oGv4eS3_28y-Ceqw", category: "News" },
+  // 2. TED 演講 (TED: 經典思維、全球演講與深度觀點，100% 官方高品質 CC 字幕)
+  { name: "TED", id: "UCsT0YIqwnpJCM-mx7-gSA4Q", category: "TED" },
+  { name: "TED-Ed", id: "UCsooa4yRKGN_zEE8iknghZA", category: "TED" },
+  { name: "Big Think", id: "UCEBb1b_L6zDS3xTUrIALZOw", category: "TED" },
+  // 3. 3C 科技 (Technology: 旗艦產品評測、3C 前沿與數位生活，100% 官方英文字幕)
+  { name: "The Verge", id: "UCddiUEpeqJcYeBxX1IVBKvQ", category: "Technology" },
+  { name: "Marques Brownlee", id: "UCBJycsmduvYEL83R_U4JriQ", category: "Technology" },
+  { name: "CNET", id: "UCOmcA33OE6WwHp9432oTagQ", category: "Technology" },
+  { name: "WIRED", id: "UCftwRNsjfEc04G0YRxSOvAw", category: "Technology" },
+  // 4. 美語娛樂 (Entertainment: 美式脫口秀與影視娛樂訪談，口語高頻對話)
+  { name: "The Tonight Show Starring Jimmy Fallon", id: "UC8-Th83bH_thdKZDJCrn88g", category: "Entertainment" },
+  { name: "Jimmy Kimmel Live", id: "UCa6vGFO9ty8v5KZJXQxdhaw", category: "Entertainment" },
+  { name: "The Late Show with Stephen Colbert", id: "UCMtFAi84ehTSYSE9XoHefig", category: "Entertainment" },
+  { name: "Late Night with Seth Meyers", id: "UCVTyTA7-g9nopHeHbeuvpRA", category: "Entertainment" },
+  { name: "The Daily Show", id: "UCwWhs_6x42TyRM4Wstoq8HA", category: "Entertainment" },
+  { name: "Team Coco", id: "UCi7GJNg51C3jgmYTUwqoUXA", category: "Entertainment" },
+  // 5. 知識科普 (Knowledge: 科學、深度人文與趣味科普，標準美式發音)
   { name: "Kurzgesagt \u2013 In a Nutshell", id: "UCsXVk37bltHxD1rDPwtNM8Q", category: "Knowledge" },
   { name: "Vox", id: "UCLXo7UDZvByw2ixzpQCufnA", category: "Knowledge" },
+  { name: "Veritasium", id: "UCHnyfMqiRRG1u-2MsSQLbXA", category: "Knowledge" },
   { name: "CrashCourse", id: "UCX6b17PVsYBQ0ip5gyeme-Q", category: "Knowledge" },
   { name: "National Geographic", id: "UCpVm7bg6pXKo1Pr6k5kxG9A", category: "Knowledge" },
   { name: "BBC Learning English", id: "UCHaHD477h-FeBbVh9Sh7syA", category: "Knowledge" },
-  { name: "Veritasium", id: "UCHnyfMqiRRG1u-2MsSQLbXA", category: "Knowledge" },
-  // Business, Finance & Technology (商業財經與科技前沿)
+  // 6. 商業財經 (Business: 職場商務與全球財經脈動)
   { name: "Bloomberg Television", id: "UCIALMKvObZNtJ6AmdCLP7Lg", category: "Business" },
   { name: "CNBC", id: "UCvJJ_dzjViJCoLf5uKUTwoA", category: "Business" },
   { name: "Wall Street Journal", id: "UCK7tptUDHh-RYDsdxO1-5QQ", category: "Business" },
-  { name: "Financial Times", id: "UCoUxsWakJucW46KW5RFPVFA", category: "Business" },
-  { name: "The Verge", id: "UCddiUEpeqJcYeBxX1IVBKvQ", category: "Technology" },
-  // World, US & Current Affairs (國際視野與權威時事)
-  { name: "PBS NewsHour", id: "UC6ZFN9Tx6xh-skXCuRHCDpQ", category: "US" },
-  { name: "ABC News", id: "UCBi2mrWuNuyYy4gbM6fU18Q", category: "US" },
-  { name: "NBC News", id: "UCeY0bbntWzzVIaj2z3QigXg", category: "US" },
-  { name: "CBS News", id: "UC8p1vwvWtl6T73JiExfWs1g", category: "US" },
-  { name: "CNN", id: "UCupvZG-5ko_eiXAupbDfxWw", category: "World" },
-  { name: "BBC News", id: "UC16niRr50-MSBwiO3YDb3RA", category: "World" },
-  { name: "DW News", id: "UCknLrEdhRCp1aegoMqRaCZg", category: "World" },
-  { name: "Reuters", id: "UChqUTb7kYRX8-EiaN3XFrSQ", category: "World" },
-  { name: "Associated Press", id: "UC52XwA83_M4hDia5cCUMifA", category: "World" },
-  { name: "Sky News", id: "UCoMdktPbSTixAyNGwb-UYkQ", category: "World" }
+  { name: "Financial Times", id: "UCoUxsWakJucW46KW5RFPVFA", category: "Business" }
 ];
+var DAILY_SNAPSHOT_FILE = import_path.default.join(process.cwd(), "data", "daily-youtube-curated-snapshot.json");
+var EVERGREEN_SEED_VIDEOS = [
+  // TED 演講經典種子 (100% 官方英文字幕)
+  {
+    videoId: "iCvmsMzlF7o",
+    title: "The power of vulnerability | Bren\xE9 Brown",
+    titleZh: "\u8106\u5F31\u7684\u529B\u91CF | \u5E03\u82AE\u5C3C\xB7\u5E03\u6717 (TED \u7D93\u5178\u6F14\u8B1B)",
+    channelTitle: "TED",
+    channelId: "UCsT0YIqwnpJCM-mx7-gSA4Q",
+    publishedAt: "2023-01-01T00:00:00Z",
+    publishedRelative: "TED \u7D93\u5178\u6F14\u8B1B",
+    durationFormatted: "20:19",
+    durationSeconds: 1219,
+    thumbnailUrl: "https://i.ytimg.com/vi/iCvmsMzlF7o/hqdefault.jpg",
+    hasCaptions: true,
+    captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
+    category: "TED"
+  },
+  {
+    videoId: "qp0HIF3SfI4",
+    title: "Inside the mind of a master procrastinator | Tim Urban",
+    titleZh: "\u62D6\u5EF6\u5927\u5E2B\u7684\u5FC3\u667A\u4E16\u754C | \u63D0\u59C6\xB7\u5384\u672C (TED \u6F14\u8B1B)",
+    channelTitle: "TED",
+    channelId: "UCsT0YIqwnpJCM-mx7-gSA4Q",
+    publishedAt: "2023-01-01T00:00:00Z",
+    publishedRelative: "TED \u7D93\u5178\u6F14\u8B1B",
+    durationFormatted: "14:03",
+    durationSeconds: 843,
+    thumbnailUrl: "https://i.ytimg.com/vi/qp0HIF3SfI4/hqdefault.jpg",
+    hasCaptions: true,
+    captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
+    category: "TED"
+  },
+  {
+    videoId: "Rbg0xiwTez0",
+    title: "How to protect your identity from AI deepfakes | Melissa Hut",
+    titleZh: "\u5982\u4F55\u9632\u6B62\u500B\u4EBA\u8EAB\u5206\u906D AI \u6DF1\u507D\u76DC\u7528 | \u6885\u9E97\u838E\xB7\u54C8\u7279 (TED)",
+    channelTitle: "TED",
+    channelId: "UCsT0YIqwnpJCM-mx7-gSA4Q",
+    publishedAt: "2026-10-12T00:00:00Z",
+    publishedRelative: "TED \u6F14\u8B1B",
+    durationFormatted: "12:45",
+    durationSeconds: 765,
+    thumbnailUrl: "https://i.ytimg.com/vi/Rbg0xiwTez0/hqdefault.jpg",
+    hasCaptions: true,
+    captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
+    category: "TED"
+  },
+  {
+    videoId: "h6CmKF-mN2U",
+    title: "Which is better: Buying or renting a home? - Ella Feldman",
+    titleZh: "\u8CB7\u623F\u9084\u662F\u79DF\u623F\u6BD4\u8F03\u5212\u7B97\uFF1F - \u827E\u62C9\xB7\u8CBB\u723E\u5FB7\u66FC (TED-Ed)",
+    channelTitle: "TED-Ed",
+    channelId: "UCsooa4yRKGN_zEE8iknghZA",
+    publishedAt: "2026-10-08T00:00:00Z",
+    publishedRelative: "TED-Ed \u601D\u7DAD",
+    durationFormatted: "05:12",
+    durationSeconds: 312,
+    thumbnailUrl: "https://i.ytimg.com/vi/h6CmKF-mN2U/hqdefault.jpg",
+    hasCaptions: true,
+    captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
+    category: "TED"
+  },
+  {
+    videoId: "G3hXvByzLHs",
+    title: "6 ways to be more persuasive - TED-Ed",
+    titleZh: "\u8B93\u8AAA\u670D\u529B\u5927\u589E\u7684 6 \u7A2E\u6838\u5FC3\u65B9\u6CD5 - TED-Ed \u601D\u8003\u8A13\u7DF4",
+    channelTitle: "TED-Ed",
+    channelId: "UCsooa4yRKGN_zEE8iknghZA",
+    publishedAt: "2026-10-01T00:00:00Z",
+    publishedRelative: "TED-Ed \u7CBE\u9078",
+    durationFormatted: "06:30",
+    durationSeconds: 390,
+    thumbnailUrl: "https://i.ytimg.com/vi/G3hXvByzLHs/hqdefault.jpg",
+    hasCaptions: true,
+    captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
+    category: "TED"
+  },
+  {
+    videoId: "Bjr62PO1WO4",
+    title: "From Uganda to Ukraine: The Global Impact of MIT OpenCourseWare at 25",
+    titleZh: "\u5F9E\u70CF\u5E72\u9054\u8D70\u5411\u70CF\u514B\u862D\uFF1AMIT \u958B\u653E\u5F0F\u8AB2\u7A0B 25 \u9031\u5E74\u7684\u5168\u7403\u6DF1\u9060\u5F71\u97FF",
+    channelTitle: "Big Think",
+    channelId: "UCEBb1b_L6zDS3xTUrIALZOw",
+    publishedAt: "2026-10-08T00:00:00Z",
+    publishedRelative: "Big Think",
+    durationFormatted: "08:45",
+    durationSeconds: 525,
+    thumbnailUrl: "https://i.ytimg.com/vi/Bjr62PO1WO4/hqdefault.jpg",
+    hasCaptions: true,
+    captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
+    category: "TED"
+  },
+  // 知識科普經典種子 (Knowledge)
+  {
+    videoId: "ujkD4SxPKOI",
+    title: "AI Just Crossed the Terrifying Line - Now What?",
+    titleZh: "AI \u525B\u525B\u8DE8\u8D8A\u4E86\u4EE4\u4EBA\u9707\u9A5A\u7684\u81E8\u754C\u7DDA\u2014\u2014\u4EBA\u985E\u63A5\u4E0B\u4F86\u8A72\u5982\u4F55\u61C9\u5C0D\uFF1F",
+    channelTitle: "Kurzgesagt \u2013 In a Nutshell",
+    channelId: "UCsXVk37bltHxD1rDPwtNM8Q",
+    publishedAt: "2026-10-05T00:00:00Z",
+    publishedRelative: "\u7C21\u800C\u8A00\u4E4B\u79D1\u666E",
+    durationFormatted: "11:20",
+    durationSeconds: 680,
+    thumbnailUrl: "https://i.ytimg.com/vi/ujkD4SxPKOI/hqdefault.jpg",
+    hasCaptions: true,
+    captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
+    category: "Knowledge"
+  },
+  {
+    videoId: "NiCgcUTL9_Q",
+    title: "The Clearest Material Ever Made - Veritasium",
+    titleZh: "\u4EBA\u985E\u6709\u53F2\u4EE5\u4F86\u88FD\u9020\u51FA\u6700\u900F\u660E\u7684\u7D42\u6975\u6750\u6599 - \u771F\u7406\u5143\u7D20",
+    channelTitle: "Veritasium",
+    channelId: "UCHnyfMqiRRG1u-2MsSQLbXA",
+    publishedAt: "2026-10-12T00:00:00Z",
+    publishedRelative: "\u79D1\u5B78\u63A2\u79D8",
+    durationFormatted: "18:50",
+    durationSeconds: 1130,
+    thumbnailUrl: "https://i.ytimg.com/vi/NiCgcUTL9_Q/hqdefault.jpg",
+    hasCaptions: true,
+    captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
+    category: "Knowledge"
+  },
+  {
+    videoId: "PSysNY5EIbc",
+    title: "Meet the Extraordinary Team Behind Africa Earth | National Geographic",
+    titleZh: "\u6DF1\u5165\u76F4\u64CA\u300A\u975E\u6D32\u5927\u5730\u300B\u5E55\u5F8C\u50B3\u5947\u651D\u5F71\u5718\u968A | \u570B\u5BB6\u5730\u7406\u983B\u9053",
+    channelTitle: "National Geographic",
+    channelId: "UCpVm7bg6pXKo1Pr6k5kxG9A",
+    publishedAt: "2026-10-11T00:00:00Z",
+    publishedRelative: "\u570B\u5BB6\u5730\u7406\u7D00\u9304",
+    durationFormatted: "14:20",
+    durationSeconds: 860,
+    thumbnailUrl: "https://i.ytimg.com/vi/PSysNY5EIbc/hqdefault.jpg",
+    hasCaptions: true,
+    captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
+    category: "Knowledge"
+  },
+  {
+    videoId: "Y22FuMI7vXI",
+    title: "Where Does Campaign Money Really Come From?: Crash Course",
+    titleZh: "\u7AF6\u9078\u8CC7\u91D1\u7A76\u7ADF\u5F9E\u4F55\u800C\u4F86\uFF1F\u6DF1\u5165\u89E3\u6790\u653F\u6CBB\u91D1\u9322\u6D41\u5411 - \u901F\u6210\u8AB2",
+    channelTitle: "CrashCourse",
+    channelId: "UCX6b17PVsYBQ0ip5gyeme-Q",
+    publishedAt: "2026-10-06T00:00:00Z",
+    publishedRelative: "\u516C\u6C11\u901A\u8B58\u901F\u6210",
+    durationFormatted: "09:40",
+    durationSeconds: 580,
+    thumbnailUrl: "https://i.ytimg.com/vi/Y22FuMI7vXI/hqdefault.jpg",
+    hasCaptions: true,
+    captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
+    category: "Knowledge"
+  },
+  {
+    videoId: "I4G9TjlbdtM",
+    title: "Films at home or at the cinema - which is better? | BBC Learning English",
+    titleZh: "\u5728\u5BB6\u770B\u96FB\u5F71\u9084\u662F\u53BB\u96FB\u5F71\u9662\u611F\u53D7\u66F4\u597D\uFF1FBBC \u82F1\u8A9E\u8996\u89D2\u6DF1\u5EA6\u8A0E\u8AD6",
+    channelTitle: "BBC Learning English",
+    channelId: "UCHaHD477h-FeBbVh9Sh7syA",
+    publishedAt: "2026-10-12T00:00:00Z",
+    publishedRelative: "BBC \u82F1\u8A9E\u5B78\u7FD2",
+    durationFormatted: "06:15",
+    durationSeconds: 375,
+    thumbnailUrl: "https://i.ytimg.com/vi/I4G9TjlbdtM/hqdefault.jpg",
+    hasCaptions: true,
+    captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
+    category: "Knowledge"
+  },
+  {
+    videoId: "yS7hhQd4Jpg",
+    title: "This science depends on one of the most expensive resources | Vox",
+    titleZh: "\u9019\u9805\u5C16\u7AEF\u79D1\u5B78\u5B8C\u5168\u4EF0\u8CF4\u5168\u7403\u6700\u6602\u8CB4\u7684\u7A00\u6709\u8CC7\u6E90 | Vox \u6DF1\u5EA6\u89E3\u8AAA",
+    channelTitle: "Vox",
+    channelId: "UCLXo7UDZvByw2ixzpQCufnA",
+    publishedAt: "2026-10-12T00:00:00Z",
+    publishedRelative: "Vox \u6DF1\u5165\u5C08\u984C",
+    durationFormatted: "10:55",
+    durationSeconds: 655,
+    thumbnailUrl: "https://i.ytimg.com/vi/yS7hhQd4Jpg/hqdefault.jpg",
+    hasCaptions: true,
+    captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
+    category: "Knowledge"
+  },
+  // 3C 科技經典種子 (Technology)
+  {
+    videoId: "aoag03mSuXQ",
+    title: "The Internet Was Weeks Away From Disaster And No One Knew",
+    titleZh: "\u5168\u7403\u7DB2\u969B\u7DB2\u8DEF\u66FE\u5DEE\u5E7E\u9031\u5C31\u5168\u9762\u5D29\u6F70\uFF0C\u800C\u7576\u6642\u5E7E\u4E4E\u6C92\u4EBA\u5BDF\u89BA",
+    channelTitle: "Veritasium",
+    channelId: "UCHnyfMqiRRG1u-2MsSQLbXA",
+    publishedAt: "2026-09-10T00:00:00Z",
+    publishedRelative: "\u79D1\u6280\u6DF1\u5EA6\u56DE\u9867",
+    durationFormatted: "22:15",
+    durationSeconds: 1335,
+    thumbnailUrl: "https://i.ytimg.com/vi/aoag03mSuXQ/hqdefault.jpg",
+    hasCaptions: true,
+    captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
+    category: "Technology"
+  }
+];
+function loadDailySnapshot() {
+  try {
+    if (import_fs.default.existsSync(DAILY_SNAPSHOT_FILE)) {
+      const raw = import_fs.default.readFileSync(DAILY_SNAPSHOT_FILE, "utf-8");
+      const data = JSON.parse(raw);
+      if (data && Array.isArray(data.videos) && data.videos.length > 0) {
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn("[YouTubeDiscovery] Error loading daily snapshot:", err);
+  }
+  return null;
+}
+function saveDailySnapshot(snapshot) {
+  try {
+    const dir = import_path.default.dirname(DAILY_SNAPSHOT_FILE);
+    if (!import_fs.default.existsSync(dir)) import_fs.default.mkdirSync(dir, { recursive: true });
+    import_fs.default.writeFileSync(DAILY_SNAPSHOT_FILE, JSON.stringify(snapshot, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("[YouTubeDiscovery] Error saving daily snapshot:", err);
+  }
+}
 var newsCache = null;
-var CACHE_TTL_MS = 7 * 60 * 1e3;
+var CACHE_TTL_MS = 10 * 60 * 1e3;
+var verifiedCaptionsCache = /* @__PURE__ */ new Map();
+var reportedNoCaptionBlacklist = /* @__PURE__ */ new Set();
+function reportNoCaptionVideo(videoId) {
+  if (!videoId) return;
+  reportedNoCaptionBlacklist.add(videoId);
+  verifiedCaptionsCache.set(videoId, false);
+  if (newsCache && Array.isArray(newsCache.videos)) {
+    newsCache.videos = newsCache.videos.filter((v) => v.videoId !== videoId);
+  }
+}
+async function probeHasEnglishTranscript(videoId) {
+  if (!videoId) return false;
+  if (reportedNoCaptionBlacklist.has(videoId)) return false;
+  if (verifiedCaptionsCache.has(videoId)) return verifiedCaptionsCache.get(videoId);
+  try {
+    const res = await Promise.race([
+      defaultTranscriptProvider.getTranscript(videoId),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("probe_timeout")), 2500))
+    ]);
+    const hasValidTranscript = !!(res && res.success && res.result?.segments && res.result.segments.length > 0);
+    verifiedCaptionsCache.set(videoId, hasValidTranscript);
+    if (!hasValidTranscript) {
+      reportedNoCaptionBlacklist.add(videoId);
+    }
+    return hasValidTranscript;
+  } catch {
+    return true;
+  }
+}
 function parseIsoDuration(durationStr) {
   if (!durationStr) return { seconds: 0, formatted: "00:00" };
   const match = durationStr.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
@@ -1200,39 +1768,46 @@ function parseIsoDuration(durationStr) {
   return { seconds: totalSeconds, formatted };
 }
 function formatRelativeTimeZh(publishedAt) {
-  const diffMs = Math.max(0, Date.now() - new Date(publishedAt).getTime());
-  const mins = Math.floor(diffMs / (60 * 1e3));
-  if (mins < 1) return "\u525B\u525B";
-  if (mins < 60) return `${mins} \u5206\u9418\u524D`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} \u5C0F\u6642\u524D`;
-  const days = Math.floor(hours / 24);
-  return `${days} \u5929\u524D`;
+  if (!publishedAt) return "\u7CBE\u9078\u5F71\u7247";
+  try {
+    const pubMs = new Date(publishedAt).getTime();
+    if (isNaN(pubMs)) return "\u7CBE\u9078\u5F71\u7247";
+    const diffSec = Math.max(0, Math.floor((Date.now() - pubMs) / 1e3));
+    if (diffSec < 60) return "\u525B\u525B";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin} \u5206\u9418\u524D`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour} \u5C0F\u6642\u524D`;
+    const diffDay = Math.floor(diffHour / 24);
+    if (diffDay < 30) return `${diffDay} \u5929\u524D`;
+    const diffMonth = Math.floor(diffDay / 30);
+    if (diffMonth < 12) return `${diffMonth} \u500B\u6708\u524D`;
+    const diffYear = Math.floor(diffMonth / 12);
+    return `${diffYear} \u5E74\u524D`;
+  } catch {
+    return "\u7CBE\u9078\u5F71\u7247";
+  }
 }
-function categorizeNewsVideo(title, channelTitle, defaultCat = "World") {
+function categorizeNewsVideo(title, channelTitle, defaultCat = "News") {
   const lower = title.toLowerCase();
-  const lowerCh = channelTitle.toLowerCase();
-  if (lowerCh.includes("jimmy fallon") || lowerCh.includes("fallontonight") || lowerCh.includes("jimmy kimmel") || lowerCh.includes("colbert") || lowerCh.includes("seth meyers") || lowerCh.includes("daily show") || lowerCh.includes("team coco") || lowerCh.includes("conan") || defaultCat === "TalkShow" || /\b(talk show|tonight show|late night|monologue|interview|jimmy fallon|jimmy kimmel|stephen colbert|seth meyers|conan o'brien|daily show)\b/i.test(lower)) {
-    return "TalkShow";
+  if (channelTitle.includes("TED") || channelTitle.includes("Big Think") || defaultCat === "TED") {
+    return "TED";
   }
-  if (channelTitle.includes("TED") || channelTitle.includes("Kurzgesagt") || channelTitle.includes("CrashCourse") || channelTitle.includes("National Geographic") || channelTitle.includes("Veritasium") || channelTitle.includes("Learning English") || channelTitle.includes("Vox") || /\b(science|space|universe|biology|physics|history|psychology|brain|evolution|planet|learn|lesson|grammar|vocabulary)\b/i.test(lower)) {
-    return "Knowledge";
+  if (defaultCat === "Entertainment" || defaultCat === "TalkShow" || channelTitle.includes("Fallon") || channelTitle.includes("Kimmel") || channelTitle.includes("Colbert") || channelTitle.includes("Meyers") || channelTitle.includes("Daily Show") || channelTitle.includes("Coco") || /\b(talk show|tonight show|late night|monologue|interview|jimmy fallon|jimmy kimmel|stephen colbert|seth meyers|conan o'brien|daily show|comedy|hollywood|actor|actress)\b/i.test(lower)) {
+    return "Entertainment";
   }
-  if (/\b(breaking|alert|urgent|just in|live update)\b/i.test(lower)) {
-    return "Breaking";
-  }
-  if (channelTitle.includes("The Verge") || /\b(ai|artificial intelligence|tech|technology|nvidia|openai|semiconductor|cyber|google|apple|microsoft|gadget|robot)\b/i.test(lower)) {
+  if (channelTitle.includes("The Verge") || channelTitle.includes("Marques Brownlee") || channelTitle.includes("CNET") || channelTitle.includes("WIRED") || defaultCat === "Technology" || /\b(ai|artificial intelligence|tech|technology|nvidia|openai|semiconductor|cyber|google|apple|microsoft|gadget|robot|smartphone|iphone|macbook|pixel|review)\b/i.test(lower)) {
     return "Technology";
   }
-  if (channelTitle.includes("Bloomberg") || channelTitle.includes("CNBC") || channelTitle.includes("Wall Street Journal") || channelTitle.includes("Financial Times") || /\b(economy|inflation|wall street|stock|market|fed|interest rate|trade|tariff|ceo|bank|investor)\b/i.test(lower)) {
+  if (channelTitle.includes("Kurzgesagt") || channelTitle.includes("CrashCourse") || channelTitle.includes("National Geographic") || channelTitle.includes("Veritasium") || channelTitle.includes("Learning English") || channelTitle.includes("Vox") || defaultCat === "Knowledge" || /\b(science|space|universe|biology|physics|history|psychology|brain|evolution|planet|learn|lesson|grammar|vocabulary|documentary)\b/i.test(lower)) {
+    return "Knowledge";
+  }
+  if (channelTitle.includes("Bloomberg") || channelTitle.includes("CNBC") || channelTitle.includes("Wall Street Journal") || channelTitle.includes("Financial Times") || defaultCat === "Business" || /\b(economy|inflation|wall street|stock|market|fed|interest rate|trade|tariff|ceo|bank|investor|finance)\b/i.test(lower)) {
     return "Business";
   }
-  if (/\b(biden|trump|congress|senate|white house|supreme court|fbi|pentagon|us election|election|harris|republican|democrat)\b/i.test(lower)) {
-    return "US";
-  }
-  return defaultCat;
+  return "News";
 }
-function isNewsContent(title, channelTitle) {
+function isCleanLearningVideo(title, channelTitle) {
   const lower = title.toLowerCase();
   if (lower.includes("#shorts") || lower.includes("#short") || lower.includes(" shorts") || lower.includes("shorts ")) {
     return false;
@@ -1244,39 +1819,36 @@ function isNewsContent(title, channelTitle) {
   if (!isEnglish) {
     return false;
   }
-  const isTalkShow = channelTitle && (channelTitle.includes("Fallon") || channelTitle.includes("Kimmel") || channelTitle.includes("Colbert") || channelTitle.includes("Meyers") || channelTitle.includes("Daily Show") || channelTitle.includes("Coco"));
-  if (!isTalkShow) {
-    const bannedKeywords = [
-      "vlog",
-      "gaming",
-      "gameplay",
-      "highlights",
-      "music video",
-      "trailer",
-      "official audio",
-      "teaser",
-      "remix",
-      "unboxing",
-      "reaction video"
-    ];
-    if (bannedKeywords.some((kw) => lower.includes(kw))) {
-      return false;
-    }
+  const bannedKeywords = [
+    "vlog",
+    "gaming",
+    "gameplay",
+    "music video",
+    "official audio",
+    "trailer",
+    "teaser",
+    "remix",
+    "reaction video",
+    "asmr"
+  ];
+  if (bannedKeywords.some((b) => lower.includes(b))) {
+    return false;
   }
   return true;
 }
 function deduplicateNewsVideos(videos) {
-  const result = [];
   const seenTitles = [];
+  const result = [];
   for (const v of videos) {
-    const tokens = v.title.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter((t) => t.length > 3);
-    const tokenSet = new Set(tokens);
+    const tokenSet = new Set(
+      v.title.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter((t) => t.length > 3)
+    );
     let isDuplicate = false;
     for (const prevTitle of seenTitles) {
       const prevTokens = prevTitle.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter((t) => t.length > 3);
-      if (prevTokens.length > 0 && tokens.length > 0) {
+      if (prevTokens.length > 0 && tokenSet.size > 0) {
         const overlap = prevTokens.filter((t) => tokenSet.has(t)).length;
-        const ratio = overlap / Math.min(prevTokens.length, tokens.length);
+        const ratio = overlap / Math.min(prevTokens.length, tokenSet.size);
         if (ratio >= 0.75) {
           isDuplicate = true;
           break;
@@ -1292,16 +1864,35 @@ function deduplicateNewsVideos(videos) {
 }
 async function discoverLiveEnglishNews(forceRefresh = false) {
   const now = Date.now();
-  const oneWeekAgoMs = now - 7 * 24 * 60 * 60 * 1e3;
-  const publishedAfterIso = new Date(oneWeekAgoMs).toISOString();
-  if (!forceRefresh && newsCache && now - newsCache.timestamp < CACHE_TTL_MS && newsCache.videos.length > 0) {
-    return {
-      success: true,
-      cached: true,
-      timestamp: newsCache.timestamp,
-      publishedAfter: newsCache.publishedAfter,
-      videos: newsCache.videos
-    };
+  const currentUtcDay = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  if (!forceRefresh) {
+    if (newsCache && newsCache.videos.length > 0) {
+      const active = newsCache.videos.filter((v) => !reportedNoCaptionBlacklist.has(v.videoId));
+      if (active.length > 0) {
+        return {
+          success: true,
+          cached: true,
+          timestamp: newsCache.timestamp,
+          videos: active
+        };
+      }
+    }
+    const savedSnapshot = loadDailySnapshot();
+    if (savedSnapshot && savedSnapshot.utcDate === currentUtcDay && savedSnapshot.videos.length > 0) {
+      const active = savedSnapshot.videos.filter((v) => !reportedNoCaptionBlacklist.has(v.videoId));
+      if (active.length >= 30) {
+        newsCache = {
+          timestamp: savedSnapshot.updatedAt,
+          videos: active
+        };
+        return {
+          success: true,
+          cached: true,
+          timestamp: savedSnapshot.updatedAt,
+          videos: active
+        };
+      }
+    }
   }
   const apiKey = process.env.YOUTUBE_API_KEY?.trim();
   let candidateVideos = [];
@@ -1322,14 +1913,12 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
           const block = entry[1];
           const vId = block.match(/<yt:videoId>([^<]+)<\/yt:videoId>/)?.[1];
           const titleRaw = block.match(/<title>([^<]+)<\/title>/)?.[1];
-          const published = block.match(/<published>([^<]+)<\/published>/)?.[1];
+          const published = block.match(/<published>([^<]+)<\/published>/)?.[1] || "";
           const thumb = block.match(/<media:thumbnail[^>]+url=["']([^"']+)["']/)?.[1] || (vId ? `https://i.ytimg.com/vi/${vId}/hqdefault.jpg` : "");
-          if (!vId || !titleRaw || !published) continue;
-          const pubMs = new Date(published).getTime();
-          const minPubMs = ch.category === "TalkShow" ? now - 365 * 24 * 60 * 60 * 1e3 : oneWeekAgoMs;
-          if (pubMs < minPubMs || pubMs > now) continue;
+          if (!vId || !titleRaw) continue;
+          if (reportedNoCaptionBlacklist.has(vId)) continue;
           const title = titleRaw.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-          if (!isNewsContent(title, ch.name)) continue;
+          if (!isCleanLearningVideo(title, ch.name)) continue;
           const cat = categorizeNewsVideo(title, ch.name, ch.category);
           items.push({
             videoId: vId,
@@ -1339,11 +1928,9 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
             publishedAt: published,
             publishedRelative: formatRelativeTimeZh(published),
             durationFormatted: "05:00",
-            // Default fallback duration estimate
             durationSeconds: 300,
             thumbnailUrl: thumb,
             hasCaptions: true,
-            // Will be verified in stage 2
             captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
             category: cat
           });
@@ -1361,32 +1948,26 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
       }
     }
   } catch (e) {
-    console.warn("[YouTubeNews] Feed aggregation error:", e?.message || e);
+    console.warn("[YouTubeDiscovery] Feed aggregation error:", e?.message || e);
   }
   if (apiKey) {
     try {
-      const oneYearAgoIso = new Date(now - 365 * 24 * 60 * 60 * 1e3).toISOString();
-      const talkShowQueries = [
-        { name: "The Tonight Show Starring Jimmy Fallon", id: "UC8-Th83bH_thdKZDJCrn88g" },
-        { name: "Jimmy Kimmel Live", id: "UCa6vGFO9ty8v5KZJXQxdhaw" },
-        { name: "The Late Show with Stephen Colbert", id: "UCMtFAi84ehTSYSE9XoHefig", query: "Stephen Colbert interview" },
-        { name: "Late Night with Seth Meyers", id: "UCVTyTA7-g9nopHeHbeuvpRA" },
-        { name: "The Daily Show", id: "UCwWhs_6x42TyRM4Wstoq8HA" },
-        { name: "Team Coco", id: "UCi7GJNg51C3jgmYTUwqoUXA" }
+      const targetedQueries = [
+        { name: "TED", id: "UCsT0YIqwnpJCM-mx7-gSA4Q", cat: "TED" },
+        { name: "The Tonight Show Starring Jimmy Fallon", id: "UC8-Th83bH_thdKZDJCrn88g", cat: "Entertainment" },
+        { name: "The Verge", id: "UCddiUEpeqJcYeBxX1IVBKvQ", cat: "Technology" },
+        { name: "Kurzgesagt \u2013 In a Nutshell", id: "UCsXVk37bltHxD1rDPwtNM8Q", cat: "Knowledge" },
+        { name: "CNBC", id: "UCvJJ_dzjViJCoLf5uKUTwoA", cat: "Business" }
       ];
-      for (const tsq of talkShowQueries) {
+      for (const tq of targetedQueries) {
         try {
           const sUrl = new URL("https://www.googleapis.com/youtube/v3/search");
           sUrl.searchParams.set("part", "snippet");
           sUrl.searchParams.set("type", "video");
-          if (tsq.query) {
-            sUrl.searchParams.set("q", tsq.query);
-          } else {
-            sUrl.searchParams.set("channelId", tsq.id);
-          }
-          sUrl.searchParams.set("publishedAfter", oneYearAgoIso);
-          sUrl.searchParams.set("order", "viewCount");
-          sUrl.searchParams.set("maxResults", "3");
+          sUrl.searchParams.set("videoCaption", "closedCaption");
+          sUrl.searchParams.set("channelId", tq.id);
+          sUrl.searchParams.set("order", "relevance");
+          sUrl.searchParams.set("maxResults", "4");
           sUrl.searchParams.set("key", apiKey);
           const sRes = await fetch(sUrl.toString(), { headers: { Accept: "application/json" } });
           if (!sRes.ok) continue;
@@ -1395,30 +1976,29 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
             const vId = item.id?.videoId;
             const title = (item.snippet?.title || "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
             const published = item.snippet?.publishedAt || "";
-            if (!vId || !title || !isNewsContent(title, tsq.name)) continue;
+            if (!vId || !title || !isCleanLearningVideo(title, tq.name)) continue;
+            if (reportedNoCaptionBlacklist.has(vId)) continue;
             if (!candidateVideos.some((cv) => cv.videoId === vId)) {
               candidateVideos.push({
                 videoId: vId,
                 title,
-                channelTitle: tsq.name,
-                channelId: tsq.id,
+                channelTitle: tq.name,
+                channelId: tq.id,
                 publishedAt: published,
                 publishedRelative: formatRelativeTimeZh(published),
-                durationFormatted: "06:00",
-                durationSeconds: 360,
+                durationFormatted: "08:00",
+                durationSeconds: 480,
                 thumbnailUrl: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${vId}/hqdefault.jpg`,
                 hasCaptions: true,
                 captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
-                category: "TalkShow"
+                category: tq.cat
               });
             }
           }
-        } catch (subErr) {
-          console.warn(`[YouTubeNews] 1-year talk show query error for ${tsq.name}:`, subErr?.message || subErr);
+        } catch (_) {
         }
       }
-    } catch (tsErr) {
-      console.warn("[YouTubeNews] 1-year talk show discovery error:", tsErr?.message || tsErr);
+    } catch (_) {
     }
   }
   if (apiKey && candidateVideos.length > 0) {
@@ -1431,9 +2011,7 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
         videosUrl.searchParams.set("part", "snippet,contentDetails,liveStreamingDetails,status");
         videosUrl.searchParams.set("id", batchIds.join(","));
         videosUrl.searchParams.set("key", apiKey);
-        const vRes = await fetch(videosUrl.toString(), {
-          headers: { Accept: "application/json" }
-        });
+        const vRes = await fetch(videosUrl.toString(), { headers: { Accept: "application/json" } });
         if (vRes.ok) {
           const vData = await vRes.json();
           for (const item of vData.items || []) {
@@ -1441,12 +2019,16 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
             const hasCaption = item.contentDetails?.caption === "true";
             const isLive = !!item.liveStreamingDetails || item.snippet?.liveBroadcastContent && item.snippet.liveBroadcastContent !== "none";
             const { seconds, formatted } = parseIsoDuration(item.contentDetails?.duration || "");
+            const defaultAudioLanguage = (item.snippet?.defaultAudioLanguage || "").toLowerCase();
+            const defaultLanguage = (item.snippet?.defaultLanguage || "").toLowerCase();
+            const isNonEnglishAudio = defaultAudioLanguage && !defaultAudioLanguage.startsWith("en") || defaultLanguage && !defaultLanguage.startsWith("en") && !defaultAudioLanguage;
             validDetailsMap.set(item.id, {
               seconds,
               formatted,
               hasCaption,
               isLive,
-              embeddable: isEmbeddable
+              embeddable: isEmbeddable,
+              isNonEnglishAudio: !!isNonEnglishAudio
             });
           }
         }
@@ -1456,72 +2038,22 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
         if (!details) return false;
         if (details.isLive) return false;
         if (!details.embeddable) return false;
-        if (details.seconds < 60 || details.seconds > 7200) return false;
+        if (details.seconds < 45 || details.seconds > 7200) return false;
+        if (details.hasCaption !== true) return false;
+        if (details.isNonEnglishAudio) return false;
+        if (reportedNoCaptionBlacklist.has(v.videoId)) return false;
+        const lowerTitle = v.title.toLowerCase();
+        if (lowerTitle.startsWith("raw:") || lowerTitle.startsWith("raw video:") || lowerTitle.includes("no comment") || lowerTitle.includes("raw footage")) return false;
+        if (/\b(?:auf deutsch|en español|en français|in russian|in french|in german|in spanish|in hindi|in arabic|en francais|en espanol)\b/i.test(lowerTitle)) return false;
+        if (/[\u0400-\u04FF\u0600-\u06FF\u0900-\u097F]/.test(v.title)) return false;
         v.durationSeconds = details.seconds;
         v.durationFormatted = details.formatted;
         v.hasCaptions = true;
-        v.captionBadge = details.hasCaption ? "CC \u82F1\u6587\u5B57\u5E55" : "\u82F1\u6587\u5B57\u5E55";
+        v.captionBadge = "CC \u82F1\u6587\u5B57\u5E55";
         return true;
       });
     } catch (apiErr) {
-      console.warn("[YouTubeNews] API batch validation error:", apiErr?.message || apiErr);
-    }
-  }
-  if (apiKey && candidateVideos.length < 15) {
-    try {
-      for (const ch of REPUTABLE_NEWS_CHANNELS.slice(0, 5)) {
-        if (candidateVideos.length >= 25) break;
-        const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
-        searchUrl.searchParams.set("part", "snippet");
-        searchUrl.searchParams.set("type", "video");
-        searchUrl.searchParams.set("videoCaption", "closedCaption");
-        searchUrl.searchParams.set("channelId", ch.id);
-        searchUrl.searchParams.set("order", "date");
-        searchUrl.searchParams.set("maxResults", "5");
-        searchUrl.searchParams.set("key", apiKey);
-        const sRes = await fetch(searchUrl.toString(), { headers: { Accept: "application/json" } });
-        if (!sRes.ok) continue;
-        const sData = await sRes.json();
-        const ids = (sData.items || []).map((i) => i?.id?.videoId).filter(Boolean);
-        if (ids.length === 0) continue;
-        const vUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
-        vUrl.searchParams.set("part", "snippet,contentDetails,liveStreamingDetails,status");
-        vUrl.searchParams.set("id", ids.join(","));
-        vUrl.searchParams.set("key", apiKey);
-        const vRes = await fetch(vUrl.toString(), { headers: { Accept: "application/json" } });
-        if (!vRes.ok) continue;
-        const vData = await vRes.json();
-        for (const item of vData.items || []) {
-          const title = item.snippet?.title || "";
-          if (!isNewsContent(title)) continue;
-          if (item.status?.embeddable === false) continue;
-          if (item.contentDetails?.caption !== "true") continue;
-          if (item.liveStreamingDetails || item.snippet?.liveBroadcastContent && item.snippet.liveBroadcastContent !== "none") continue;
-          const { seconds, formatted } = parseIsoDuration(item.contentDetails?.duration || "");
-          if (seconds < 60 || seconds > 7200) continue;
-          const publishedAt = item.snippet?.publishedAt || "";
-          const pubMs = new Date(publishedAt).getTime();
-          if (pubMs < oneWeekAgoMs || pubMs > now) continue;
-          if (!candidateVideos.some((cv) => cv.videoId === item.id)) {
-            candidateVideos.push({
-              videoId: item.id,
-              title,
-              channelTitle: ch.name,
-              channelId: ch.id,
-              publishedAt,
-              publishedRelative: formatRelativeTimeZh(publishedAt),
-              durationFormatted: formatted,
-              durationSeconds: seconds,
-              thumbnailUrl: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
-              hasCaptions: true,
-              captionBadge: "CC \u82F1\u6587\u5B57\u5E55",
-              category: ch.category
-            });
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("[YouTubeNews] Direct search CC query error:", e?.message || e);
+      console.warn("[YouTubeDiscovery] API batch validation error:", apiErr?.message || apiErr);
     }
   }
   candidateVideos.sort(
@@ -1529,23 +2061,45 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
   );
   const deduplicated = deduplicateNewsVideos(candidateVideos);
   const categoryOrder = [
-    "TalkShow",
-    "Knowledge",
+    "News",
+    "TED",
     "Technology",
-    "Business",
-    "World",
-    "US",
-    "Breaking"
+    "Entertainment",
+    "Knowledge",
+    "Business"
   ];
   const selectedVideos = [];
   const selectedIds = /* @__PURE__ */ new Set();
+  const previousSnapshot = loadDailySnapshot();
+  const previousVideos = previousSnapshot?.videos || [];
   for (const cat of categoryOrder) {
     const catItems = deduplicated.filter((v) => v.category === cat);
-    const maxForCat = cat === "TalkShow" ? 12 : 5;
-    for (const item of catItems.slice(0, maxForCat)) {
+    for (const item of catItems.slice(0, 10)) {
       if (!selectedIds.has(item.videoId)) {
         selectedIds.add(item.videoId);
         selectedVideos.push(item);
+      }
+    }
+    const currentCount = selectedVideos.filter((v) => v.category === cat).length;
+    if (currentCount < 10 && previousVideos.length > 0) {
+      const prevCatItems = previousVideos.filter((v) => v.category === cat);
+      for (const pItem of prevCatItems) {
+        if (selectedVideos.filter((v) => v.category === cat).length >= 10) break;
+        if (!selectedIds.has(pItem.videoId)) {
+          selectedIds.add(pItem.videoId);
+          selectedVideos.push(pItem);
+        }
+      }
+    }
+    const countAfterPrev = selectedVideos.filter((v) => v.category === cat).length;
+    if (countAfterPrev < 10) {
+      const seedCatItems = EVERGREEN_SEED_VIDEOS.filter((v) => v.category === cat);
+      for (const sItem of seedCatItems) {
+        if (selectedVideos.filter((v) => v.category === cat).length >= 10) break;
+        if (!selectedIds.has(sItem.videoId)) {
+          selectedIds.add(sItem.videoId);
+          selectedVideos.push(sItem);
+        }
       }
     }
   }
@@ -1559,29 +2113,48 @@ async function discoverLiveEnglishNews(forceRefresh = false) {
   selectedVideos.sort(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );
-  const validatedList = selectedVideos.length > 0 ? selectedVideos : deduplicated.slice(0, 60);
-  if (validatedList.length === 0) {
+  const fullyVerifiedVideos = [];
+  const unverified = selectedVideos.filter((v) => !v.hasCaptions && !verifiedCaptionsCache.has(v.videoId));
+  if (unverified.length > 0) {
+    const probeBatch = unverified.slice(0, 8);
+    await Promise.all(
+      probeBatch.map(async (v) => {
+        const ok = await probeHasEnglishTranscript(v.videoId);
+        v.hasCaptions = ok;
+      })
+    );
+  }
+  for (const v of selectedVideos) {
+    if (reportedNoCaptionBlacklist.has(v.videoId)) continue;
+    if (v.hasCaptions !== false) {
+      fullyVerifiedVideos.push(v);
+    }
+  }
+  const finalVideoList = fullyVerifiedVideos.length > 0 ? fullyVerifiedVideos : selectedVideos;
+  if (finalVideoList.length === 0) {
     return {
       success: true,
       cached: false,
       timestamp: now,
-      publishedAfter: publishedAfterIso,
       videos: [],
-      message: "\u66AB\u6642\u627E\u4E0D\u5230\u53EF\u7528\u82F1\u6587\u5B57\u5E55\u7684\u65B0\u805E\u6216\u812B\u53E3\u79C0\u5F71\u7247"
+      message: "\u66AB\u6642\u627E\u4E0D\u5230\u53EF\u7528\u82F1\u6587\u5B57\u5E55\u7684\u5F71\u7247\uFF0C\u8ACB\u7A0D\u5F8C\u9EDE\u64CA\u91CD\u65B0\u6574\u7406"
     };
   }
-  await enrichNewsVideosWithDetailsAndTranslation(validatedList);
+  await enrichNewsVideosWithDetailsAndTranslation(finalVideoList);
   newsCache = {
     timestamp: now,
-    publishedAfter: publishedAfterIso,
-    videos: validatedList
+    videos: finalVideoList
   };
+  saveDailySnapshot({
+    utcDate: currentUtcDay,
+    updatedAt: now,
+    videos: finalVideoList
+  });
   return {
     success: true,
     cached: false,
     timestamp: now,
-    publishedAfter: publishedAfterIso,
-    videos: validatedList
+    videos: finalVideoList
   };
 }
 async function enrichNewsVideosWithDetailsAndTranslation(videos) {
@@ -1595,9 +2168,7 @@ async function enrichNewsVideosWithDetailsAndTranslation(videos) {
         videosUrl.searchParams.set("part", "contentDetails");
         videosUrl.searchParams.set("id", ids.slice(0, 50).join(","));
         videosUrl.searchParams.set("key", apiKey);
-        const res = await fetch(videosUrl.toString(), {
-          headers: { Accept: "application/json" }
-        });
+        const res = await fetch(videosUrl.toString(), { headers: { Accept: "application/json" } });
         if (res.ok) {
           const data = await res.json();
           const durationMap = /* @__PURE__ */ new Map();
@@ -1616,8 +2187,7 @@ async function enrichNewsVideosWithDetailsAndTranslation(videos) {
           }
         }
       }
-    } catch (e) {
-      console.warn("[YouTubeNews] Duration enrichment error:", e?.message || e);
+    } catch (_) {
     }
   }
   const titlesToTranslate = videos.map((v) => v.title);
@@ -1627,12 +2197,12 @@ async function enrichNewsVideosWithDetailsAndTranslation(videos) {
     try {
       const { GoogleGenAI: GoogleGenAI2 } = await import("@google/genai");
       const ai = new GoogleGenAI2({ apiKey: geminiKey });
-      const prompt = "Translate the following English news titles into authentic, fluent Traditional Chinese (Taiwan, \u7E41\u9AD4\u4E2D\u6587\u53F0\u7063\u7FD2\u6163\u7528\u8A9E). Return ONLY a valid JSON array of strings corresponding to each title in order, with no explanation or markdown tags:\n" + JSON.stringify(titlesToTranslate);
+      const prompt = "Translate the following English video titles into authentic, fluent Traditional Chinese (Taiwan, \u7E41\u9AD4\u4E2D\u6587\u53F0\u7063\u7FD2\u6163\u7528\u8A9E). Return ONLY a valid JSON array of strings corresponding to each title in order, with no explanation or markdown tags:\n" + JSON.stringify(titlesToTranslate);
       let resp;
       try {
         resp = await Promise.race([
           ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3.8-flash",
             contents: prompt
           }),
           new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 7e3))
@@ -1641,12 +2211,12 @@ async function enrichNewsVideosWithDetailsAndTranslation(videos) {
         try {
           resp = await Promise.race([
             ai.models.generateContent({
-              model: "gemini-2.0-flash",
+              model: "gemini-2.5-flash",
               contents: prompt
             }),
             new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 7e3))
           ]);
-        } catch {
+        } catch (_) {
         }
       }
       const text = resp?.text?.trim() || "";
@@ -1661,7 +2231,7 @@ async function enrichNewsVideosWithDetailsAndTranslation(videos) {
           });
         }
       }
-    } catch {
+    } catch (_) {
     }
   }
   const untranslated = videos.filter((v) => !translatedMap.has(v.title));
@@ -1675,8 +2245,8 @@ async function enrichNewsVideosWithDetailsAndTranslation(videos) {
           );
           if (res.ok) {
             const arr = await res.json();
-            if (Array.isArray(arr) && arr[0] && typeof arr[0] === "string") {
-              translatedMap.set(v.title, arr[0].trim());
+            if (Array.isArray(arr) && arr[0]) {
+              translatedMap.set(v.title, String(arr[0]).trim());
             }
           }
         } catch (_) {
@@ -2146,6 +2716,14 @@ app.get("/api/youtube/news", async (req, res) => {
       videos: []
     });
   }
+});
+app.post("/api/youtube/report-no-caption", (req, res) => {
+  const videoId = String(req.body?.videoId || req.query?.videoId || "").trim();
+  if (videoId) {
+    reportNoCaptionVideo(videoId);
+    console.log(`[YouTubeDiscovery] Blacklisted video without captions: ${videoId}`);
+  }
+  res.json({ success: true, blacklisted: videoId });
 });
 app.post("/api/youtube/batch-translate", async (req, res) => {
   try {
@@ -2710,9 +3288,9 @@ app.get("/api/version", (req, res) => {
   let commitHash = "main";
   let dynamicVersion = APP_VERSION;
   try {
-    const versionFile = import_path.default.resolve("dist/build-version.json");
-    if (import_fs.default.existsSync(versionFile)) {
-      const parsed = JSON.parse(import_fs.default.readFileSync(versionFile, "utf-8"));
+    const versionFile = import_path2.default.resolve("dist/build-version.json");
+    if (import_fs2.default.existsSync(versionFile)) {
+      const parsed = JSON.parse(import_fs2.default.readFileSync(versionFile, "utf-8"));
       if (parsed.version) dynamicVersion = parsed.version;
       if (parsed.buildTime) currentBuildTime = parsed.buildTime;
       if (parsed.commit) commitHash = parsed.commit;
@@ -3063,11 +3641,11 @@ var sttUsageTracker = {
   deepgramRequestsSinceReset: 0,
   deepgramStreamSecondsSinceReset: 0
 };
-var STT_USAGE_CACHE_FILE = import_path.default.join(process.cwd(), "data", "stt-usage-cache.json");
+var STT_USAGE_CACHE_FILE = import_path2.default.join(process.cwd(), "data", "stt-usage-cache.json");
 function loadSttUsageTracker() {
   try {
-    if (import_fs.default.existsSync(STT_USAGE_CACHE_FILE)) {
-      const data = JSON.parse(import_fs.default.readFileSync(STT_USAGE_CACHE_FILE, "utf-8"));
+    if (import_fs2.default.existsSync(STT_USAGE_CACHE_FILE)) {
+      const data = JSON.parse(import_fs2.default.readFileSync(STT_USAGE_CACHE_FILE, "utf-8"));
       const currentUtcDay = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
       if (data && data.groqCurrentUtcDay === currentUtcDay) {
         if (data.groqTodayRequests) sttUsageTracker.groqTodayRequests = data.groqTodayRequests;
@@ -3120,9 +3698,9 @@ function loadSttUsageTracker() {
 }
 function saveSttUsageTracker() {
   try {
-    const dir = import_path.default.dirname(STT_USAGE_CACHE_FILE);
-    if (!import_fs.default.existsSync(dir)) import_fs.default.mkdirSync(dir, { recursive: true });
-    import_fs.default.writeFileSync(STT_USAGE_CACHE_FILE, JSON.stringify(sttUsageTracker), "utf-8");
+    const dir = import_path2.default.dirname(STT_USAGE_CACHE_FILE);
+    if (!import_fs2.default.existsSync(dir)) import_fs2.default.mkdirSync(dir, { recursive: true });
+    import_fs2.default.writeFileSync(STT_USAGE_CACHE_FILE, JSON.stringify(sttUsageTracker), "utf-8");
   } catch (_) {
   }
 }
@@ -5008,7 +5586,7 @@ async function startServer() {
     }
     next();
   });
-  app.use(import_express.default.static(import_path.default.join(process.cwd(), "public")));
+  app.use(import_express.default.static(import_path2.default.join(process.cwd(), "public")));
   app.all("/api/*", (req, res) => {
     res.status(404).json({
       status: 404,
@@ -5027,10 +5605,10 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = import_path.default.join(process.cwd(), "dist");
+    const distPath = import_path2.default.join(process.cwd(), "dist");
     app.use(import_express.default.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(import_path.default.join(distPath, "index.html"));
+      res.sendFile(import_path2.default.join(distPath, "index.html"));
     });
   }
   server.listen(PORT, "0.0.0.0", () => {

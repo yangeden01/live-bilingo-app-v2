@@ -20,6 +20,7 @@ import { lookupQuickWord } from '../utils/quickDictionary';
 import { convertChinese, ChineseVariant } from '../utils/chineseConverter';
 import { getWordDifficulty } from '../utils/cefrDifficulty';
 import { getPersistentItem, setPersistentItem } from '../utils/persistentStorage';
+import { translateEnglishToChinese } from '../utils/clientTranslation';
 
 interface Props {
   isOpen: boolean;
@@ -41,6 +42,7 @@ export const FlashcardQuizModal: React.FC<Props> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [dynamicZh, setDynamicZh] = useState<string>('');
 
   // Auto-speak preference: Default is TRUE (預設開啟自動發音)
   const [autoSpeak, setAutoSpeak] = useState<boolean>(() => {
@@ -78,10 +80,56 @@ export const FlashcardQuizModal: React.FC<Props> = ({
   };
 
   const currentWord = shuffledWords[currentIndex] || '';
-  const quickInfo = useMemo(() => lookupQuickWord(currentWord), [currentWord]);
-  const diffInfo = useMemo(() => getWordDifficulty(currentWord), [currentWord]);
-  const rawZh = quickInfo?.zh || asyncWordTranslations[currentWord] || '英語廣播常用生詞';
-  const zhTranslation = chineseVariant === 'simplified' ? convertChinese(rawZh, 'simplified') : rawZh;
+  const cleanCurrentWord = currentWord.toLowerCase().trim();
+  const quickInfo = useMemo(() => lookupQuickWord(cleanCurrentWord), [cleanCurrentWord]);
+  const diffInfo = useMemo(() => getWordDifficulty(cleanCurrentWord), [cleanCurrentWord]);
+
+  // Auto-resolve translation if not present in quickInfo or asyncWordTranslations
+  useEffect(() => {
+    if (!cleanCurrentWord) return;
+    if (quickInfo?.zh) {
+      setDynamicZh('');
+      return;
+    }
+    const propTrans = asyncWordTranslations[cleanCurrentWord] || asyncWordTranslations[currentWord];
+    if (propTrans) {
+      setDynamicZh(propTrans);
+      return;
+    }
+
+    try {
+      const rawCache = getPersistentItem('vocab_translations_cache');
+      if (rawCache) {
+        const cache = JSON.parse(rawCache);
+        if (cache[cleanCurrentWord]?.zh) {
+          setDynamicZh(cache[cleanCurrentWord].zh);
+          return;
+        }
+      }
+    } catch (e) {}
+
+    let cancelled = false;
+    translateEnglishToChinese(cleanCurrentWord).then((zh) => {
+      if (!cancelled && zh) {
+        setDynamicZh(zh);
+        try {
+          const rawCache = getPersistentItem('vocab_translations_cache');
+          const cache = rawCache ? JSON.parse(rawCache) : {};
+          cache[cleanCurrentWord] = { zh, pos: '詞彙' };
+          setPersistentItem('vocab_translations_cache', JSON.stringify(cache));
+        } catch (e) {}
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cleanCurrentWord, quickInfo, asyncWordTranslations, currentWord]);
+
+  const rawZh = quickInfo?.zh || dynamicZh || asyncWordTranslations[cleanCurrentWord] || asyncWordTranslations[currentWord] || '';
+  const zhTranslation = rawZh
+    ? (chineseVariant === 'simplified' ? convertChinese(rawZh, 'simplified') : rawZh)
+    : '正在獲取中文釋義...';
 
   // Auto-pronounce current word on card change or open when autoSpeak is enabled
   useEffect(() => {

@@ -111,10 +111,13 @@ export type YouTubeErrorCode =
   | 'YOUTUBE_API_UNAVAILABLE';
 
 export type YouTubeNewsCategory =
-  | 'TalkShow'
-  | 'Knowledge'
+  | 'News'
+  | 'TED'
   | 'Technology'
+  | 'Entertainment'
+  | 'Knowledge'
   | 'Business'
+  | 'TalkShow'
   | 'World'
   | 'US'
   | 'Breaking';

@@ -11,7 +11,7 @@ import { GoogleGenAI } from '@google/genai';
 import { matchExactPhrase, postprocessChineseTranslation, preprocessEnglishForTranslation } from './src/utils/broadcastGlossary';
 import { lookupQuickWord, generateContextualExample } from './src/utils/quickDictionary';
 import { defaultTranscriptProvider } from './server/youtubeTranscriptProvider';
-import { discoverLiveEnglishNews } from './server/youtubeNewsDiscoveryService';
+import { discoverLiveEnglishNews, reportNoCaptionVideo } from './server/youtubeNewsDiscoveryService';
 
 // Allow radio streams with custom/mismatched SSL certs
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -566,6 +566,16 @@ app.get('/api/youtube/news', async (req, res) => {
       videos: [],
     });
   }
+});
+
+// Report video with no captions to immediately blacklist and evict from cache
+app.post('/api/youtube/report-no-caption', (req, res) => {
+  const videoId = String(req.body?.videoId || req.query?.videoId || '').trim();
+  if (videoId) {
+    reportNoCaptionVideo(videoId);
+    console.log(`[YouTubeDiscovery] Blacklisted video without captions: ${videoId}`);
+  }
+  res.json({ success: true, blacklisted: videoId });
 });
 
 // YouTube Subtitle Batch Translation Endpoint

@@ -20,6 +20,7 @@ interface Props {
   isLoopEnabled?: boolean;
   isLive?: boolean;
   autoPlay?: boolean;
+  onLoopReplay?: () => void;
   ref?: React.Ref<YouTubePlayerRef>;
 }
 
@@ -41,6 +42,7 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
   isLoopEnabled = false,
   isLive = false,
   autoPlay = false,
+  onLoopReplay,
   ref,
 }) => {
   const containerId = useRef(`yt-player-${Math.random().toString(36).substring(2, 9)}`).current;
@@ -48,7 +50,16 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
   const timePollIntervalRef = useRef<any>(null);
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const prevVideoIdRef = useRef(videoId);
+  const currentTimeRef = useRef(initialTimeSeconds || 0);
   const [currentTime, setCurrentTime] = useState(initialTimeSeconds || 0);
+
+  // Synchronously reset currentTimeRef when videoId prop changes
+  if (prevVideoIdRef.current !== videoId) {
+    prevVideoIdRef.current = videoId;
+    currentTimeRef.current = initialTimeSeconds || 0;
+  }
+
   const [duration, setDuration] = useState(0);
   const [playerError, setPlayerError] = useState<string | null>(null);
   const hasAppliedInitialTimeRef = useRef(false);
@@ -59,6 +70,12 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
   // Keep a stable ref for isLoopEnabled
   const isLoopEnabledRef = useRef(isLoopEnabled);
   isLoopEnabledRef.current = isLoopEnabled;
+
+  const onLoopReplayRef = useRef(onLoopReplay);
+  onLoopReplayRef.current = onLoopReplay;
+
+  const autoPlayRef = useRef(autoPlay);
+  autoPlayRef.current = autoPlay;
 
   // Stable callback refs to prevent effect re-triggering and render-phase update cascades
   const onTimeUpdateRef = useRef(onTimeUpdate);
@@ -83,10 +100,14 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
             : -1;
           if (state === -1 || state === 5) {
             if (typeof playerRef.current.loadVideoById === 'function') {
+              // Always start from 0:00 unless a specific initial time was intentionally requested
+              const startAt = initialTimeSeconds > 0 ? initialTimeSeconds : 0;
               playerRef.current.loadVideoById({
                 videoId,
-                startSeconds: currentTime > 0 ? currentTime : initialTimeSeconds,
+                startSeconds: startAt,
               });
+              currentTimeRef.current = startAt;
+              setCurrentTime(startAt);
             } else {
               playerRef.current.playVideo();
             }
@@ -209,7 +230,7 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
         playerRef.current = new window.YT.Player(containerId, {
           videoId,
           playerVars: {
-            autoplay: 0,
+            autoplay: autoPlayRef.current ? 1 : 0,
             controls: 0,
             disablekb: 1,
             fs: 0,
@@ -221,6 +242,7 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
             cc_load_policy: 1,
             cc_lang_pref: 'en',
             hl: 'en',
+            start: initialTimeSeconds > 0 ? Math.floor(initialTimeSeconds) : 0,
             origin:
               typeof window !== 'undefined' &&
               window.location.origin &&
@@ -243,24 +265,34 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
                 setDuration(dur);
                 onDurationChangeRef.current?.(dur);
               }
-              if (autoPlay) {
+              if (autoPlayRef.current) {
                 if (initialTimeSeconds > 0) {
                   event.target.seekTo(initialTimeSeconds, true);
+                  currentTimeRef.current = initialTimeSeconds;
                   setCurrentTime(initialTimeSeconds);
                   hasAppliedInitialTimeRef.current = true;
+                } else {
+                  event.target.seekTo(0, true);
+                  currentTimeRef.current = 0;
+                  setCurrentTime(0);
                 }
                 event.target.playVideo();
                 setIsPlaying(true);
+                startTimePolling();
                 onStateChangeRef.current?.('playing');
               } else if (initialTimeSeconds > 0) {
                 // Seek to initial position quietly without triggering autoplay
                 event.target.seekTo(initialTimeSeconds, false);
                 event.target.pauseVideo();
+                currentTimeRef.current = initialTimeSeconds;
                 setCurrentTime(initialTimeSeconds);
                 hasAppliedInitialTimeRef.current = true;
                 onStateChangeRef.current?.('paused');
               } else {
+                event.target.seekTo(0, false);
                 event.target.pauseVideo();
+                currentTimeRef.current = 0;
+                setCurrentTime(0);
                 onStateChangeRef.current?.('paused');
               }
             },
@@ -272,6 +304,19 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
                 if (bufferingTimeoutRef.current) {
                   clearTimeout(bufferingTimeoutRef.current);
                   bufferingTimeoutRef.current = null;
+                }
+                // Guard: If starting from beginning, verify YouTube didn't resume mid-stream from user watch history
+                if (!hasAppliedInitialTimeRef.current && (!initialTimeSeconds || initialTimeSeconds === 0)) {
+                  hasAppliedInitialTimeRef.current = true;
+                  try {
+                    const currentPos = event.target.getCurrentTime();
+                    if (typeof currentPos === 'number' && currentPos > 1.5) {
+                      event.target.seekTo(0, true);
+                      currentTimeRef.current = 0;
+                      setCurrentTime(0);
+                      onTimeUpdateRef.current?.(0);
+                    }
+                  } catch (_) {}
                 }
                 setIsPlaying(true);
                 startTimePolling();
@@ -310,9 +355,12 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
                     // Loop whole video! Seek to start and play immediately
                     event.target.seekTo(0, true);
                     event.target.playVideo();
+                    setCurrentTime(0);
+                    onTimeUpdateRef.current?.(0);
                     setIsPlaying(true);
                     startTimePolling();
                     onStateChangeRef.current?.('playing');
+                    onLoopReplayRef.current?.();
                     return;
                   } catch (e) {
                     console.warn('[YouTubePlayer] Loop rewind error:', e);
@@ -390,6 +438,22 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
       }
     }
   }, [isReady, initialTimeSeconds]);
+
+  // Whenever autoPlay prop becomes true while player is ready, automatically trigger playback
+  useEffect(() => {
+    if (autoPlay && isReady && playerRef.current) {
+      try {
+        if (typeof playerRef.current.playVideo === 'function') {
+          playerRef.current.playVideo();
+          setIsPlaying(true);
+          startTimePolling();
+          onStateChangeRef.current?.('playing');
+        }
+      } catch (err) {
+        console.warn('[YouTubePlayer] autoPlay playVideo error:', err);
+      }
+    }
+  }, [autoPlay, isReady]);
 
   const togglePlayPause = () => {
     if (!playerRef.current) return;

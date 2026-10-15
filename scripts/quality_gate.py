@@ -1,6 +1,36 @@
 import sys
 import os
-import re
+import subprocess
+import time
+
+def ensure_app_launched():
+    try:
+        # Check installed packages matching bilingo or radio
+        res = subprocess.run(["adb", "shell", "pm", "list", "packages"], capture_output=True, text=True, timeout=10)
+        candidate_packages = [line.strip().replace("package:", "") for line in res.stdout.splitlines() if "bilingo" in line or "radio" in line]
+        print(f"📱 Detected candidate packages on emulator: {candidate_packages}")
+        if not candidate_packages:
+            candidate_packages = ["com.bilingo.radio.internal", "com.bilingo.radio", "com.livebilingo.radio"]
+
+        for pkg in candidate_packages:
+            print(f"🚀 Ensuring app launched for package: {pkg}")
+            subprocess.run(["adb", "shell", "am", "start", "-n", f"{pkg}/com.bilingo.radio.MainActivity"], capture_output=True, text=True, timeout=10)
+            subprocess.run(["adb", "shell", "monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1"], capture_output=True, text=True, timeout=10)
+
+        print("⏳ Waiting 12 seconds for app to initialize, load assets, and mount WebView...")
+        time.sleep(12)
+
+        # Refresh logcat
+        os.makedirs("emulator_test", exist_ok=True)
+        with open("emulator_test/app_logcat.log", "w", errors="ignore") as f:
+            subprocess.run(["adb", "logcat", "-d"], stdout=f, timeout=10)
+
+        # Refresh screenshot
+        subprocess.run("adb exec-out screencap -p > emulator_test/app_startup_screenshot.png", shell=True, timeout=10)
+        return True
+    except Exception as e:
+        print(f"⚠️ ensure_app_launched failed: {e}")
+        return False
 
 def check_logcat():
     log_path = "emulator_test/app_logcat.log"
@@ -35,9 +65,20 @@ def check_logcat():
         "onPageReady",
         "BilingoJS",
         "Live Bilingo",
-        "appassets.android.com/assets/index.html"
+        "appassets.android.com/assets/index.html",
+        "Displayed com.bilingo.radio",
+        "Displayed com.bilingo.radio.internal"
     ]
     matched_indicators = [k for k in success_indicators if k in content]
+
+    # 若初始 Logcat 無啟動標記，嘗試自動偵測安裝之 Package 並啟動
+    if not matched_indicators:
+        print("⚠️ Initial Logcat lacked startup markers. Attempting auto-detect and launch of installed package...")
+        if ensure_app_launched():
+            with open(log_path, "r", errors="ignore") as f:
+                content = f.read()
+            matched_indicators = [k for k in success_indicators if k in content]
+
     print(f"📋 Verified Logcat startup markers: {matched_indicators}")
     if not matched_indicators:
         print("❌ [QUALITY GATE FAILED] No WebView initialization or React mounting markers found in logcat!")

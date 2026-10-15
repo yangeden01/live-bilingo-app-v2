@@ -1278,40 +1278,26 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                 />
               )}
 
-              {/* Single Clear State: Play/Pause action + Subtitle % */}
-              <div className="relative z-10 flex items-center justify-center gap-1 sm:gap-1.5 min-w-0">
-                {isNewInputUrl ? (
+              {/* Single Clear State: Play/Pause action (No percentage badge to prevent text truncation) */}
+              <div className="relative z-10 flex items-center justify-center gap-1.5 min-w-0">
+                {status === 'loading' || status === 'translating' ? (
+                  <Loader2 className={`w-4 h-4 shrink-0 animate-spin ${isLightOrPaper ? 'text-emerald-700' : 'text-emerald-400'}`} />
+                ) : isNewInputUrl ? (
                   <Play className={`w-4 h-4 shrink-0 ${isLightOrPaper ? 'fill-emerald-700 text-emerald-700' : 'fill-emerald-400 text-emerald-400'}`} />
                 ) : playerState === 'playing' ? (
                   <Pause className={`w-4 h-4 shrink-0 ${isLightOrPaper ? 'fill-amber-700 text-amber-700' : 'fill-amber-400 text-amber-400'}`} />
                 ) : (
                   <Play className={`w-4 h-4 shrink-0 ml-0.5 ${isLightOrPaper ? 'fill-emerald-700 text-emerald-700' : 'fill-emerald-400 text-emerald-400'}`} />
                 )}
-                <span className={`font-black tracking-tight truncate ${isLightOrPaper ? 'text-[#09090B]' : 'text-white'}`}>
-                  {isNewInputUrl ? '播放' : playerState === 'playing' ? '暫停' : '播放'}
+                <span className={`font-black tracking-tight whitespace-nowrap ${isLightOrPaper ? 'text-[#09090B]' : 'text-white'}`}>
+                  {status === 'loading' || status === 'translating'
+                    ? '載入中'
+                    : isNewInputUrl
+                    ? '播放'
+                    : playerState === 'playing'
+                    ? '暫停'
+                    : '播放'}
                 </span>
-
-                {/* Subtitle Progress Badge: Only percentage without 字幕 */}
-                {(status === 'loading' || status === 'translating' || (status === 'ready' && !isNewInputUrl)) && (
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black border shrink-0 flex items-center gap-0.5 ${
-                    status === 'loading' || status === 'translating'
-                      ? currentTheme === 'paper'
-                        ? 'bg-[#E4D5B8] text-[#18181B] border-[#C0AA7F]'
-                        : currentTheme === 'light'
-                        ? 'bg-emerald-100 text-[#09090B] border-emerald-400'
-                        : 'bg-emerald-950/80 text-emerald-200 border-emerald-500/40'
-                      : currentTheme === 'paper'
-                      ? 'bg-[#E4D5B8] text-[#18181B] border-[#C0AA7F]'
-                      : currentTheme === 'light'
-                      ? 'bg-emerald-100 text-[#09090B] border-emerald-400'
-                      : 'bg-emerald-950/80 text-emerald-200 border-emerald-500/40'
-                  }`}>
-                    {(status === 'loading' || status === 'translating') && (
-                      <Loader2 className="w-2.5 h-2.5 animate-spin inline" />
-                    )}
-                    {status === 'ready' ? '100%' : `${progress.percent || (status === 'loading' ? 25 : 60)}%`}
-                  </span>
-                )}
               </div>
             </button>
           </div>

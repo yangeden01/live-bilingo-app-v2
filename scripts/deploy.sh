@@ -91,8 +91,41 @@ echo "=== 4. Staging and Committing Changes ==="
 git add -A
 git commit -m "$COMMIT_MSG" || echo "No changes to commit"
 
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-echo "=== 5. Pushing to GitHub Branch: $CURRENT_BRANCH to Trigger APK Release ==="
+CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "main")
+echo "=== 5. Pushing to GitHub Branch ($CURRENT_BRANCH) ==="
 git push origin "$CURRENT_BRANCH" || git push --force origin "$CURRENT_BRANCH"
+
+if [ "$CURRENT_BRANCH" != "main" ]; then
+  echo "=== 6. Triggering GitHub Actions Workflow Dispatch for $CURRENT_BRANCH ==="
+  node -e '
+  const https = require("https");
+  require("dotenv").config();
+  const token = process.env.GITHUB_TOKEN;
+  const repo = process.env.GITHUB_REPO || "yangeden01/live-bilingo-app-v2";
+  const branch = process.argv[1];
+  const data = JSON.stringify({ ref: branch });
+  const req = https.request({
+    hostname: "api.github.com",
+    path: `/repos/${repo}/actions/workflows/build-android.yml/dispatches`,
+    method: "POST",
+    headers: {
+      "User-Agent": "NodeJS",
+      "Authorization": `Bearer ${token}`,
+      "Accept": "application/vnd.github+json",
+      "Content-Type": "application/json",
+      "Content-Length": data.length
+    }
+  }, (res) => {
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      console.log(`Successfully triggered workflow build for ${branch} (HTTP ${res.statusCode})`);
+    } else {
+      console.error(`Workflow dispatch returned HTTP ${res.statusCode}`);
+    }
+  });
+  req.on("error", (e) => console.error("Error triggering workflow:", e));
+  req.write(data);
+  req.end();
+  ' "$CURRENT_BRANCH"
+fi
 
 echo "=== Deployment & Verification Completed Successfully ==="

@@ -312,6 +312,8 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -492,7 +494,13 @@ fun MainScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0B0F19))) {
-        AndroidView(
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+        ) {
+            AndroidView(
             factory = { ctx ->
                 try {
                     WebView(ctx).apply {
@@ -601,6 +609,7 @@ fun MainScreen(
             },
             modifier = Modifier.fillMaxSize()
         )
+        }
     }
 }`
   },

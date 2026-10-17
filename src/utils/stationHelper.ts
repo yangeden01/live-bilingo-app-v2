@@ -1,0 +1,39 @@
+/**
+ * Utility functions for radio station URL normalization, canonicalization, and strict isolation comparison.
+ */
+
+export function normalizeStationUrl(url?: string | null): string {
+  if (!url) return '';
+  let cleaned = url.trim();
+  // Extract destination URL if wrapped inside local or remote proxy
+  if (cleaned.includes('/api/radio-stream-proxy') || cleaned.includes('/api/radio-stream-delayed')) {
+    try {
+      const parsed = new URL(cleaned, 'http://localhost:3000');
+      const targetParam = parsed.searchParams.get('url');
+      if (targetParam && (targetParam.startsWith('http://') || targetParam.startsWith('https://'))) {
+        cleaned = targetParam;
+      }
+    } catch (_) {}
+  }
+  // Automatic normalization for Bloomberg Revma stream
+  if (cleaned.toLowerCase().includes('revma.ihrhls.com/zc4732')) {
+    return 'https://stream.revma.ihrhls.com/zc4732';
+  }
+  // Automatic normalization for NHPR AAC stream to MP3 stream
+  if (cleaned.toLowerCase().startsWith('https://nhpr.streamguys1.com/nhpr') && !cleaned.toLowerCase().includes('.mp3')) {
+    cleaned = 'https://nhpr.streamguys1.com/nhpr.mp3';
+  }
+  // Strip protocol, trailing slash, query params, and lowercase for protocol/host comparison
+  return cleaned.trim().toLowerCase().replace(/^https?:\/\//i, '').replace(/\/+$/, '').split('?')[0];
+}
+
+/**
+ * Checks if two station URLs represent the exact same canonical radio station.
+ */
+export function isStationUrlMatch(urlA?: string | null, urlB?: string | null): boolean {
+  if (!urlA || !urlB) return false;
+  const normA = normalizeStationUrl(urlA);
+  const normB = normalizeStationUrl(urlB);
+  if (!normA || !normB) return false;
+  return normA === normB;
+}

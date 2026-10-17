@@ -46,6 +46,12 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+// Google AdMob Authorized Digital Sellers verification
+app.get('/app-ads.txt', (req, res) => {
+  res.type('text/plain');
+  res.send('google.com, pub-7732369001198376, DIRECT, f08c47fec0942fa0\n');
+});
+
 // In-memory translation cache
 const translationCache = new Map<string, string>();
 

@@ -2288,6 +2288,10 @@ app.use((req, res, next) => {
   next();
 });
 app.use(import_express.default.json());
+app.get("/app-ads.txt", (req, res) => {
+  res.type("text/plain");
+  res.send("google.com, pub-7732369001198376, DIRECT, f08c47fec0942fa0\n");
+});
 var translationCache = /* @__PURE__ */ new Map();
 function withTimeout(promise, ms) {
   return new Promise((resolve, reject) => {

@@ -40,7 +40,7 @@
 ## Verified Google Play Console & Closed Testing Configuration (DO NOT ASK FOR CONFIRMATION AGAIN)
 The following Google Play Console and closed testing settings have been 100% verified via screenshots and MUST NOT be asked to re-confirm:
 1. **Target Package ID**: `com.livebilingo.radio`
-2. **Current Release Status**: 🎉 **Live Bilingo 影音雙語已正式公開上架 (Production / Published Live)**，活躍版本 `223 (2.2.3)`。
+2. **Current Release Status**: 🎉 **Live Bilingo 影音雙語已正式公開上架 (Production / Published Live)**，正式上架版本號為 `264 (2.6.4)`（VersionCode: 264, VersionName: 2.6.4 / v2.6.4）。
 3. **Countries / Regions**: Taiwan (台灣), United States (美國), and China (中國) are verified as assigned (`已指定 3 個國家/地區`).
 4. **Tester Group Setting**:
    - Testing Type: Google Group (`Google 群組`).

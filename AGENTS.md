@@ -53,6 +53,21 @@ The following Google Play Console and closed testing settings have been 100% ver
 
 
 
+## Verified AdMob Monetization & Revenue Tracking Status (已核准設定與收益追蹤核心記憶)
+The following AdMob account & monetization setup has been 100% verified via screenshots and MUST NOT be asked to re-confirm:
+1. **AdMob App Information & Linkage (已核准且完成商店關聯)**:
+   - **應用程式名稱**: `Live B`（Live Bilingo 雙語影音英語學習）
+   - **應用程式 ID (App ID)**: `ca-app-pub-7732369001198376~9508349578`
+   - **關聯商店**: Google Play 商店已成功關聯 (`com.bilingo.radio` / `com.livebilingo.radio`)
+   - **核准狀態 (Approval Status)**: ✅ **「就緒」(Ready)** —— 取得 AdMob 最高級別審核綠燈，正式放送廣告並具備完整產生與結算收益資格。
+   - **使用者指標 (User Metrics)**: 已啟用 (`已啟用`)。
+2. **廣告單元配置 (Ad Units)**:
+   - 插頁廣告 (Interstitial Ad) 等高參與度廣告已就緒，配合用戶在 App 內觀看 YouTube 影音與切換時自然觸發曝光。
+3. **第一筆廣告收益追蹤任務 (Revenue Milestone Tracking)**:
+   - **目標**: 持續追蹤至 AdMob 報表出現第一筆實際收益（Estimated Earnings > $0.00 USD）。
+   - **收益轉換機制**: 只要有真實用戶開啟正式版 App 觀看影片學習，觸發廣告曝光（Impression）或點擊（Click），AdMob 即時依據有效 eCPM 結算並轉化為美金收益。
+   - **設定狀態確認**: 基礎架構、Google Play 商店關聯、AdMob 審核全部滿分綠燈通過，無任何未完成之設定阻礙收益入帳。
+
 ## Mandatory Ending Format (每一次對話最後必回報規範 - 實際花費 Total 與拆分細項，幣別以美金 USD 標示)
 每一次對話回覆的最末尾，不需要官方牌價標準，只要秀出本次請求的「實際花費 Total」與「拆分細項」，幣別使用美金（USD），其餘一律取消：
 1. 本次請求實際花費（Total Cost）：$X.XXXX USD

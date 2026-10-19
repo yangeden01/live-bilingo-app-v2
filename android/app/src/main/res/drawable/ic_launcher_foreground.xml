@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Video Player Rounded Screen (Safe-Zone Centered) -->
+    <path
+        android:fillColor="#E11D48"
+        android:pathData="M36,24 L72,24 C77.52,24 82,28.48 82,34 L82,54 C82,59.52 77.52,64 72,64 L36,64 C30.48,64 26,59.52 26,54 L26,34 C26,28.48 30.48,24 36,24 Z"/>
+    <!-- Subtle Player Top Highlight Bar -->
+    <path
+        android:fillColor="#F43F5E"
+        android:pathData="M36,24 L72,24 C77.52,24 82,28.48 82,34 L82,37 L26,37 L26,34 C26,28.48 30.48,24 36,24 Z"/>
+    <!-- Centered Video Play Triangle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,36 L64,44 L48,52 Z"/>
+    <!-- Dual Bilingual Subtitles Indicator Bars Under Player -->
+    <!-- Line 1 (English Subtitle: Cyan Sky Blue) -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M32,70 L76,70 C77.38,70 78.5,71.12 78.5,72.5 C78.5,73.88 77.38,75 76,75 L32,75 C30.62,75 29.5,73.88 29.5,72.5 C29.5,71.12 30.62,70 32,70 Z"/>
+    <!-- Line 2 (Chinese Translation: Warm Amber Gold) -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M38,79 L70,79 C71.38,79 72.5,80.12 72.5,81.5 C72.5,82.88 71.38,84 70,84 L38,84 C36.62,84 35.5,82.88 35.5,81.5 C35.5,80.12 36.62,79 38,79 Z"/>
+</vector>

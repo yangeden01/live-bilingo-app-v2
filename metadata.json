@@ -1,0 +1,8 @@
+{
+  "name": "Live Bilingo 雙語電台",
+  "description": "Live Bilingo - YouTube 影音雙語字幕英語學習應用程式 (支援 YouTube 影音學習、雙語字幕精準對照、單字字典與即時發音)",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

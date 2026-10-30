@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Play 商店最新圖素與文案專區 - Live Bilingo</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --border: #1f2937;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --text: #f8fafc;
+      --subtext: #94a3b8;
+      --green: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      padding: 24px 16px;
+      line-height: 1.6;
+    }
+    .container { max-width: 1040px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 32px; padding: 24px 0 20px; border-bottom: 1px solid var(--border); }
+    h1 { font-size: 28px; font-weight: 800; color: #fff; margin-bottom: 8px; letter-spacing: 0.5px; }
+    p.subtitle { color: var(--subtext); font-size: 15px; }
+    .badge {
+      display: inline-block;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 4px 14px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    /* Copy Section */
+    .copy-section {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 36px;
+    }
+    .copy-section h2 { font-size: 20px; color: #38bdf8; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .copy-box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .copy-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .copy-label {
+      font-size: 14px;
+      font-weight: 700;
+      color: #93c5fd;
+    }
+    .copy-limit {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .copy-content {
+      font-family: inherit;
+      font-size: 14px;
+      color: #f1f5f9;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #090d16;
+      border: 1px solid #1f2937;
+      padding: 12px;
+      border-radius: 8px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .btn-copy {
+      background: #0284c7;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn-copy:hover { background: #0369a1; }
+    .btn-copy:active { transform: scale(0.97); }
+    .btn-copy.copied {
+      background: var(--green);
+    }
+
+    /* Grid & Cards */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+    .card-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 4px; text-align: center; }
+    .card-spec { font-size: 12px; color: var(--accent); font-weight: 600; margin-bottom: 14px; text-align: center; }
+    .card-img-wrap {
+      width: 100%;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #1e293b;
+    }
+    .card-img-wrap img {
+      max-width: 100%;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+    .btn-download {
+      margin-top: auto;
+      width: 100%;
+      background: #0284c7;
+      color: #fff;
+      text-decoration: none;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+      transition: background 0.2s;
+    }
+    .btn-download:hover { background: #0369a1; }
+
+    /* Guide Box */
+    .guide-box {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 40px;
+    }
+    .guide-box h2 { font-size: 18px; color: #38bdf8; margin-bottom: 14px; }
+    .guide-box ol { padding-left: 20px; color: #cbd5e1; font-size: 14px; line-height: 1.8; }
+    .guide-box li { margin-bottom: 8px; }
+    .guide-box code { background: #1e293b; color: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge">Google Play Console 100% 規格合規素材 • 純影音學習版</div>
+      <h1>Live Bilingo 商店圖素與文案專區</h1>
+      <p class="subtitle">已完全移除電台相關內容，聚焦 YouTube 雙語影音、逐句語意對齊字幕、隨身生字本與翻卡測驗</p>
+    </header>
+
+    <!-- 1. Quick Copy Section for Google Play Listing Text -->
+    <section class="copy-section">
+      <h2>📋 Google Play 商品詳情文字（點擊按鈕一鍵複製）</h2>
+
+      <!-- App Name -->
+      <div class="copy-box">
+        <div class="copy-header">
+          <span class="copy-label">1. 應用程式名稱 (App name)</span>
+          <div>
+            <span class="copy-limit">限制 30 字元 • 目前 29 字元</span>
+            <button class="btn-copy" onclick="copyText('appName', this)">📋 快速複製</button>
+          </div>
+        </div>
+        <pre class="copy-content" id="appName">Live Bilingo 雙語影音英語學習</pre>
+      </div>
+
+      <!-- Short Description -->
+      <div class="copy-box">
+        <div class="copy-header">
+          <span class="copy-label">2. 簡短說明 (Short description)</span>
+          <div>
+            <span class="copy-limit">限制 80 字元 • 目前 73 字元</span>
+            <button class="btn-copy" onclick="copyText('shortDesc', this)">📋 快速複製</button>
+          </div>
+        </div>
+        <pre class="copy-content" id="shortDesc">精選 YouTube 雙語影音學習！中英同步逐句字幕、自然語意斷句、點詞即查生字本與翻卡測驗，沉浸式看影片學道地英文。</pre>
+      </div>
+
+      <!-- Full Description -->
+      <div class="copy-box">
+        <div class="copy-header">
+          <span class="copy-label">3. 完整說明 (Full description)</span>
+          <div>
+            <span class="copy-limit">限制 4000 字元 • ASO 排版優化</span>
+            <button class="btn-copy" onclick="copyText('fullDesc', this)">📋 快速複製完整說明</button>
+          </div>
+        </div>
+        <pre class="copy-content" id="fullDesc">Live Bilingo 是一款專為英語學習者設計的「YouTube 雙語影音沉浸式學習」應用程式。透過精選的國際時事、科技趨勢、商業財經與文化生活影音，搭配中英同步雙語字幕與智慧輔助工具，讓你在看喜愛影片的同時，輕鬆提升英語聽力與字彙量！
+
+【四大學習特色】
+
+🎬 1. 精選 YouTube 雙語影音庫
+• 每日自動推薦最新國際新聞、知識科普、TED演說、商業訪談等高畫質熱門影片。
+• 告別枯燥死背教材，從真實道地的母語人士發音與語境中學習最實用的英語表達。
+
+⚡ 2. 逐句自然語意斷句 ✕ 中英同步字幕
+• 採用語意邊界精準對齊，徹底告別逗號切碎的碎片化短句。
+• 中英文逐句清晰對照，支援繁體中文 / 簡體中文自由切換。
+• 支援字級放大與紙質護眼閱讀模式，久看也不疲勞。
+
+📚 3. 點詞即查 ✕ 個人隨身生字本
+• 在字幕中遇到不懂的生字？輕輕一點立即查看權威英漢雙解釋義、KK音標與雙語例句。
+• 一鍵收藏到生字筆記本，不再需要頻繁跳出切換字典 App。
+
+🧠 4. 單字記憶翻卡測驗 ✕ CEFR 國際難度分級
+• 依照歐洲語言架構 (CEFR A1～C2) 標註單字難易度，一眼掌握學習重心。
+• 內建隨身翻卡測驗功能（Flashcards），利用零碎時間自我抽測，強化長效記憶。
+
+【適合的使用族群】
+✓ 準備多益 (TOEIC)、雅思 (IELTS)、托福 (TOEFL) 的考生
+✓ 想要擺脫死板英文課本，透過真實 YouTube 影片練聽力的上班族與學生
+✓ 想累積道地時事與科技詞彙的自學愛好者
+
+立即下載 Live Bilingo，開啟最直覺、最有趣的雙語影音學習之旅！</pre>
+      </div>
+    </section>
+
+    <!-- 2. Guide Box -->
+    <div class="guide-box">
+      <h2>🚀 如何在 Google Play 管理中心更新？（操作步驟）</h2>
+      <ol>
+        <li>打開 <b>Google Play 管理中心 (Google Play Console)</b> 並選擇您的 App：<code>Live Bilingo</code>。</li>
+        <li>在左側選單往下滾動，找到 <b>「拓展」 (Grow)</b> 類別下的 <b>「商店發布」 (Store presence)</b>。</li>
+        <li>點擊 <b>「主要商品資訊」 (Main store listing)</b>。</li>
+        <li>將上方複製的 <b>應用程式名稱</b>、<b>簡短說明</b>、<b>完整說明</b> 依序貼上。</li>
+        <li>在頁面下方「圖片和影片」欄位，直接上傳下方對應的圖檔：
+          <br>• <b>應用程式圖示 (App icon)</b> ➔ 上傳 <code>app-icon-512x512.png</code>
+          <br>• <b>置頂大圖 (Feature graphic)</b> ➔ 上傳 <code>feature-graphic-1024x500.png</code>
+          <br>• <b>手機螢幕截圖 (Phone screenshots)</b> ➔ 刪除原本舊圖，依序上傳 <code>screenshot-1 ~ 4</code>。
+        </li>
+        <li>上傳完成後，點擊畫面右下角藍色的 <b>「儲存」 (Save)</b>。</li>
+        <li>回到左側導覽列最上方的 <b>「發布總覽」 (Publishing overview)</b>，點擊 <b>「提交審查」 (Send for review)</b> 即可！</li>
+      </ol>
+    </div>
+
+    <!-- 3. App Icon & Feature Graphic -->
+    <h2 style="font-size: 20px; margin-bottom: 16px; color: #fff;">1. 應用程式圖示與主橫幅 (Icon & Feature Graphic)</h2>
+    <div class="grid">
+      <!-- Icon -->
+      <div class="card">
+        <div class="card-title">應用程式圖示 (App Icon)</div>
+        <div class="card-spec">512 x 512 px • 32-bit PNG • 符合純淨影音規範</div>
+        <div class="card-img-wrap" style="max-width: 200px;">
+          <img src="/store-assets/app-icon-512x512.png" alt="App Icon">
+        </div>
+        <a class="btn-download" href="/store-assets/app-icon-512x512.png" download="app-icon-512x512.png">
+          ⬇ 下載 App 圖示 (512x512)
+        </a>
+      </div>
+
+      <!-- Feature Graphic -->
+      <div class="card" style="grid-column: span 2;">
+        <div class="card-title">置頂大圖 (Feature Graphic)</div>
+        <div class="card-spec">1024 x 500 px • PNG • 純影音雙語學習橫幅</div>
+        <div class="card-img-wrap">
+          <img src="/store-assets/feature-graphic-1024x500.png" alt="Feature Graphic">
+        </div>
+        <a class="btn-download" href="/store-assets/feature-graphic-1024x500.png" download="feature-graphic-1024x500.png">
+          ⬇ 下載置頂大圖 (1024x500)
+        </a>
+      </div>
+    </div>
+
+    <!-- 4. Four Phone Screenshots -->
+    <h2 style="font-size: 20px; margin-bottom: 16px; color: #fff;">2. 最新功能手機螢幕截圖 (Phone Screenshots)</h2>
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+      <!-- Screen 1 -->
+      <div class="card">
+        <div class="card-title">第 1 張：YouTube 雙語影音</div>
+        <div class="card-spec">1080 x 2400 px (9:16)</div>
+        <div class="card-img-wrap">
+          <img src="/store-assets/screenshot-1-youtube.png" alt="Screenshot 1">
+        </div>
+        <a class="btn-download" href="/store-assets/screenshot-1-youtube.png" download="screenshot-1-youtube.png">
+          ⬇ 下載第 1 張截圖
+        </a>
+      </div>
+
+      <!-- Screen 2 -->
+      <div class="card">
+        <div class="card-title">第 2 張：語意斷句雙語字幕</div>
+        <div class="card-spec">1080 x 2400 px (9:16)</div>
+        <div class="card-img-wrap">
+          <img src="/store-assets/screenshot-2-subtitles.png" alt="Screenshot 2">
+        </div>
+        <a class="btn-download" href="/store-assets/screenshot-2-subtitles.png" download="screenshot-2-subtitles.png">
+          ⬇ 下載第 2 張截圖
+        </a>
+      </div>
+
+      <!-- Screen 3 -->
+      <div class="card">
+        <div class="card-title">第 3 張：點詞即查生字本</div>
+        <div class="card-spec">1080 x 2400 px (9:16)</div>
+        <div class="card-img-wrap">
+          <img src="/store-assets/screenshot-3-vocab.png" alt="Screenshot 3">
+        </div>
+        <a class="btn-download" href="/store-assets/screenshot-3-vocab.png" download="screenshot-3-vocab.png">
+          ⬇ 下載第 3 張截圖
+        </a>
+      </div>
+
+      <!-- Screen 4 -->
+      <div class="card">
+        <div class="card-title">第 4 張：翻卡測驗 ✕ CEFR分級</div>
+        <div class="card-spec">1080 x 2400 px (9:16)</div>
+        <div class="card-img-wrap">
+          <img src="/store-assets/screenshot-4-flashcard.png" alt="Screenshot 4">
+        </div>
+        <a class="btn-download" href="/store-assets/screenshot-4-flashcard.png" download="screenshot-4-flashcard.png">
+          ⬇ 下載第 4 張截圖
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function copyText(elementId, btn) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      const text = el.innerText || el.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '✓ 已複製！';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+          btn.classList.remove('copied');
+        }, 2000);
+      }).catch(err => {
+        console.error('複製失敗', err);
+      });
+    }
+  </script>
+</body>
+</html>

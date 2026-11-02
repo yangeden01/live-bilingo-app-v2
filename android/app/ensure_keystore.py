@@ -126,13 +126,6 @@ def main():
             f.write(f"- **Alias**: `{final_alias}`\n")
             if os.path.exists(ks_path):
                 f.write(f"- **Keystore Size**: {os.path.getsize(ks_path)} bytes\n")
-                try:
-                    with open(ks_path, "rb") as ksf:
-                        b64_str = base64.b64encode(ksf.read()).decode("utf-8")
-                    f.write("\n<details><summary>💡 點此展開並複製 Base64 設定至 GitHub Secrets (RELEASE_KEYSTORE_BASE64) 以固定簽名</summary>\n\n")
-                    f.write(f"```\n{b64_str}\n```\n\n</details>\n")
-                except Exception:
-                    pass
 
 if __name__ == "__main__":
     main()

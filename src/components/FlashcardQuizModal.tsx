@@ -21,6 +21,7 @@ import { convertChinese, ChineseVariant } from '../utils/chineseConverter';
 import { getWordDifficulty } from '../utils/cefrDifficulty';
 import { getPersistentItem, setPersistentItem } from '../utils/persistentStorage';
 import { translateEnglishToChinese } from '../utils/clientTranslation';
+import { ReviewManager } from '../utils/reviewManager';
 
 interface Props {
   isOpen: boolean;
@@ -71,6 +72,12 @@ export const FlashcardQuizModal: React.FC<Props> = ({
       setIsCompleted(false);
     }
   }, [isOpen, words]);
+
+  React.useEffect(() => {
+    if (isCompleted) {
+      ReviewManager.recordQuizCompleted();
+    }
+  }, [isCompleted]);
 
   const handleShuffle = () => {
     const shuffled = [...shuffledWords].sort(() => Math.random() - 0.5);

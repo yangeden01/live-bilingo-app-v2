@@ -51,7 +51,6 @@ import { YouTubeNewsDiscoveryModal } from './YouTubeNewsDiscoveryModal';
 import { NotesExportModal } from './NotesExportModal';
 import { VocabularyNotebookModal } from './VocabularyNotebookModal';
 import { AdManager } from '../utils/adManager';
-import { ReviewManager } from '../utils/reviewManager';
 
 interface Props {
   onOpenDictionary?: (word?: string) => void;
@@ -476,7 +475,6 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     onPlaybackStateChange?.(mappedState);
     if (state === 'ended') {
       AdManager.triggerInterstitialAd('video_ended');
-      ReviewManager.recordVideoCompletionAndCheckReview();
     }
   }, [onPlaybackStateChange]);
 

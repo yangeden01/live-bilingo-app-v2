@@ -7,6 +7,7 @@ import { getPersistentItem, setPersistentItem } from '../utils/persistentStorage
 import { lookupQuickWord, generateContextualExample } from '../utils/quickDictionary';
 import { translateEnglishToChinese } from '../utils/clientTranslation';
 import { convertChinese } from '../utils/chineseConverter';
+import { ReviewManager } from '../utils/reviewManager';
 
 interface DictionaryMeaning {
   partOfSpeech: string;
@@ -583,6 +584,10 @@ export const DictionaryModal: React.FC<Props> = ({ isOpen, onClose, initialWord 
       setTimeout(() => {
         window.dispatchEvent(new Event('storage'));
       }, 0);
+
+      if (!isSaved) {
+        ReviewManager.recordSavedWordCount(updated.length);
+      }
     } catch (e) {}
   };
 

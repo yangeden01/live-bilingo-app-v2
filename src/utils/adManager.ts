@@ -177,6 +177,10 @@ export class AdManager {
     this.notify();
   }
 
+  static getLastInterstitialTime(): number {
+    return parseInt(getPersistentItem(LAST_INTERSTITIAL_KEY) || '0', 10);
+  }
+
   // --- Interstitial Ad Trigger ---
   static triggerInterstitialAd(source = 'navigation'): boolean {
     if (this.isVipAdFree()) {

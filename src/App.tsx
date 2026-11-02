@@ -69,6 +69,10 @@ export default function App() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
+  useEffect(() => {
+    ReviewManager.recordAppLaunch();
+  }, []);
+
   const effectiveTheme = useMemo<'paper' | 'light' | 'dark'>(() => {
     if (readingMode === 'paper') return 'paper';
     if (readingMode === 'light') return 'light';

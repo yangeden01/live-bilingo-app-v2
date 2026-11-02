@@ -248,6 +248,20 @@ class WebAppInterface(
         onNetworkRestoredInternal()
     }
 
+    /** 取出（並清除）從 YouTube 分享進來的網址；沒有時回傳空字串。 */
+    @JavascriptInterface
+    fun consumeSharedYouTubeUrl(): String {
+        val url = MainActivity.pendingSharedYouTubeUrl ?: return ""
+        val title = MainActivity.pendingSharedYouTubeTitle ?: ""
+        MainActivity.pendingSharedYouTubeUrl = null
+        MainActivity.pendingSharedYouTubeTitle = null
+        return try {
+            org.json.JSONObject().put("url", url).put("title", title).toString()
+        } catch (e: Exception) {
+            url
+        }
+    }
+
     @JavascriptInterface
     fun setContentMode(mode: String) {
         Handler(Looper.getMainLooper()).post {

@@ -1175,6 +1175,17 @@ export default function App() {
     setPersistentItem('active_content_source', newMode);
   }, [contentSource]);
 
+  // 從 YouTube 分享影片進來時，自動切到 YouTube 模式
+  const handleContentSourceChangeRef = useRef(handleContentSourceChange);
+  useEffect(() => {
+    handleContentSourceChangeRef.current = handleContentSourceChange;
+  }, [handleContentSourceChange]);
+  useEffect(() => {
+    const onSharedUrl = () => handleContentSourceChangeRef.current('youtube');
+    window.addEventListener('youtube-shared-url-received', onSharedUrl);
+    return () => window.removeEventListener('youtube-shared-url-received', onSharedUrl);
+  }, []);
+
   // YouTube Whole Video Loop Playback State (用戶需求：在YouTube模式，取消定時鍵改成整部video循環播放鍵)
   const [isYouTubeLoopEnabled, setIsYouTubeLoopEnabled] = useState<boolean>(() => {
     try {

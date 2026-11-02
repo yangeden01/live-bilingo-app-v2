@@ -605,6 +605,58 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     }
   }, [saveUrlToHistory, activeVideoId, scrollToYouTubeReadingMode, onPlaybackStateChange]);
 
+  // 從 YouTube「分享」選 Bilingo：取出 Android 暫存的網址，直接載入並自動播放
+  const startLoadingVideoRef = useRef(startLoadingVideoWithAutoPlay);
+  useEffect(() => {
+    startLoadingVideoRef.current = startLoadingVideoWithAutoPlay;
+  }, [startLoadingVideoWithAutoPlay]);
+
+  useEffect(() => {
+    const consumeSharedUrl = () => {
+      const bridge = (window as any).AndroidBridge;
+      if (!bridge || typeof bridge.consumeSharedYouTubeUrl !== 'function') return;
+      let raw = '';
+      try {
+        raw = bridge.consumeSharedYouTubeUrl() || '';
+      } catch (_) {
+        return;
+      }
+      if (!raw) return;
+      let sharedUrl = raw;
+      let sharedTitle: string | undefined;
+      try {
+        const parsed = JSON.parse(raw);
+        sharedUrl = parsed?.url || '';
+        sharedTitle = parsed?.title || undefined;
+      } catch (_) {}
+      const vid = extractYouTubeVideoId(sharedUrl);
+      if (!vid) {
+        setUrlInput(sharedUrl);
+        setUrlInputError('分享的網址不是有效的 YouTube 影片');
+        return;
+      }
+      // 自用版：若目前在廣播模式，通知 App 切到 YouTube 模式（會暫停廣播）
+      window.dispatchEvent(new CustomEvent('youtube-shared-url-received'));
+      startLoadingVideoRef.current(vid, `https://www.youtube.com/watch?v=${vid}`, sharedTitle);
+    };
+
+    // 延後一拍，確保 App 的模式切換監聽已掛上（冷啟動時子元件 effect 先執行）
+    const initialTimer = setTimeout(consumeSharedUrl, 0);
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'SHARED_YOUTUBE_URL_AVAILABLE') consumeSharedUrl();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') consumeSharedUrl();
+    };
+    window.addEventListener('message', onMessage);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      clearTimeout(initialTimer);
+      window.removeEventListener('message', onMessage);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, []);
+
   // When subtitles are ready or autoPlay was requested, automatically play video, scroll to reading mode, and start live subtitles
   useEffect(() => {
     if (!isAutoPlayPending) return;

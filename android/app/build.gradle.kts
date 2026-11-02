@@ -12,8 +12,8 @@ android {
         applicationId = "com.bilingo.radio"
         minSdk = 24
         targetSdk = 36
-        versionCode = 269
-        versionName = "2.6.9"
+        versionCode = 270
+        versionName = "2.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -76,6 +76,11 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
 
   const autoPlayRef = useRef(autoPlay);
   autoPlayRef.current = autoPlay;
+  // 自動播放請求鎖存：字幕可能比播放器先就緒，上層會提早把 autoPlay 關掉；
+  // 在 YouTube 真正回報「播放中」之前保留這個請求，播放器就緒時照樣自動開播。
+  const autoPlayLatchRef = useRef(autoPlay);
+  if (autoPlay) autoPlayLatchRef.current = true;
+  const autoPlayRetryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Stable callback refs to prevent effect re-triggering and render-phase update cascades
   const onTimeUpdateRef = useRef(onTimeUpdate);
@@ -123,6 +128,7 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
     },
     pause: () => {
       try {
+        autoPlayLatchRef.current = false;
         playerRef.current?.pauseVideo();
         setIsPlaying(false);
         onStateChangeRef.current?.('paused');
@@ -265,7 +271,18 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
                 setDuration(dur);
                 onDurationChangeRef.current?.(dur);
               }
-              if (autoPlayRef.current) {
+              if (autoPlayRef.current || autoPlayLatchRef.current) {
+                // 播放可能被延遲擋下，短時間內再補送幾次，直到 YouTube 回報播放中
+                autoPlayRetryTimersRef.current.forEach(clearTimeout);
+                autoPlayRetryTimersRef.current = [800, 2000, 4000].map((ms) =>
+                  setTimeout(() => {
+                    if (!isMounted || !autoPlayLatchRef.current) return;
+                    try {
+                      const st = event.target.getPlayerState?.();
+                      if (st !== 1 && st !== 3) event.target.playVideo();
+                    } catch (_) {}
+                  }, ms)
+                );
                 if (initialTimeSeconds > 0) {
                   event.target.seekTo(initialTimeSeconds, true);
                   currentTimeRef.current = initialTimeSeconds;
@@ -301,6 +318,7 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
               // YT.PlayerState: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (video cued)
               const stateCode = event.data;
               if (stateCode === 1) {
+                autoPlayLatchRef.current = false;
                 if (bufferingTimeoutRef.current) {
                   clearTimeout(bufferingTimeoutRef.current);
                   bufferingTimeoutRef.current = null;
@@ -417,6 +435,8 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
     return () => {
       isMounted = false;
       stopTimePolling();
+      autoPlayRetryTimersRef.current.forEach(clearTimeout);
+      autoPlayRetryTimersRef.current = [];
       try {
         if (playerRef.current && typeof playerRef.current.destroy === 'function') {
           playerRef.current.destroy();
@@ -459,6 +479,7 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
   useEffect(() => {
     const handlePauseForAd = () => {
       try {
+        autoPlayLatchRef.current = false;
         if (playerRef.current) {
           playerRef.current.pauseVideo();
           setIsPlaying(false);

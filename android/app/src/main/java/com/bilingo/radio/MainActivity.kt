@@ -40,6 +40,32 @@ class MainActivity : ComponentActivity() {
         var currentInstance: MainActivity? = null
 
         fun isForeground(): Boolean = isAppInForeground
+
+        // 從其他 App（例如 YouTube）分享進來、尚未被前端取走的影片網址
+        @Volatile
+        var pendingSharedYouTubeUrl: String? = null
+        @Volatile
+        var pendingSharedYouTubeTitle: String? = null
+
+        private val SHARED_YOUTUBE_URL_REGEX =
+            Regex("""https?://[^\s]*(youtube\.com|youtu\.be)[^\s]*""", RegexOption.IGNORE_CASE)
+    }
+
+    /** 若 intent 是分享進來的 YouTube 網址，暫存起來等前端取用；回傳是否有取到。 */
+    private fun captureSharedYouTubeUrl(intent: Intent?): Boolean {
+        try {
+            if (intent?.action != Intent.ACTION_SEND) return false
+            val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return false
+            val match = SHARED_YOUTUBE_URL_REGEX.find(text) ?: return false
+            pendingSharedYouTubeUrl = match.value.trimEnd(')', ']', '.', ',', '"', '\'')
+            pendingSharedYouTubeTitle = intent.getStringExtra(Intent.EXTRA_SUBJECT)
+            // 已處理，避免旋轉或重建時重複載入
+            intent.action = Intent.ACTION_MAIN
+            return true
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to read shared YouTube URL", e)
+            return false
+        }
     }
 
     private var appUpdateManager: AppUpdateManager? = null
@@ -101,6 +127,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         currentInstance = this
+        captureSharedYouTubeUrl(intent)
 
         try {
             requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -367,6 +394,16 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (captureSharedYouTubeUrl(intent)) {
+            try {
+                activeWebView?.evaluateJavascript(
+                    "(function(){ try { window.postMessage({ type: 'SHARED_YOUTUBE_URL_AVAILABLE' }, '*'); } catch(e){} })();",
+                    null
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
         try {
             activeWebView?.resumeTimers()
             activeWebView?.onResume()

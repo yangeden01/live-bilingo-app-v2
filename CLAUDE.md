@@ -53,7 +53,7 @@ Android 原生外殼以 WebView 載入 React 前端，前端呼叫遠端 Node �
 ## 建置
 
 ```bash
-npm ci
+npm install --no-package-lock
 ```
 
 ```bash
@@ -72,6 +72,7 @@ npm run test:subtitles
 cd android && ./gradlew assembleDebug
 ```
 
+- `package-lock.json` 與 `package.json` 不同步，`npm ci` 會失敗；CI 靠 `npm ci || npm install` 退回。
 - `npm run build` 含 `rm`、`cp`，Windows 要用 Git Bash。切換分支後要重跑。
 - 本機需要 JDK 17 與 SDK 36；Windows clone 需要 `git config core.longpaths true`。
 - repo 內的 keystore 已損毀，release 版只能由 CI 建置。
@@ -81,18 +82,29 @@ CI：`.github/workflows/build-android.yml` 建置 AAB、APK，跑模擬器測試
 
 ## 現況
 
+### 主要風險（依優先順序）
+
+1. YouTube 字幕依賴非官方的 InnerTube API，變動時主功能會失效，也有服務條款風險。
+2. 翻譯依賴免費的非官方端點，可能被限流或停用。
+3. 公開 repo 與 APK 內有寫死的金鑰。
+4. AI Studio 後端：只影響次要功能，風險較低。
+
 ### 後端
 
-- `BACKEND_URL` 指向 AI Studio 預覽服務（`ais-pre-*.run.app`），匿名請求會被導向 AI Studio 登入。
-- 2026-11-02 重新安裝 Play 版後操作正常，但不確定哪些功能走備援。
-- **最大遺留風險**：AI Studio 專案停用或網址變更時，已安裝的 App 會失去後端。遷移時保留舊後端，另外部署新後端。
+- `BACKEND_URL` 指向 AI Studio 預覽服務（`ais-pre-*.run.app`），匿名請求會被導向 AI Studio 登入，所以 APK 內對後端的呼叫通常不會成功。
+- `main` 的主流程不靠後端：YouTube 字幕、翻譯、新聞探索都走 `AndroidBridge` 原生路徑；字典與發音有備援。
+- 只走後端的是版本檢查、回報與除錯面板，失效不影響主流程。
+- `radio-selfuse` 的電台管理 API（`/api/repair-stations`、`/api/set-active-station`、`/api/clear-subtitles-history`）在被擋時的影響未實測。
+- 不要移除舊後端；現階段也不需要急著遷移。
+
+以上依程式碼判斷，未量測實際網路請求。
 
 ### API 金鑰
 
-- 後端以環境變數讀取 `GEMINI_API_KEY`，自行部署時要自己設定。不得把 Gemini Key 打包進 APK。
-- Android 原生 Gemini 路徑沒有傳入 key，且仍指向 `gemini-1.5-flash`，不會成功。
-- 公開 repo 中有寫死的 Deepgram token 與 YouTube Data API Key，`/api/deepgram-config` 也會回傳 token。
+- 後端以環境變數讀取 `GEMINI_API_KEY`，但 Play 版的翻譯不使用 Gemini，走 GTX、Clients5、MyMemory。不得把 Gemini Key 打包進 APK。
+- 公開 repo 中有寫死的 Deepgram token、YouTube Data API Key 與 Groq key（`RadioStreamSttManager.kt`，以數字陣列隱藏，一般掃描抓不到）；`/api/deepgram-config` 也會回傳 Deepgram token。
 - **不得直接撤銷舊金鑰**，已發布的 App 可能仍在使用。先建新路徑、發新版，舊版用量降低後再撤銷；若確認遭盜用，由使用者決定。
+- YouTube Data API Key 影響上架版新聞探索；Groq 與 Deepgram key 主要影響自用版廣播，對上架版的影響尚未確認。
 
 ### 簽署
 

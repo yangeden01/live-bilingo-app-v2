@@ -642,11 +642,15 @@ class MainActivity : ComponentActivity() {
             e.printStackTrace()
         }
 
-        if (!enabled && wasLandscape) {
+        // 平板（最短邊 ≥ 600dp）原本就常橫放，離開全螢幕時不鎖直向；
+        // 否則舊版 Android 會把橫放的平板轉成直向，又因方向偵測立即解鎖而轉回橫向、再次進入全螢幕
+        if (!enabled && wasLandscape && !isLargeScreen()) {
             lockPortraitUntilUpright()
         }
         applyVideoOrientation()
     }
+
+    private fun isLargeScreen(): Boolean = resources.configuration.smallestScreenWidthDp >= 600
 
     private fun lockPortraitUntilUpright() {
         isPortraitLockedUntilUpright = true

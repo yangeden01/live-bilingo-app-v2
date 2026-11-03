@@ -589,6 +589,14 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
     return () => mql.removeEventListener?.('change', handleChange);
   }, []);
 
+  // 平板常一直橫放，不會發生旋轉事件；播放頁開始顯示影片時若畫面已是橫向，直接進入全螢幕。
+  // 只在「允許旋轉」由否轉是時判斷一次，手動離開全螢幕後不會又自動進入。
+  useEffect(() => {
+    if (!isRotationAllowed || fullscreenModeRef.current) return;
+    if (typeof window === 'undefined' || !window.matchMedia || !getAndroidBridge()) return;
+    if (window.matchMedia('(orientation: landscape)').matches) enterFullscreen('rotate');
+  }, [isRotationAllowed]);
+
   // 原生返回鍵透過這個函式離開全螢幕
   useEffect(() => {
     if (!isFullscreen) return;
@@ -773,7 +781,7 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
               {overlaySubtitle!.english && (
                 <p
                   className="font-semibold leading-snug text-white"
-                  style={{ fontSize: `calc(clamp(15px, 4.6vh, 30px) * ${overlayScale})` }}
+                  style={{ fontSize: `calc(clamp(15px, 4.6vh, 40px) * ${overlayScale})` }}
                 >
                   {overlaySubtitle!.english}
                 </p>
@@ -781,7 +789,7 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
               {overlaySubtitle!.chinese && (
                 <p
                   className="font-medium leading-snug text-amber-200"
-                  style={{ fontSize: `calc(clamp(14px, 4.3vh, 28px) * ${overlayScale})` }}
+                  style={{ fontSize: `calc(clamp(14px, 4.3vh, 38px) * ${overlayScale})` }}
                 >
                   {overlaySubtitle!.chinese}
                 </p>

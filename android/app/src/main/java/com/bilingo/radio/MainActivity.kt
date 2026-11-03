@@ -2,13 +2,17 @@ package com.bilingo.radio
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.OrientationEventListener
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,6 +22,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.play.core.appupdate.AppUpdateInfo
 import com.google.android.play.core.appupdate.AppUpdateManager
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
@@ -73,6 +80,23 @@ class MainActivity : ComponentActivity() {
     var activeWebView: WebView? = null
     var activeWebAppInterface: com.bilingo.radio.ui.screens.WebAppInterface? = null
 
+    // 影片全螢幕：播放頁允許隨手機旋轉；按鈕進入時強制橫向
+    private var isVideoRotationAllowed = false
+    private var isVideoFullscreen = false
+    private var isFullscreenForcedLandscape = false
+    // 手機仍打橫時離開全螢幕，先鎖直向，直到手機轉回直立才恢復自動旋轉，避免立刻又進入全螢幕
+    private var isPortraitLockedUntilUpright = false
+    private var uprightOrientationListener: OrientationEventListener? = null
+
+    private val fullscreenBackCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            activeWebView?.evaluateJavascript(
+                "window.__bilingoExitFullscreen && window.__bilingoExitFullscreen();",
+                null
+            )
+        }
+    }
+
     private var connectivityManager: android.net.ConnectivityManager? = null
     private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
 
@@ -108,6 +132,8 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        onBackPressedDispatcher.addCallback(this, fullscreenBackCallback)
 
         try {
             setupGoogleInAppUpdate()
@@ -500,7 +526,72 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** 播放頁顯示時允許隨手機旋轉（遵守系統自動旋轉開關），離開時恢復直向。 */
+    fun setVideoRotationAllowed(allowed: Boolean) {
+        isVideoRotationAllowed = allowed
+        applyVideoOrientation()
+    }
+
+    /** 進入或離開影片全螢幕：隱藏系統列、攔截返回鍵；forceLandscape 為按鈕進入時強制橫向。 */
+    fun setVideoFullscreen(enabled: Boolean, forceLandscape: Boolean) {
+        val wasLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        isVideoFullscreen = enabled
+        isFullscreenForcedLandscape = enabled && forceLandscape
+        fullscreenBackCallback.isEnabled = enabled
+
+        try {
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            if (enabled) {
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+            } else {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        if (!enabled && wasLandscape) {
+            lockPortraitUntilUpright()
+        }
+        applyVideoOrientation()
+    }
+
+    private fun lockPortraitUntilUpright() {
+        isPortraitLockedUntilUpright = true
+        if (uprightOrientationListener == null) {
+            uprightOrientationListener = object : OrientationEventListener(this) {
+                override fun onOrientationChanged(degrees: Int) {
+                    if (degrees == OrientationEventListener.ORIENTATION_UNKNOWN) return
+                    if (degrees <= 30 || degrees >= 330) {
+                        isPortraitLockedUntilUpright = false
+                        disable()
+                        applyVideoOrientation()
+                    }
+                }
+            }
+        }
+        uprightOrientationListener?.let {
+            if (it.canDetectOrientation()) it.enable() else isPortraitLockedUntilUpright = false
+        }
+    }
+
+    private fun applyVideoOrientation() {
+        try {
+            requestedOrientation = when {
+                isFullscreenForcedLandscape -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                isPortraitLockedUntilUpright -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                isVideoRotationAllowed || isVideoFullscreen -> ActivityInfo.SCREEN_ORIENTATION_USER
+                else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     override fun onDestroy() {
+        uprightOrientationListener?.disable()
+        uprightOrientationListener = null
         super.onDestroy()
         isAppInForeground = false
         if (currentInstance == this) {

@@ -1852,6 +1852,7 @@ export default function App() {
                 onPlaybackStateChange={setYoutubePlaybackState}
                 isVideoLoopEnabled={isYouTubeLoopEnabled}
                 onSwitchToRadioMode={() => handleContentSourceChange('radio')}
+                isActive={contentSource === 'youtube'}
               />
             </div>
           </>

@@ -148,4 +148,4 @@ export interface YouTubeNewsResponse {
   message?: string;
 }
 
-export const APP_VERSION = 'v2.5.2';
+export const APP_VERSION = 'v2.5.8';

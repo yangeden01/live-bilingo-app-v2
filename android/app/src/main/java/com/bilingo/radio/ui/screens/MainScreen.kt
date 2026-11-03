@@ -262,6 +262,22 @@ class WebAppInterface(
         }
     }
 
+    /** 影片播放頁顯示時呼叫，允許手機打橫自動進入全螢幕。 */
+    @JavascriptInterface
+    fun setVideoRotationAllowed(allowed: Boolean) {
+        Handler(Looper.getMainLooper()).post {
+            MainActivity.currentInstance?.setVideoRotationAllowed(allowed)
+        }
+    }
+
+    /** 影片全螢幕切換；forceLandscape 為 true 時強制橫向（按鈕進入）。 */
+    @JavascriptInterface
+    fun setVideoFullscreen(enabled: Boolean, forceLandscape: Boolean) {
+        Handler(Looper.getMainLooper()).post {
+            MainActivity.currentInstance?.setVideoFullscreen(enabled, forceLandscape)
+        }
+    }
+
     @JavascriptInterface
     fun setContentMode(mode: String) {
         Handler(Looper.getMainLooper()).post {

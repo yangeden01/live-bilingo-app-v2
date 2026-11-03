@@ -1694,7 +1694,9 @@ export const YouTubeBilingualView: React.FC<Props> = ({
       {/* Main Learning Interface: Video Player & Subtitles Grid */}
       <div id="youtube-player-section" className="grid grid-cols-1 lg:grid-cols-12 gap-1.5 sm:gap-4 lg:gap-6 items-start">
         {/* Left Column: Player (Clean fixed/sticky reading mode) */}
-        <div className="lg:col-span-5 space-y-2 lg:space-y-3 lg:sticky lg:top-20">
+        {/* 平板橫向（lg 以上）此欄為 sticky，會形成獨立疊層，全螢幕播放器的 z-index 被困在欄內，
+            右欄字幕卡片會蓋到影片上；全螢幕時把整欄拉到最上層 */}
+        <div className={`lg:col-span-5 space-y-2 lg:space-y-3 lg:sticky lg:top-20 ${isPlayerFullscreen ? 'relative z-[10000]' : ''}`}>
           {/* Live Stream Notice: Guide to Curated Channels (Moved above video player to preserve optimal reading layout) */}
           {isCurrentLiveVideo && (
             <div className={`p-3 sm:p-3.5 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-2.5 transition-colors duration-200 shadow-sm ${

@@ -158,4 +158,4 @@ export interface RewardFeatureInfo {
   durationText: string;
 }
 
-export const APP_VERSION = 'v2.6.8';
+export const APP_VERSION = 'v2.7.1';

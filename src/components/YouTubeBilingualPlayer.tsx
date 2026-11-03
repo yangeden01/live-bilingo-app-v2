@@ -36,6 +36,15 @@ const OVERLAY_FONT_SCALE = { small: 0.85, medium: 1, large: 1.15, xlarge: 1.3 } 
 
 const getAndroidBridge = (): any => (typeof window !== 'undefined' ? (window as any).AndroidBridge : undefined);
 
+// 畫面上已有 Bilingo 雙語字幕，關掉 YouTube 自帶字幕（含影片作者預設開啟的情況）
+const disableYouTubeCaptions = (player: any) => {
+  try {
+    if (typeof player?.unloadModule !== 'function') return;
+    player.unloadModule('captions');
+    player.unloadModule('cc');
+  } catch (_) {}
+};
+
 declare global {
   interface Window {
     YT: any;
@@ -290,12 +299,7 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
             onReady: (event: any) => {
               if (!isMounted) return;
               setIsReady(true);
-              try {
-                // 影片作者預設開啟字幕時也一併關掉
-                if (typeof event.target.unloadModule === 'function') {
-                  event.target.unloadModule('captions');
-                }
-              } catch (_) {}
+              disableYouTubeCaptions(event.target);
               const dur = event.target.getDuration();
               if (dur > 0) {
                 setDuration(dur);
@@ -343,11 +347,18 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
                 onStateChangeRef.current?.('paused');
               }
             },
+            // YouTube 載入字幕模組時會觸發 onApiChange，在這裡關掉才不會被重新顯示
+            onApiChange: (event: any) => {
+              if (!isMounted) return;
+              disableYouTubeCaptions(event.target);
+            },
             onStateChange: (event: any) => {
               if (!isMounted) return;
               // YT.PlayerState: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (video cued)
               const stateCode = event.data;
               if (stateCode === 1) {
+                // 字幕模組常在開始播放後才載入，播放時再關一次
+                disableYouTubeCaptions(event.target);
                 autoPlayLatchRef.current = false;
                 if (bufferingTimeoutRef.current) {
                   clearTimeout(bufferingTimeoutRef.current);
@@ -638,6 +649,7 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
 
   const overlayScale = OVERLAY_FONT_SCALE[overlayFontSize] ?? 1;
   const hasOverlayText = !!(overlaySubtitle && (overlaySubtitle.english || overlaySubtitle.chinese));
+  const isPausedInFullscreen = isFullscreen && !isLive && !isPlaying && !playerError;
 
   return (
     <div
@@ -661,6 +673,11 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
           className="absolute inset-0 cursor-pointer z-5"
           title={isFullscreen ? '點擊顯示控制鍵' : isPlaying ? '點擊暫停影片' : '點擊播放影片'}
         />
+
+        {/* 全螢幕暫停時遮住 YouTube 自帶的暫停介面（標題、分享、推薦影片） */}
+        {isPausedInFullscreen && (
+          <div className="absolute inset-0 z-[6] bg-black/85 pointer-events-none" />
+        )}
 
         {/* 全螢幕：雙語字幕疊在畫面下方 */}
         {isFullscreen && hasOverlayText && (
@@ -686,8 +703,8 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
           </div>
         )}
 
-        {/* 全螢幕：點畫面後顯示的控制鍵，3 秒後自動隱藏 */}
-        {isFullscreen && showFsControls && (
+        {/* 全螢幕：點畫面後顯示的控制鍵，3 秒後自動隱藏；暫停時一直顯示 */}
+        {isFullscreen && (showFsControls || isPausedInFullscreen) && (
           <>
             <button
               type="button"

@@ -52,6 +52,7 @@ import { YouTubeNewsDiscoveryModal } from './YouTubeNewsDiscoveryModal';
 import { NotesExportModal } from './NotesExportModal';
 import { VocabularyNotebookModal } from './VocabularyNotebookModal';
 import { convertChinese } from '../utils/chineseConverter';
+import { splitSubtitleIntoCues, pickCueAt } from '../utils/subtitleCueSplitter';
 
 interface Props {
   onOpenDictionary?: (word?: string) => void;
@@ -974,16 +975,20 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     return activeSubtitleId;
   }, [effectiveActiveIndex, subtitles, activeSubtitleId, currentTimeSeconds]);
 
-  // 全螢幕時疊在畫面下方的雙語字幕
-  const fullscreenOverlaySubtitle = useMemo(() => {
+  // 全螢幕時疊在畫面下方的雙語字幕：長句切成電影式短段，依播放時間切換
+  const fullscreenCues = useMemo(() => {
+    if (!isPlayerFullscreen) return [];
     const item = subtitles.find((s) => s.id === effectiveActiveId);
-    if (!item) return null;
-    const chinese = item.traditionalChinese || '';
-    return {
-      english: item.english || '',
-      chinese: chineseVariant === 'simplified' ? convertChinese(chinese, 'simplified') : chinese,
-    };
-  }, [subtitles, effectiveActiveId, chineseVariant]);
+    if (!item) return [];
+    const rawChinese = item.traditionalChinese || '';
+    const chinese = chineseVariant === 'simplified' ? convertChinese(rawChinese, 'simplified') : rawChinese;
+    return splitSubtitleIntoCues(item.english || '', chinese, item.startMs, item.endMs);
+  }, [isPlayerFullscreen, subtitles, effectiveActiveId, chineseVariant]);
+
+  const fullscreenOverlaySubtitle = useMemo(() => {
+    const cue = pickCueAt(fullscreenCues, currentTimeSeconds * 1000);
+    return cue ? { english: cue.english, chinese: cue.chinese } : null;
+  }, [fullscreenCues, currentTimeSeconds]);
 
   // Ahead Subtitles (for pre-reading when voice is delayed by videoSyncOffset > 0)
   const aheadSubtitles = useMemo(() => {

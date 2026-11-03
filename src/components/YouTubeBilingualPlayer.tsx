@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useImperativeHandle } from 'react';
-import { Play, Pause, RotateCcw, Volume2, AlertCircle, Youtube } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, AlertCircle, Youtube, Maximize2, Minimize2, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 export interface YouTubePlayerRef {
   play: () => void;
@@ -21,8 +21,34 @@ interface Props {
   isLive?: boolean;
   autoPlay?: boolean;
   onLoopReplay?: () => void;
+  // 全螢幕（橫向）：按鈕進入或播放頁手機打橫自動進入，字幕疊在畫面下方
+  fullscreenEnabled?: boolean;
+  isActive?: boolean;
+  overlaySubtitle?: { english: string; chinese: string } | null;
+  overlayFontSize?: 'small' | 'medium' | 'large' | 'xlarge';
+  onFullscreenChange?: (isFullscreen: boolean) => void;
   ref?: React.Ref<YouTubePlayerRef>;
 }
+
+type FullscreenMode = 'rotate' | 'button' | null;
+type TapSide = 'left' | 'center' | 'right';
+
+const SEEK_STEP_SECONDS = 10;
+const DOUBLE_TAP_MS = 300;
+const SEEK_BURST_MS = 800;
+
+const OVERLAY_FONT_SCALE = { small: 0.85, medium: 1, large: 1.15, xlarge: 1.3 } as const;
+
+const getAndroidBridge = (): any => (typeof window !== 'undefined' ? (window as any).AndroidBridge : undefined);
+
+// 畫面上已有 Bilingo 雙語字幕，關掉 YouTube 自帶字幕（含影片作者預設開啟的情況）
+const disableYouTubeCaptions = (player: any) => {
+  try {
+    if (typeof player?.unloadModule !== 'function') return;
+    player.unloadModule('captions');
+    player.unloadModule('cc');
+  } catch (_) {}
+};
 
 declare global {
   interface Window {
@@ -43,6 +69,11 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
   isLive = false,
   autoPlay = false,
   onLoopReplay,
+  fullscreenEnabled = false,
+  isActive = true,
+  overlaySubtitle = null,
+  overlayFontSize = 'medium',
+  onFullscreenChange,
   ref,
 }) => {
   const containerId = useRef(`yt-player-${Math.random().toString(36).substring(2, 9)}`).current;
@@ -94,6 +125,18 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
 
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
+
+  const [fullscreenMode, setFullscreenMode] = useState<FullscreenMode>(null);
+  const fullscreenModeRef = useRef<FullscreenMode>(null);
+  fullscreenModeRef.current = fullscreenMode;
+  const isFullscreen = fullscreenMode !== null;
+  const [showFsControls, setShowFsControls] = useState(false);
+  const fsControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onFullscreenChangeRef = useRef(onFullscreenChange);
+  onFullscreenChangeRef.current = onFullscreenChange;
+  const isRotationAllowed = fullscreenEnabled && isActive && !!videoId;
+  const isRotationAllowedRef = useRef(isRotationAllowed);
+  isRotationAllowedRef.current = isRotationAllowed;
 
   // Expose imperative player controls for seeking from subtitle clicks
   useImperativeHandle(ref, () => ({
@@ -245,8 +288,8 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
             rel: 0,
             modestbranding: 1,
             enablejsapi: 1,
-            cc_load_policy: 1,
-            cc_lang_pref: 'en',
+            // 畫面下方已有 Bilingo 雙語字幕，不顯示 YouTube 自帶字幕
+            cc_load_policy: 0,
             hl: 'en',
             start: initialTimeSeconds > 0 ? Math.floor(initialTimeSeconds) : 0,
             origin:
@@ -261,11 +304,7 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
             onReady: (event: any) => {
               if (!isMounted) return;
               setIsReady(true);
-              try {
-                if (typeof event.target.loadModule === 'function') {
-                  event.target.loadModule('captions');
-                }
-              } catch (_) {}
+              disableYouTubeCaptions(event.target);
               const dur = event.target.getDuration();
               if (dur > 0) {
                 setDuration(dur);
@@ -313,11 +352,18 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
                 onStateChangeRef.current?.('paused');
               }
             },
+            // YouTube 載入字幕模組時會觸發 onApiChange，在這裡關掉才不會被重新顯示
+            onApiChange: (event: any) => {
+              if (!isMounted) return;
+              disableYouTubeCaptions(event.target);
+            },
             onStateChange: (event: any) => {
               if (!isMounted) return;
               // YT.PlayerState: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (video cued)
               const stateCode = event.data;
               if (stateCode === 1) {
+                // 字幕模組常在開始播放後才載入，播放時再關一次
+                disableYouTubeCaptions(event.target);
                 autoPlayLatchRef.current = false;
                 if (bufferingTimeoutRef.current) {
                   clearTimeout(bufferingTimeoutRef.current);
@@ -504,6 +550,182 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
     }
   };
 
+  const enterFullscreen = (mode: Exclude<FullscreenMode, null>) => {
+    if (fullscreenModeRef.current) return;
+    fullscreenModeRef.current = mode;
+    setFullscreenMode(mode);
+    setShowFsControls(false);
+    onFullscreenChangeRef.current?.(true);
+    try {
+      getAndroidBridge()?.setVideoFullscreen?.(true, mode === 'button');
+    } catch (_) {}
+  };
+
+  const exitFullscreen = () => {
+    if (!fullscreenModeRef.current) return;
+    fullscreenModeRef.current = null;
+    setFullscreenMode(null);
+    setShowFsControls(false);
+    onFullscreenChangeRef.current?.(false);
+    try {
+      getAndroidBridge()?.setVideoFullscreen?.(false, false);
+    } catch (_) {}
+  };
+
+  const exitFullscreenRef = useRef(exitFullscreen);
+  exitFullscreenRef.current = exitFullscreen;
+
+  // 播放頁顯示且有影片時，允許手機隨旋轉；離開或隱藏時恢復直向並退出全螢幕
+  // （未啟用全螢幕的播放器，例如直播頁，不碰原生旋轉設定）
+  useEffect(() => {
+    if (!fullscreenEnabled) return;
+    try {
+      getAndroidBridge()?.setVideoRotationAllowed?.(isRotationAllowed);
+    } catch (_) {}
+    if (!isRotationAllowed) exitFullscreenRef.current();
+    return () => {
+      try {
+        const bridge = getAndroidBridge();
+        if (fullscreenModeRef.current) bridge?.setVideoFullscreen?.(false, false);
+        bridge?.setVideoRotationAllowed?.(false);
+      } catch (_) {}
+    };
+  }, [isRotationAllowed, fullscreenEnabled]);
+
+  // 手機打橫自動進入全螢幕；由打橫進入的，轉回直向時自動離開。
+  // 只在旋轉「發生時」判斷，避免手動離開後因仍是橫向而立刻又進入。
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mql = window.matchMedia('(orientation: landscape)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (!getAndroidBridge()) return;
+      if (e.matches) {
+        if (isRotationAllowedRef.current && !fullscreenModeRef.current) enterFullscreen('rotate');
+      } else if (fullscreenModeRef.current === 'rotate') {
+        exitFullscreenRef.current();
+      }
+    };
+    mql.addEventListener?.('change', handleChange);
+    return () => mql.removeEventListener?.('change', handleChange);
+  }, []);
+
+  // 原生返回鍵透過這個函式離開全螢幕
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const w = window as any;
+    w.__bilingoExitFullscreen = () => exitFullscreenRef.current();
+    return () => {
+      if (w.__bilingoExitFullscreen) delete w.__bilingoExitFullscreen;
+    };
+  }, [isFullscreen]);
+
+  // 全螢幕雙擊左右快轉（同 YouTube）：雙擊左側倒退、右側快轉 10 秒，連續點擊累加
+  const [seekIndicator, setSeekIndicator] = useState<{ side: 'left' | 'right'; seconds: number; tick: number } | null>(null);
+  const lastTapRef = useRef<{ time: number; side: TapSide } | null>(null);
+  const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekBurstRef = useRef<{ side: 'left' | 'right'; seconds: number; until: number } | null>(null);
+  const seekIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showFsControlsRef = useRef(showFsControls);
+  showFsControlsRef.current = showFsControls;
+
+  useEffect(() => {
+    return () => {
+      if (fsControlsTimerRef.current) clearTimeout(fsControlsTimerRef.current);
+      if (singleTapTimerRef.current) clearTimeout(singleTapTimerRef.current);
+      if (seekIndicatorTimerRef.current) clearTimeout(seekIndicatorTimerRef.current);
+    };
+  }, []);
+
+  const revealFsControls = () => {
+    setShowFsControls(true);
+    if (fsControlsTimerRef.current) clearTimeout(fsControlsTimerRef.current);
+    fsControlsTimerRef.current = setTimeout(() => setShowFsControls(false), 3000);
+  };
+
+  const toggleFsControls = () => {
+    if (showFsControlsRef.current) {
+      if (fsControlsTimerRef.current) clearTimeout(fsControlsTimerRef.current);
+      setShowFsControls(false);
+    } else {
+      revealFsControls();
+    }
+  };
+
+  const seekBySeconds = (delta: number) => {
+    const player = playerRef.current;
+    if (!player || typeof player.seekTo !== 'function') return;
+    let now = currentTimeRef.current;
+    try {
+      const t = player.getCurrentTime?.();
+      if (typeof t === 'number' && !isNaN(t)) now = t;
+    } catch (_) {}
+    const maxTime = duration > 0 ? Math.max(0, duration - 0.5) : Number.POSITIVE_INFINITY;
+    const target = Math.min(maxTime, Math.max(0, now + delta));
+    player.seekTo(target, true);
+    currentTimeRef.current = target;
+    setCurrentTime(target);
+    onTimeUpdateRef.current?.(target);
+  };
+
+  const doSeekStep = (side: 'left' | 'right') => {
+    const now = Date.now();
+    const burst = seekBurstRef.current;
+    const seconds = burst && burst.side === side && now < burst.until ? burst.seconds + SEEK_STEP_SECONDS : SEEK_STEP_SECONDS;
+    seekBurstRef.current = { side, seconds, until: now + SEEK_BURST_MS };
+    seekBySeconds(side === 'left' ? -SEEK_STEP_SECONDS : SEEK_STEP_SECONDS);
+    setSeekIndicator({ side, seconds, tick: now });
+    if (seekIndicatorTimerRef.current) clearTimeout(seekIndicatorTimerRef.current);
+    seekIndicatorTimerRef.current = setTimeout(() => setSeekIndicator(null), SEEK_BURST_MS);
+  };
+
+  const handleVideoTap = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isFullscreen) {
+      togglePlayPause();
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0.5;
+    const side: TapSide = isLive ? 'center' : ratio < 0.35 ? 'left' : ratio > 0.65 ? 'right' : 'center';
+    const now = Date.now();
+
+    if (side === 'center') {
+      lastTapRef.current = null;
+      // 暫停時畫面中央是 YouTube 自己的播放鍵，點中間就直接播放
+      if (!isPlaying && !isLive) {
+        togglePlayPause();
+        return;
+      }
+      toggleFsControls();
+      return;
+    }
+
+    // 快轉連點中：同一側每點一下再加 10 秒
+    const burst = seekBurstRef.current;
+    if (burst && burst.side === side && now < burst.until) {
+      doSeekStep(side);
+      return;
+    }
+
+    // 雙擊：取消待執行的單擊動作，開始快轉
+    const last = lastTapRef.current;
+    if (last && last.side === side && now - last.time < DOUBLE_TAP_MS) {
+      if (singleTapTimerRef.current) clearTimeout(singleTapTimerRef.current);
+      singleTapTimerRef.current = null;
+      lastTapRef.current = null;
+      doSeekStep(side);
+      return;
+    }
+
+    // 單擊：稍等確認不是雙擊，再顯示或隱藏控制鍵
+    lastTapRef.current = { time: now, side };
+    if (singleTapTimerRef.current) clearTimeout(singleTapTimerRef.current);
+    singleTapTimerRef.current = setTimeout(() => {
+      singleTapTimerRef.current = null;
+      toggleFsControls();
+    }, DOUBLE_TAP_MS);
+  };
+
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const targetSeconds = parseFloat(e.target.value);
     setCurrentTime(targetSeconds);
@@ -532,18 +754,68 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
     );
   }
 
+  const overlayScale = OVERLAY_FONT_SCALE[overlayFontSize] ?? 1;
+  const hasOverlayText = !!(overlaySubtitle && (overlaySubtitle.english || overlaySubtitle.chinese));
+  const isPausedInFullscreen = isFullscreen && !isLive && !isPlaying && !playerError;
+  const isFsControlsVisible = isFullscreen && (showFsControls || isPausedInFullscreen);
+
   return (
-    <div className="w-full overflow-hidden rounded-2xl bg-slate-950 border border-slate-800 shadow-xl">
-      {/* 16:9 Video Container */}
-      <div className="relative w-full aspect-video bg-black flex items-center justify-center overflow-hidden group">
+    <div
+      className={
+        isFullscreen
+          ? 'fixed inset-0 z-[10000] bg-black flex flex-col'
+          : 'w-full overflow-hidden rounded-2xl bg-slate-950 border border-slate-800 shadow-xl'
+      }
+    >
+      {/* 16:9 Video Container（全螢幕時佔滿字幕列以外的畫面） */}
+      <div
+        className={`relative w-full bg-black flex items-center justify-center overflow-hidden group [&_iframe]:w-full [&_iframe]:h-full ${
+          isFullscreen ? 'flex-1 min-h-0' : 'aspect-video'
+        }`}
+      >
         <div id={containerId} className="w-full h-full pointer-events-none" />
 
         {/* Clean transparent overlay: allows user tap to play/pause without native YouTube buttons popping up */}
         <div
-          onClick={togglePlayPause}
+          onClick={handleVideoTap}
           className="absolute inset-0 cursor-pointer z-5"
-          title={isPlaying ? '點擊暫停影片' : '點擊播放影片'}
+          title={isFullscreen ? '點擊顯示控制鍵' : isPlaying ? '點擊暫停影片' : '點擊播放影片'}
         />
+
+        {/* 全螢幕：雙擊快轉提示（同 YouTube，顯示累計秒數） */}
+        {isFullscreen && seekIndicator && (
+          <div
+            className={`absolute inset-y-0 z-[6] w-[38%] flex items-center justify-center bg-white/10 pointer-events-none ${
+              seekIndicator.side === 'left' ? 'left-0 rounded-r-[50%]' : 'right-0 rounded-l-[50%]'
+            }`}
+          >
+            <div className="flex flex-col items-center gap-1 text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
+              {seekIndicator.side === 'left' ? (
+                <ChevronsLeft className="w-8 h-8" />
+              ) : (
+                <ChevronsRight className="w-8 h-8" />
+              )}
+              <span className="text-sm font-semibold">{seekIndicator.seconds} 秒</span>
+            </div>
+          </div>
+        )}
+
+
+        {/* 直播沒有控制列，全螢幕鍵放在畫面右下角 */}
+        {fullscreenEnabled && isLive && !isFullscreen && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              enterFullscreen('button');
+            }}
+            className="absolute z-[7] bottom-2 right-2 w-9 h-9 rounded-full bg-black/50 text-white flex items-center justify-center cursor-pointer active:scale-95"
+            title="全螢幕"
+            aria-label="全螢幕"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
+        )}
 
         {playerError && (
           <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center z-10">
@@ -554,8 +826,82 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
         )}
       </div>
 
+      {/* 全螢幕：影片下方的字幕列（不疊在影片上）；點畫面後控制鍵也顯示在這裡 */}
+      {isFullscreen && (
+        <div className="relative shrink-0 h-[28vh] bg-black flex flex-col overflow-hidden px-[max(1.5rem,env(safe-area-inset-left))] pb-[env(safe-area-inset-bottom)]">
+          {isFsControlsVisible && (
+            <div className="shrink-0 flex items-center gap-3 pt-1.5">
+              {!isLive && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      togglePlayPause();
+                      revealFsControls();
+                    }}
+                    className="shrink-0 w-8 h-8 rounded-full text-white flex items-center justify-center cursor-pointer active:scale-95"
+                    title={isPlaying ? '暫停' : '播放'}
+                    aria-label={isPlaying ? '暫停' : '播放'}
+                  >
+                    {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
+                  </button>
+                  <span className="shrink-0 text-xs font-mono text-white/80">
+                    {formatTime(currentTime)} / {formatTime(duration)}
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={duration || 100}
+                    step={0.1}
+                    value={currentTime}
+                    onChange={(e) => {
+                      handleSeek(e);
+                      revealFsControls();
+                    }}
+                    disabled={!isReady || duration <= 0}
+                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-white/30 accent-red-500 focus:outline-none"
+                    aria-label="播放進度"
+                  />
+                </>
+              )}
+              <button
+                type="button"
+                onClick={exitFullscreen}
+                className="shrink-0 ml-auto w-8 h-8 rounded-full text-white flex items-center justify-center cursor-pointer active:scale-95"
+                title="離開全螢幕"
+                aria-label="離開全螢幕"
+              >
+                <Minimize2 className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+          <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center">
+            {hasOverlayText && (
+              <>
+                {overlaySubtitle!.english && (
+                  <p
+                    className="font-semibold leading-snug text-white"
+                    style={{ fontSize: `calc(clamp(13px, 4vh, 24px) * ${overlayScale})` }}
+                  >
+                    {overlaySubtitle!.english}
+                  </p>
+                )}
+                {overlaySubtitle!.chinese && (
+                  <p
+                    className="font-medium leading-snug text-amber-200"
+                    style={{ fontSize: `calc(clamp(12px, 3.8vh, 22px) * ${overlayScale})` }}
+                  >
+                    {overlaySubtitle!.chinese}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Embedded Player Control Bar (Hidden completely in live streaming mode) */}
-      {!isLive && (
+      {!isLive && !isFullscreen && (
         <div className={`px-4 ${hideActionControls ? 'py-2' : 'py-3'} bg-slate-900 border-t border-slate-800/80 flex flex-col gap-2`}>
           {/* Progress seek slider */}
           <div className="flex items-center gap-3">
@@ -575,6 +921,18 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
             <span className="text-[11px] font-mono text-slate-400 w-10 text-left shrink-0">
               {formatTime(duration)}
             </span>
+            {fullscreenEnabled && (
+              <button
+                type="button"
+                onClick={() => enterFullscreen('button')}
+                disabled={!isReady}
+                className="shrink-0 p-1 -mr-1 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer disabled:opacity-40"
+                title="全螢幕"
+                aria-label="全螢幕"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* Action Controls (Hidden in reading mode to maximize subtitle area) */}

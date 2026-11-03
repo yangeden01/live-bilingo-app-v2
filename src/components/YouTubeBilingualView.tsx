@@ -51,6 +51,8 @@ import { YouTubeNewsDiscoveryModal } from './YouTubeNewsDiscoveryModal';
 import { NotesExportModal } from './NotesExportModal';
 import { VocabularyNotebookModal } from './VocabularyNotebookModal';
 import { AdManager } from '../utils/adManager';
+import { convertChinese } from '../utils/chineseConverter';
+import { splitSubtitleIntoCues, pickCueAt } from '../utils/subtitleCueSplitter';
 
 interface Props {
   onOpenDictionary?: (word?: string) => void;
@@ -66,6 +68,7 @@ interface Props {
   onPlaybackStateChange?: (state: 'playing' | 'paused' | 'buffering' | 'idle') => void;
   isVideoLoopEnabled?: boolean;
   onSwitchToRadioMode?: () => void;
+  isActive?: boolean;
 }
 
 // Preset verified caption test video (passes all 6 backend extraction criteria 100%)
@@ -125,7 +128,9 @@ export const YouTubeBilingualView: React.FC<Props> = ({
   onPlaybackStateChange,
   isVideoLoopEnabled = false,
   onSwitchToRadioMode,
+  isActive = true,
 }) => {
+  const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
   const [localHighlightDifficulty, setLocalHighlightDifficulty] = useState<boolean>(() => {
     try {
       const saved = getPersistentItem('bilingo_highlight_difficulty') || getPersistentItem('radio_highlight_difficulty');
@@ -1036,6 +1041,21 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     return activeSubtitleId;
   }, [effectiveActiveIndex, subtitles, activeSubtitleId, currentTimeSeconds]);
 
+  // 全螢幕時疊在畫面下方的雙語字幕：長句切成電影式短段，依播放時間切換
+  const fullscreenCues = useMemo(() => {
+    if (!isPlayerFullscreen) return [];
+    const item = subtitles.find((s) => s.id === effectiveActiveId);
+    if (!item) return [];
+    const rawChinese = item.traditionalChinese || '';
+    const chinese = chineseVariant === 'simplified' ? convertChinese(rawChinese, 'simplified') : rawChinese;
+    return splitSubtitleIntoCues(item.english || '', chinese, item.startMs, item.endMs);
+  }, [isPlayerFullscreen, subtitles, effectiveActiveId, chineseVariant]);
+
+  const fullscreenOverlaySubtitle = useMemo(() => {
+    const cue = pickCueAt(fullscreenCues, currentTimeSeconds * 1000);
+    return cue ? { english: cue.english, chinese: cue.chinese } : null;
+  }, [fullscreenCues, currentTimeSeconds]);
+
   // Ahead Subtitles (for pre-reading when voice is delayed by videoSyncOffset > 0)
   const aheadSubtitles = useMemo(() => {
     if (videoSyncOffset <= 0 || effectiveActiveIndex < 0 || subtitles.length === 0) return [];
@@ -1772,7 +1792,11 @@ export const YouTubeBilingualView: React.FC<Props> = ({
             </div>
           )}
 
-          <div id="youtube-player-anchor" className={`sticky top-[56px] z-20 sm:static pb-0 transition-colors duration-200 ${playerAnchorBg}`}>
+          {/* 全螢幕時拉高層級，讓播放器蓋過頂部列與其他浮動元件 */}
+          <div
+            id="youtube-player-anchor"
+            className={`sticky top-[56px] ${isPlayerFullscreen ? 'z-[10000]' : 'z-20'} sm:static pb-0 transition-colors duration-200 ${playerAnchorBg}`}
+          >
             <YouTubeBilingualPlayer
               ref={playerRef}
               videoId={activeVideoId}
@@ -1783,6 +1807,11 @@ export const YouTubeBilingualView: React.FC<Props> = ({
               isLoopEnabled={isVideoLoopEnabled}
               autoPlay={isAutoPlayPending}
               onLoopReplay={handleLoopReplay}
+              fullscreenEnabled
+              isActive={isActive}
+              overlaySubtitle={fullscreenOverlaySubtitle}
+              overlayFontSize={fontSize}
+              onFullscreenChange={setIsPlayerFullscreen}
             />
           </div>
         </div>

@@ -15,6 +15,23 @@
 
 **本檔優先於 `AGENTS.md`。** AGENTS.md 的自動 push、回覆附花費報告、「main 是唯一維護目標」都不適用；其中的版本、地區與套件名已過時。
 
+## 新工作階段的分支設定
+
+雲端工作階段預設從 `main` 開出 `ccr-*` 工作分支。
+
+- 使用者說要改**自用版**時，先把工作分支切到 `radio-selfuse` 再動手：
+  ```bash
+  git fetch origin +refs/heads/radio-selfuse:refs/remotes/origin/radio-selfuse
+  git checkout -B <工作分支> origin/radio-selfuse
+  git branch --unset-upstream
+  ```
+  切換前先確認工作分支沒有未提交或未推送的修改。
+- 改**上架版**時，直接在工作分支上改（基底是 `main`）。
+- 沒說改哪一版時，先問使用者。
+- 遠端另有同名**標籤** `radio-selfuse`（指向舊提交 `32bae92`），一律用 `refs/heads/radio-selfuse`，不要只寫 `radio-selfuse`。
+- 修改先推到 `ccr-*` 工作分支，不直接推到 `main` 或 `radio-selfuse`。
+- 工作告一段落前要推送；雲端環境閒置後會被回收，未推送的修改會遺失，手機接續時也拿不到。
+
 ## 兩個版本
 
 | | 上架版 | 自用版 |

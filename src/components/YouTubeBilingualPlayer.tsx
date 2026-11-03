@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useImperativeHandle } from 'react';
-import { Play, Pause, RotateCcw, Volume2, AlertCircle, Youtube, Maximize2, Minimize2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, AlertCircle, Youtube, Maximize2, Minimize2, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 export interface YouTubePlayerRef {
   play: () => void;
@@ -31,6 +31,11 @@ interface Props {
 }
 
 type FullscreenMode = 'rotate' | 'button' | null;
+type TapSide = 'left' | 'center' | 'right';
+
+const SEEK_STEP_SECONDS = 10;
+const DOUBLE_TAP_MS = 300;
+const SEEK_BURST_MS = 800;
 
 const OVERLAY_FONT_SCALE = { small: 0.85, medium: 1, large: 1.15, xlarge: 1.3 } as const;
 
@@ -594,9 +599,20 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
     };
   }, [isFullscreen]);
 
+  // 全螢幕雙擊左右快轉（同 YouTube）：雙擊左側倒退、右側快轉 10 秒，連續點擊累加
+  const [seekIndicator, setSeekIndicator] = useState<{ side: 'left' | 'right'; seconds: number; tick: number } | null>(null);
+  const lastTapRef = useRef<{ time: number; side: TapSide } | null>(null);
+  const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekBurstRef = useRef<{ side: 'left' | 'right'; seconds: number; until: number } | null>(null);
+  const seekIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showFsControlsRef = useRef(showFsControls);
+  showFsControlsRef.current = showFsControls;
+
   useEffect(() => {
     return () => {
       if (fsControlsTimerRef.current) clearTimeout(fsControlsTimerRef.current);
+      if (singleTapTimerRef.current) clearTimeout(singleTapTimerRef.current);
+      if (seekIndicatorTimerRef.current) clearTimeout(seekIndicatorTimerRef.current);
     };
   }, []);
 
@@ -606,17 +622,83 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
     fsControlsTimerRef.current = setTimeout(() => setShowFsControls(false), 3000);
   };
 
-  const handleVideoTap = () => {
-    if (!isFullscreen) {
-      togglePlayPause();
-      return;
-    }
-    if (showFsControls) {
+  const toggleFsControls = () => {
+    if (showFsControlsRef.current) {
       if (fsControlsTimerRef.current) clearTimeout(fsControlsTimerRef.current);
       setShowFsControls(false);
     } else {
       revealFsControls();
     }
+  };
+
+  const seekBySeconds = (delta: number) => {
+    const player = playerRef.current;
+    if (!player || typeof player.seekTo !== 'function') return;
+    let now = currentTimeRef.current;
+    try {
+      const t = player.getCurrentTime?.();
+      if (typeof t === 'number' && !isNaN(t)) now = t;
+    } catch (_) {}
+    const maxTime = duration > 0 ? Math.max(0, duration - 0.5) : Number.POSITIVE_INFINITY;
+    const target = Math.min(maxTime, Math.max(0, now + delta));
+    player.seekTo(target, true);
+    currentTimeRef.current = target;
+    setCurrentTime(target);
+    onTimeUpdateRef.current?.(target);
+  };
+
+  const doSeekStep = (side: 'left' | 'right') => {
+    const now = Date.now();
+    const burst = seekBurstRef.current;
+    const seconds = burst && burst.side === side && now < burst.until ? burst.seconds + SEEK_STEP_SECONDS : SEEK_STEP_SECONDS;
+    seekBurstRef.current = { side, seconds, until: now + SEEK_BURST_MS };
+    seekBySeconds(side === 'left' ? -SEEK_STEP_SECONDS : SEEK_STEP_SECONDS);
+    setSeekIndicator({ side, seconds, tick: now });
+    if (seekIndicatorTimerRef.current) clearTimeout(seekIndicatorTimerRef.current);
+    seekIndicatorTimerRef.current = setTimeout(() => setSeekIndicator(null), SEEK_BURST_MS);
+  };
+
+  const handleVideoTap = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isFullscreen) {
+      togglePlayPause();
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0.5;
+    const side: TapSide = isLive ? 'center' : ratio < 0.35 ? 'left' : ratio > 0.65 ? 'right' : 'center';
+    const now = Date.now();
+
+    if (side === 'center') {
+      lastTapRef.current = null;
+      toggleFsControls();
+      return;
+    }
+
+    // 快轉連點中：同一側每點一下再加 10 秒
+    const burst = seekBurstRef.current;
+    if (burst && burst.side === side && now < burst.until) {
+      doSeekStep(side);
+      return;
+    }
+
+    // 雙擊：取消待執行的單擊動作，開始快轉
+    const last = lastTapRef.current;
+    if (last && last.side === side && now - last.time < DOUBLE_TAP_MS) {
+      if (singleTapTimerRef.current) clearTimeout(singleTapTimerRef.current);
+      singleTapTimerRef.current = null;
+      lastTapRef.current = null;
+      doSeekStep(side);
+      return;
+    }
+
+    // 單擊：稍等確認不是雙擊，再顯示或隱藏控制鍵
+    lastTapRef.current = { time: now, side };
+    if (singleTapTimerRef.current) clearTimeout(singleTapTimerRef.current);
+    singleTapTimerRef.current = setTimeout(() => {
+      singleTapTimerRef.current = null;
+      toggleFsControls();
+    }, DOUBLE_TAP_MS);
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -650,6 +732,7 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
   const overlayScale = OVERLAY_FONT_SCALE[overlayFontSize] ?? 1;
   const hasOverlayText = !!(overlaySubtitle && (overlaySubtitle.english || overlaySubtitle.chinese));
   const isPausedInFullscreen = isFullscreen && !isLive && !isPlaying && !playerError;
+  const isFsControlsVisible = isFullscreen && (showFsControls || isPausedInFullscreen);
 
   return (
     <div
@@ -681,7 +764,11 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
 
         {/* 全螢幕：雙語字幕疊在畫面下方 */}
         {isFullscreen && hasOverlayText && (
-          <div className="absolute inset-x-0 bottom-0 z-[6] flex justify-center px-[6%] pb-[max(1rem,env(safe-area-inset-bottom))] pointer-events-none">
+          <div
+            className={`absolute inset-x-0 bottom-0 z-[6] flex justify-center px-[6%] pointer-events-none ${
+              isFsControlsVisible && !isLive ? 'pb-[4.5rem]' : 'pb-[max(1rem,env(safe-area-inset-bottom))]'
+            }`}
+          >
             <div className="max-w-full rounded-xl bg-black/60 px-4 py-1.5 text-center [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
               {overlaySubtitle!.english && (
                 <p
@@ -703,9 +790,51 @@ export const YouTubeBilingualPlayer: React.FC<Props> = ({
           </div>
         )}
 
+        {/* 全螢幕：雙擊快轉提示（同 YouTube，顯示累計秒數） */}
+        {isFullscreen && seekIndicator && (
+          <div
+            className={`absolute inset-y-0 z-[6] w-[38%] flex items-center justify-center bg-white/10 pointer-events-none ${
+              seekIndicator.side === 'left' ? 'left-0 rounded-r-[50%]' : 'right-0 rounded-l-[50%]'
+            }`}
+          >
+            <div className="flex flex-col items-center gap-1 text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
+              {seekIndicator.side === 'left' ? (
+                <ChevronsLeft className="w-8 h-8" />
+              ) : (
+                <ChevronsRight className="w-8 h-8" />
+              )}
+              <span className="text-sm font-semibold">{seekIndicator.seconds} 秒</span>
+            </div>
+          </div>
+        )}
+
         {/* 全螢幕：點畫面後顯示的控制鍵，3 秒後自動隱藏；暫停時一直顯示 */}
-        {isFullscreen && (showFsControls || isPausedInFullscreen) && (
+        {isFsControlsVisible && (
           <>
+            {!isLive && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="absolute z-[7] inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-black/70 to-transparent pt-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] px-[max(1.5rem,env(safe-area-inset-left))]"
+              >
+                <span className="shrink-0 text-xs font-mono text-white/90">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={duration || 100}
+                  step={0.1}
+                  value={currentTime}
+                  onChange={(e) => {
+                    handleSeek(e);
+                    revealFsControls();
+                  }}
+                  disabled={!isReady || duration <= 0}
+                  className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-white/30 accent-red-500 focus:outline-none"
+                  aria-label="播放進度"
+                />
+              </div>
+            )}
             <button
               type="button"
               onClick={(e) => {

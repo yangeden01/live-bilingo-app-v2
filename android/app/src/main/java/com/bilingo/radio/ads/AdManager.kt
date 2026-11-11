@@ -58,7 +58,7 @@ object AdManager {
      * 模擬器會自動被視為測試裝置，不需要加入。
      */
     private val MY_TEST_DEVICE_IDS: List<String> = listOf(
-        // "PASTE_HASHED_DEVICE_ID_HERE",
+        "9A3921A4E2DFD93008D68E373DF8BD9B", // 開發者手機（由 Play 版取得）
     )
 
     /** true = 使用 Google 測試廣告單元；false = 使用正式廣告單元 */

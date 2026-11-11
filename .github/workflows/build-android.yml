@@ -126,6 +126,17 @@ jobs:
           mkdir -p release_assets
           cp android/app/build/outputs/apk/release/*.apk release_assets/bilingo-radio.apk || true
 
+      # 模擬器專用 APK：-PuseTestAds=true 讓 release 也改用 Google 測試廣告，
+      # 避免雲端模擬器載入正式廣告。放在上面的正式 APK 複製到 release_assets 之後才建置，
+      # 所以上架用的 AAB、Releases 的 bilingo-radio.apk 都維持正式廣告。
+      - name: Build Emulator Test APK (Test Ads)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease -PuseTestAds=true --no-daemon --stacktrace
+          mkdir -p ../emulator_apk
+          cp app/build/outputs/apk/release/*.apk ../emulator_apk/bilingo-radio-testads.apk
+
       - name: Enable KVM for Android Emulator
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm-rules.rules
@@ -144,7 +155,8 @@ jobs:
           script: |
             echo "=== 1. 清理舊版 App 並強制覆蓋安裝最新 APK ==="
             adb uninstall com.bilingo.radio || true
-            adb install -r -g release_assets/bilingo-radio.apk || adb install -r -g android/app/build/outputs/apk/release/*.apk || adb install -r -g android/app/build/outputs/apk/debug/*.apk
+            # 只安裝測試廣告版本（-PuseTestAds=true 的 release，失敗時退回 debug，debug 本身也用測試廣告）
+            adb install -r -g emulator_apk/bilingo-radio-testads.apk || adb install -r -g android/app/build/outputs/apk/debug/*.apk
             echo "=== 2. 自動啟動 BiLingo Radio App 主畫面 ==="
             adb shell am start -n com.bilingo.radio/com.bilingo.radio.MainActivity
             echo "=== 3. 等待 App 啟動並完成 WebView 渲染 (12 秒) ==="

@@ -16,6 +16,12 @@ android {
         versionName = "2.7.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // AdMob：-PuseTestAds=true 時 release 也強制改用 Google 測試廣告（CI 模擬器測試用）。
+        // 預設 false，上架用的 bundleRelease 不帶此參數，維持正式廣告。
+        val useTestAds = (project.findProperty("useTestAds") as String?)
+            ?.trim()?.equals("true", ignoreCase = true) ?: false
+        buildConfigField("boolean", "USE_TEST_ADS", useTestAds.toString())
     }
 
     signingConfigs {
@@ -69,7 +75,8 @@ android {
     }
     buildFeatures {
         compose = true
-        buildConfig = false
+        // AdManager 需要 BuildConfig.DEBUG / BuildConfig.USE_TEST_ADS
+        buildConfig = true
         resValues = false
     }
     packaging {

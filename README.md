@@ -1,17 +1,14 @@
-# BiLingo Radio - 雙語即時廣播 App 📻
+# Live Bilingo — YouTube 雙語字幕英語學習
 
-一款結合 AI 即時雙語字幕與語音轉文字的 Android 廣播應用程式。
+一款以 YouTube 影片學英文的 Android App：即時雙語字幕、逐句重播、字典與單字本。
 
-## 📲 APK 一鍵免解壓直接下載
+## 📲 下載
 
-每當程式碼更新時，GitHub Actions 會自動編譯並發布最新的 APK 檔（完全不需解壓縮）：
+請從 Google Play 安裝：
+👉 **[Live Bilingo on Google Play](https://play.google.com/store/apps/details?id=com.bilingo.radio)**
 
-👉 **[進入 GitHub Releases 頁面下載最新 bilingo-radio.apk](https://github.com/yangeden01/live-bilingo-app-v2/releases)**
-👉 **[直連下載最新 bilingo-radio.apk](https://github.com/yangeden01/live-bilingo-app-v2/releases/download/latest/bilingo-radio.apk)**
+GitHub 不再公開發布 APK（自 2026-11-21 起）。測試用的 AAB／APK 在 GitHub Actions 的 Artifacts（需登入）。
 
----
+## 開發
 
-## 🚀 最新修復與防護
-- **WebView 開機黑屏防護**：具備 3-Tier 自動備援降級機制。
-- **高相容性離線資產**：`index-xxx.js` 採用相容腳本標籤，防止舊版 WebView 模組載入失敗。
-- **全自動 CI/CD**：程式碼一 `git push` 即自動發布至 [GitHub Releases](https://github.com/yangeden01/live-bilingo-app-v2/releases)。
+專案規則、建置與上架流程見 [CLAUDE.md](CLAUDE.md)。

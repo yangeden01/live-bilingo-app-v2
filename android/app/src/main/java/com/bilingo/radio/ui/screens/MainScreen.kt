@@ -1118,12 +1118,17 @@ fun MainScreen(
                             javaScriptEnabled = true
                             domStorageEnabled = true
                             databaseEnabled = true
-                            allowFileAccess = true
-                            allowContentAccess = true
+                            // 一般檔案與 content:// 存取不需要（網頁從 assetLoader 的 https 網域載入；
+                            // allowFileAccess 不影響 file:///android_asset）。
+                            allowFileAccess = false
+                            allowContentAccess = false
+                            // 下面兩項保留：黑屏時的備援會改載 file:///android_asset/index.html，需要它們才能載入腳本
+                            // （見 docs/WEBVIEW_BLACKSCREEN_AND_API_ROOTCAUSE.md）。外部網頁已由 shouldOverrideUrlLoading 擋在 App 外。
                             allowFileAccessFromFileURLs = true
                             allowUniversalAccessFromFileURLs = true
                             mediaPlaybackRequiresUserGesture = false
-                            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                            // 不允許 https 頁面載入 http 腳本；圖片等被動內容仍可顯示
+                            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
                             useWideViewPort = true
                             loadWithOverviewMode = true
                             setSupportZoom(false)
@@ -1153,6 +1158,28 @@ fun MainScreen(
                         addJavascriptInterface(webInterface, "Android")
 
                         webViewClient = object : WebViewClient() {
+                            // 主畫面只能是 App 自己的網頁。其他網址（例如廣告、評分視窗的 Play 商店連結、
+                            // window.open 開的網頁）一律交給外部瀏覽器／App 開啟，避免外部網頁取得 AndroidBridge。
+                            override fun shouldOverrideUrlLoading(
+                                view: WebView?,
+                                request: WebResourceRequest?
+                            ): Boolean {
+                                val uri = request?.url ?: return false
+                                if (!request.isForMainFrame) return false
+                                val scheme = uri.scheme?.lowercase()
+                                if (scheme == "https" && uri.host == "appassets.android.com") return false
+                                if (scheme == "file" || scheme == "about" || scheme == "data" || scheme == "blob" || scheme == "javascript") return false
+                                try {
+                                    ctx.startActivity(
+                                        android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+                                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                } catch (e: Exception) {
+                                    android.util.Log.w("WebViewNav", "No app to open $uri: ${e.message}")
+                                }
+                                return true
+                            }
+
                             override fun shouldInterceptRequest(
                                 view: WebView?,
                                 request: WebResourceRequest?

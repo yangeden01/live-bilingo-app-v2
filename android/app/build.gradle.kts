@@ -12,8 +12,8 @@ android {
         applicationId = "com.bilingo.radio"
         minSdk = 24
         targetSdk = 36
-        versionCode = 275
-        versionName = "2.7.5"
+        versionCode = 276
+        versionName = "2.7.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -26,21 +26,15 @@ android {
 
     signingConfigs {
         create("release") {
-            val ksFile = project.file("release.keystore")
-            val storePass = System.getenv("RELEASE_STORE_PASSWORD")?.ifEmpty { null }
-                ?: System.getenv("KEYSTORE_PASSWORD")?.ifEmpty { null }
-                ?: "bilingo123456"
-            val keyPass = System.getenv("RELEASE_KEY_PASSWORD")?.ifEmpty { null }
-                ?: System.getenv("KEY_PASSWORD")?.ifEmpty { null }
-                ?: storePass
-            val alias = System.getenv("RELEASE_KEY_ALIAS")?.ifEmpty { null }
-                ?: System.getenv("KEY_ALIAS")?.ifEmpty { null }
-                ?: "bilingokey"
-
-            storeFile = ksFile
-            storePassword = storePass
-            keyAlias = alias
-            keyPassword = keyPass
+            // 上傳金鑰只從環境變數讀取：CI 由 android/app/ensure_keystore.py 從 GitHub Secrets 解碼到
+            // repo 外的暫存目錄。repo 內不放金鑰、不寫死密碼；沒有設定時 release 不簽署，Play 會拒收。
+            val ksPath = System.getenv("RELEASE_KEYSTORE_PATH")?.ifEmpty { null }
+            if (ksPath != null && file(ksPath).exists()) {
+                storeFile = file(ksPath)
+                storePassword = System.getenv("RELEASE_STORE_PASSWORD")
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+            }
             enableV1Signing = true
             enableV2Signing = true
         }
@@ -57,7 +51,7 @@ android {
             )
         }
         debug {
-            signingConfig = signingConfigs.getByName("release")
+            // debug 版用 Android 預設的 debug 金鑰，不用上傳金鑰簽署
             isMinifyEnabled = false
         }
     }

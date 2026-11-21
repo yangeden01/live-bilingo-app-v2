@@ -6,8 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  actions: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -27,19 +26,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
-
-      # 自動連動 Google AI Studio 撈取最新 Prompt 程式碼並覆蓋寫入專案 (選用)
-      - name: Fetch Latest Code from Google AI Studio
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          AI_STUDIO_PROMPT_ID: ${{ secrets.AI_STUDIO_PROMPT_ID }}
-        run: |
-          python fetch_ai_studio_code.py || true
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -61,6 +47,7 @@ jobs:
           fi
           cd android && gradle wrapper --gradle-version 8.7 || true
 
+      # 上傳金鑰只從 Secrets 解到 repo 外的暫存目錄；缺少或無效時直接失敗，不會產生新金鑰
       - name: Ensure Release Keystore
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -84,6 +71,12 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: Show Upload Key Fingerprint
+        run: |
+          AAB=$(find android/app/build/outputs/bundle/release -name "*.aab" | head -1)
+          echo "=== AAB 簽署憑證（核對 Play Console 的上傳金鑰 SHA-256）==="
+          keytool -printcert -jarfile "$AAB" | grep -E "SHA256|Owner"
 
       - name: Upload Release AAB to Artifacts
         uses: actions/upload-artifact@v4
@@ -121,14 +114,10 @@ jobs:
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: ignore
 
-      - name: Prepare Direct Download APK
-        run: |
-          mkdir -p release_assets
-          cp android/app/build/outputs/apk/release/*.apk release_assets/bilingo-radio.apk || true
-
       # 模擬器專用 APK：-PuseTestAds=true 讓 release 也改用 Google 測試廣告，
-      # 避免雲端模擬器載入正式廣告。放在上面的正式 APK 複製到 release_assets 之後才建置，
-      # 所以上架用的 AAB、Releases 的 bilingo-radio.apk 都維持正式廣告。
+      # 避免雲端模擬器載入正式廣告。放在正式 AAB／APK 上傳到 Artifacts 之後才建置，
+      # 所以上架用的 AAB 維持正式廣告。
+      # 2026-11-21 起不再把 APK 公開發布到 GitHub Releases（避免帶正式廣告的 APK 外流）。
       - name: Build Emulator Test APK (Test Ads)
         run: |
           cd android
@@ -178,29 +167,3 @@ jobs:
           name: emulator-startup-test-results
           path: emulator_test/
           if-no-files-found: ignore
-
-      - name: Gemini AI Automatic Self-Healing & Re-Trigger CI
-        if: failure()
-        run: |
-          echo "=== 🤖 觸發 Gemini AI 自癒系統：自動解析 Logcat、生成修復 Patch 並 Push 重新觸發 CI ==="
-          python3 scripts/ai_self_heal.py
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish Direct APK to GitHub Releases (No Zip)
-        uses: softprops/action-gh-release@v2
-        if: success()
-        with:
-          tag_name: latest
-          name: "BiLingo Radio (最新免解壓 APK)"
-          body: |
-            🚀 **BiLingo Radio 最新 APK 安裝包（免解壓縮）**
-
-            點擊下方 Assets 中的 `bilingo-radio.apk` 即可直接下載 `.apk` 安裝檔到手機進行安裝！
-          draft: false
-          prerelease: false
-          make_latest: true
-          files: release_assets/bilingo-radio.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

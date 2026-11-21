@@ -185,7 +185,7 @@ class GeminiTranslationRepository(
             val myMemoryUrl = "https://api.mymemory.translated.net/get?q=$encodedQuery&langpair=en|zh-TW"
             val myMemoryRequest = Request.Builder()
                 .url(myMemoryUrl)
-                .addHeader("User-Agent", "LiveBilingoRadio/2.4.9")
+                .addHeader("User-Agent", "LiveBilingo/${com.bilingo.radio.BuildConfig.VERSION_NAME}")
                 .build()
 
             val myMemoryResponse = client.newCall(myMemoryRequest).execute()

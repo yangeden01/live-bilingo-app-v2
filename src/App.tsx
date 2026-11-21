@@ -115,14 +115,14 @@ export default function App() {
       if (!isMounted) return;
       setInitProgress(65);
       setInitStatusText('載入 YouTube 雙語字幕模組...');
-    }, 150);
+    }, 50);
 
     const timer2 = setTimeout(() => {
       if (!isMounted) return;
       setInitProgress(100);
       setIsInitializing(false);
       clearTimeout(safetyTimer);
-    }, 400);
+    }, 100); // 原本固定等 400ms，只是假的載入動畫
 
     return () => {
       isMounted = false;

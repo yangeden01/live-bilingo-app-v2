@@ -36,7 +36,6 @@ import com.google.android.play.core.install.model.UpdateAvailability
 import com.bilingo.radio.service.RadioForegroundService
 import com.bilingo.radio.ui.screens.MainScreen
 import com.bilingo.radio.ui.theme.LiveBilingoRadioTheme
-import com.bilingo.radio.viewmodel.RadioSubtitleViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -293,7 +292,7 @@ class MainActivity : ComponentActivity() {
                     }
                 } else {
                     if (isManualCheck) {
-                        Toast.makeText(this, "目前已是最新版本 (v2.4.9)", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "目前已是最新版本 (v${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
                     }
                 }
             }.addOnFailureListener { e ->

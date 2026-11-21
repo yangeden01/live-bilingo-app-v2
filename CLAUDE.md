@@ -66,6 +66,12 @@ Android 原生外殼以 WebView 載入 React 前端，前端呼叫遠端 Node �
 - `android/app/src/main/assets/` 與 `assets/www/` 是建置產物，不要手改。
 - AGP 8.5.0、Kotlin 2.0.0、Gradle 8.7、JDK 17、compileSdk/targetSdk 36、minSdk 24。
 - WebView 黑屏問題見 `docs/WEBVIEW_BLACKSCREEN_AND_API_ROOTCAUSE.md`。
+- **背景暫停（僅 `main`）**：`MainActivity.onPause` 在網頁的背景處理跑完後暫停 WebView 與計時器；但桌面小工具正在播放廣播（`isBackgroundAudioActive`）時不暫停。`radio-selfuse` 需要背景播放，**不要移植**這項。
+- WebView 渲染程序崩潰時銷毀舊 WebView 並 `recreate()` Activity（舊做法對死掉的 WebView 再 `loadUrl` 會黑屏）。
+- 應用程式內更新下載完成後詢問是否重新啟動；選「稍後」就在 App 進入背景（且沒在播放廣播）時安裝。
+- 翻譯全部失敗時回傳空字串（畫面顯示未翻譯），不再回傳寫死的假中文或英文原文。
+- 字幕卡片 `BilingualSubtitleCard` 用 `React.memo`；`YouTubeBilingualView` 以固定參照的回呼（`getCardCallbacks`，透過 ref 讀最新狀態）傳入，新增卡片回呼時要沿用這個模式，否則 memo 失效或讀到舊狀態。
+- 全域例外處理：主執行緒例外一律交給系統（產生當機報告），只略過背景執行緒例外。前景服務每個 `onStartCommand` 路徑都先 `startForeground()`。
 
 ## 建置
 
@@ -113,6 +119,7 @@ CI：`.github/workflows/build-android.yml` 建置 AAB、APK，跑模擬器測試
 - `BACKEND_URL` 指向 AI Studio 預覽服務（`ais-pre-*.run.app`），匿名請求會被導向 AI Studio 登入，所以 APK 內對後端的呼叫通常不會成功。
 - `main` 的主流程不靠後端：YouTube 字幕、翻譯、新聞探索都走 `AndroidBridge` 原生路徑；字典與發音有備援。
 - 只走後端的是版本檢查、回報與除錯面板，失效不影響主流程。
+- 2026-11-21 起：App 內（偵測 `AndroidBridge`）不再執行每 3 秒的 `/api/version` 輪詢（AI Studio 開發用的更新提醒）。後端呼叫失敗一次後，10 分鐘內直接跳過（`src/utils/apiUrl.ts` 的 `isBackendTemporarilyDown`，`safeApiFetch`、新聞探索、字典都適用），之後自動再試；後端本身未移除。
 - `radio-selfuse` 的電台管理 API（`/api/repair-stations`、`/api/set-active-station`、`/api/clear-subtitles-history`）在被擋時的影響未實測。
 - 不要移除舊後端；現階段也不需要急著遷移。
 
@@ -137,7 +144,7 @@ CI：`.github/workflows/build-android.yml` 建置 AAB、APK，跑模擬器測試
 ### 版本
 
 - versionCode 寫死在 `android/app/build.gradle.kts`，CI 不會自動遞增。
-- 程式碼目前 276（2.7.6，第一組安全修正）。2026-11-02 時 Play 正式版為 267（2.6.7），178 個國家全面推出；之後上架到哪一版待確認。
+- 程式碼目前 277（2.7.7，第二組耗電／當機／假翻譯修正）。276（2.7.6）為第一組安全修正。2026-11-02 時 Play 正式版為 267（2.6.7），178 個國家全面推出；之後上架到哪一版待確認。
 
 ## 上架流程
 

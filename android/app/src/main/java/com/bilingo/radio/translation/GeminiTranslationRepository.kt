@@ -117,6 +117,8 @@ class GeminiTranslationRepository(
                 .build()
 
             val gtxResponse = client.newCall(gtxRequest).execute()
+            // 失敗時要關閉回應，否則連線會洩漏（成功時讀取 body 會自動關閉）
+            if (!gtxResponse.isSuccessful) gtxResponse.close()
             if (gtxResponse.isSuccessful) {
                 val gtxBody = gtxResponse.body?.string()
                 if (!gtxBody.isNullOrEmpty()) {
@@ -151,6 +153,8 @@ class GeminiTranslationRepository(
                 .build()
 
             val clients5Response = client.newCall(clients5Request).execute()
+            // 失敗時要關閉回應，否則連線會洩漏（成功時讀取 body 會自動關閉）
+            if (!clients5Response.isSuccessful) clients5Response.close()
             if (clients5Response.isSuccessful) {
                 val body = clients5Response.body?.string()
                 if (!body.isNullOrEmpty()) {
@@ -185,6 +189,8 @@ class GeminiTranslationRepository(
                 .build()
 
             val myMemoryResponse = client.newCall(myMemoryRequest).execute()
+            // 失敗時要關閉回應，否則連線會洩漏（成功時讀取 body 會自動關閉）
+            if (!myMemoryResponse.isSuccessful) myMemoryResponse.close()
             if (myMemoryResponse.isSuccessful) {
                 val body = myMemoryResponse.body?.string()
                 if (!body.isNullOrEmpty()) {
@@ -279,14 +285,9 @@ class GeminiTranslationRepository(
         }
     }
 
-    private fun fallbackTranslate(text: String): String {
-        return when {
-            text.contains("welcome", ignoreCase = true) -> "歡迎收聽 Live Bilingo 雙語新聞電台。"
-            text.contains("news", ignoreCase = true) -> "以下為公共英語廣播即時焦點新聞報導。"
-            text.contains("weather", ignoreCase = true) -> "今日各地天氣晴朗，局部沿海地區伴有晨霧。"
-            text.contains("president", ignoreCase = true) -> "總統府與各界代表就最新公共政策發表聲明。"
-            text.contains("market", ignoreCase = true) -> "國際金融與股票市場最新指數交易走勢分析。"
-            else -> text
-        }
-    }
+    // 所有翻譯來源都失敗時回傳空字串，讓畫面顯示「尚未翻譯」並可稍後重試。
+    // 原本會依關鍵字回傳寫死、與原文無關的中文（例如含 weather 就顯示「今日各地天氣晴朗…」），
+    // 或直接回傳英文原文當作翻譯，會誤導使用者。
+    @Suppress("UNUSED_PARAMETER")
+    private fun fallbackTranslate(text: String): String = ""
 }

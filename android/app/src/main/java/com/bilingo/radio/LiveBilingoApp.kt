@@ -32,7 +32,9 @@ class LiveBilingoApp : Application() {
 
             Log.e("LiveBilingoApp", "Uncaught exception on thread ${thread.name} (ignorable=$isIgnorable): ${throwable.message}", throwable)
 
-            if (isIgnorable || thread.name != "main") {
+            // 主執行緒的例外一律交給系統：主執行緒的迴圈已經結束，吞掉只會讓 App 卡住不動（ANR），
+            // Play Console 也收不到當機報告。只有背景執行緒的例外才略過。
+            if (thread.name != "main" && thread !== android.os.Looper.getMainLooper().thread) {
                 // Recover safely from non-fatal background/service/WebView crashes without killing the process with OS crash dialog
                 Log.w("LiveBilingoApp", "Suppressed non-fatal uncaught exception to preserve user session.")
                 return@setDefaultUncaughtExceptionHandler

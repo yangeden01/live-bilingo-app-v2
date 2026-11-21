@@ -364,8 +364,9 @@ class MainActivity : ComponentActivity() {
 
             installStateUpdatedListener = InstallStateUpdatedListener { state ->
                 if (state.installStatus() == InstallStatus.DOWNLOADED) {
-                    Toast.makeText(this, "新版本已下載完成，即將自動套用更新！", Toast.LENGTH_LONG).show()
-                    manager.completeUpdate()
+                    // 不要在看影片時直接重啟：先詢問；使用者選「稍後」就等 App 切到背景時再安裝
+                    isUpdateDownloaded = true
+                    showUpdateReadyDialog()
                 }
             }
             installStateUpdatedListener?.let { manager.registerListener(it) }
@@ -480,7 +481,39 @@ class MainActivity : ComponentActivity() {
 
         appUpdateManager?.appUpdateInfo?.addOnSuccessListener { appUpdateInfo ->
             if (appUpdateInfo.installStatus() == InstallStatus.DOWNLOADED) {
+                isUpdateDownloaded = true
+                showUpdateReadyDialog()
+            }
+        }
+    }
+
+    // ---- 應用程式內更新：下載完成後詢問，不在使用中直接重啟（2026-11-21）----
+    private var isUpdateDownloaded = false
+    private var updateDialog: android.app.AlertDialog? = null
+
+    private fun showUpdateReadyDialog() {
+        if (isFinishing || isDestroyed) return
+        if (updateDialog?.isShowing == true) return
+        try {
+            updateDialog = android.app.AlertDialog.Builder(this)
+                .setTitle("新版本已下載完成")
+                .setMessage("要現在重新啟動套用更新嗎？選「稍後」會在你離開 App 時自動安裝。")
+                .setPositiveButton("重新啟動") { _, _ -> appUpdateManager?.completeUpdate() }
+                .setNegativeButton("稍後", null)
+                .show()
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Update dialog failed: ${e.message}")
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // 已下載但使用者選了「稍後」：App 在背景時安裝，不會打斷正在看的影片
+        if (isUpdateDownloaded && !isBackgroundAudioActive()) {
+            try {
                 appUpdateManager?.completeUpdate()
+            } catch (e: Exception) {
+                android.util.Log.w("MainActivity", "completeUpdate in background failed: ${e.message}")
             }
         }
     }
@@ -490,15 +523,33 @@ class MainActivity : ComponentActivity() {
         isAppInForeground = false
         try {
             activeWebAppInterface?.onAppBackground()
-            activeWebView?.evaluateJavascript(
-                "(function(){ try { if (window.onAndroidAppBackground) window.onAndroidAppBackground(); } catch(e){} })();",
-                null
-            )
-            // DO NOT call activeWebView?.onPause() here!
-            // In a live background audio streaming app, pausing the WebView stops the V8 JS engine,
-            // preventing the app from responding to Widget/Notification/Lockscreen controls while in background.
+            val webView = activeWebView
+            webView?.evaluateJavascript(
+                "(function(){ try { if (window.onAndroidAppBackground) window.onAndroidAppBackground(); } catch(e){} })();"
+            ) {
+                // 網頁的背景處理跑完後再暫停 WebView，避免 YouTube 影片、每 250ms 的播放輪詢等在背景持續耗電
+                // （也避免影片在背景繼續播放）。但桌面小工具正在播放廣播時不暫停：
+                // 小工具／通知的播放控制需要 WebView 的 JS 持續運作。
+                if (!isAppInForeground && !isBackgroundAudioActive()) {
+                    try {
+                        webView.onPause()
+                        webView.pauseTimers()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    private fun isBackgroundAudioActive(): Boolean {
+        return try {
+            val prefs = getSharedPreferences("bilingo_widget_prefs", android.content.Context.MODE_PRIVATE)
+            RadioForegroundService.isNativePlaying() || prefs.getBoolean("widget_is_playing", false)
+        } catch (e: Exception) {
+            true // 判斷不了時保守處理：不暫停
         }
     }
 

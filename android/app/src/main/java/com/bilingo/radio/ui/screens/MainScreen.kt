@@ -1137,7 +1137,8 @@ fun MainScreen(
                             if (!defaultUa.contains("AndroidApp")) {
                                 userAgentString = "$defaultUa AndroidApp/2.4.9"
                             }
-                            cacheMode = WebSettings.LOAD_NO_CACHE
+                            // 一般快取：App 自己的網頁由攔截器回傳 no-cache 標頭，不會讀到舊版；縮圖等外部資源可正常快取
+                            cacheMode = WebSettings.LOAD_DEFAULT
                         }
 
                         val webInterface = WebAppInterface(
@@ -1323,13 +1324,25 @@ fun MainScreen(
                                 view: WebView?,
                                 detail: android.webkit.RenderProcessGoneDetail?
                             ): Boolean {
-                                android.util.Log.w("WebViewClient", "onRenderProcessGone detected. Recovering gracefully...")
+                                android.util.Log.w("WebViewClient", "onRenderProcessGone detected. Recreating WebView...")
+                                // 渲染程序死掉後這個 WebView 不能再用（再 loadUrl 只會黑屏）。
+                                // 移除並銷毀它，再重建 Activity，讓 Compose 建立新的 WebView。
                                 try {
-                                    view?.post {
-                                        view.loadUrl(localAppUrl)
-                                    }
+                                    (view?.parent as? android.view.ViewGroup)?.removeView(view)
+                                    view?.destroy()
                                 } catch (e: Exception) {
                                     e.printStackTrace()
+                                }
+                                ctx.findMainActivity()?.let { activity ->
+                                    if (activity.activeWebView === view) {
+                                        activity.activeWebView = null
+                                        activity.activeWebAppInterface = null
+                                    }
+                                    try {
+                                        activity.recreate()
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                    }
                                 }
                                 return true
                             }

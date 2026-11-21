@@ -20,7 +20,7 @@ import {
   Mic2,
   Sparkles,
 } from 'lucide-react';
-import { getApiUrl } from '../utils/apiUrl';
+import { getApiUrl, isBackendUrl, isBackendTemporarilyDown, markBackendDown, markBackendUp } from '../utils/apiUrl';
 import {
   YouTubeNewsVideo,
   YouTubeNewsResponse,
@@ -236,13 +236,16 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
       }
 
       // 2. Web browser or fallback if native returned no videos
-      if (!data || !data.success || !Array.isArray(data.videos) || data.videos.length === 0) {
+      const newsEndpoint = getApiUrl(`/api/youtube/news${forceRefresh ? '?refresh=true' : ''}`);
+      const newsToBackend = isBackendUrl(newsEndpoint);
+      // 後端最近連不上時直接跳過，改用下方的內建備援清單
+      if ((!data || !data.success || !Array.isArray(data.videos) || data.videos.length === 0) &&
+          !(newsToBackend && isBackendTemporarilyDown())) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
 
         try {
-          const endpoint = getApiUrl(`/api/youtube/news${forceRefresh ? '?refresh=true' : ''}`);
-          const res = await fetch(endpoint, {
+          const res = await fetch(newsEndpoint, {
             signal: controller.signal,
             headers: { Accept: 'application/json' },
           });
@@ -250,11 +253,14 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
 
           if (res.ok) {
             data = await res.json();
+            if (newsToBackend) markBackendUp();
           } else {
+            if (newsToBackend) markBackendDown();
             console.warn(`[YouTubeNewsModal] Web API returned HTTP ${res.status}`);
           }
         } catch (fetchErr: any) {
           clearTimeout(timeoutId);
+          if (newsToBackend) markBackendDown();
           console.warn('[YouTubeNewsModal] Web API fetch error:', fetchErr?.message || fetchErr);
         }
       }
@@ -299,8 +305,9 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
 
         // If any video returned from native or cache has fallback duration '05:00' or lacks titleZh,
         // perform immediate background enrichment to guarantee real duration and Traditional Chinese titles
-        if (sorted.some((v) => !v.titleZh || v.durationFormatted === '05:00')) {
-          fetch(getApiUrl(`/api/youtube/news${forceRefresh ? '?refresh=true' : ''}`))
+        if (sorted.some((v) => !v.titleZh || v.durationFormatted === '05:00') &&
+            !(newsToBackend && isBackendTemporarilyDown())) {
+          fetch(newsEndpoint)
             .then((r) => r.json())
             .then((enrichedData) => {
               if (enrichedData && enrichedData.success && Array.isArray(enrichedData.videos)) {
@@ -323,7 +330,9 @@ export const YouTubeNewsDiscoveryModal: React.FC<YouTubeNewsDiscoveryModalProps>
                 );
               }
             })
-            .catch(() => {});
+            .catch(() => {
+              if (newsToBackend) markBackendDown();
+            });
 
           const missingZh = sorted.filter((v) => !v.titleZh);
           if (missingZh.length > 0) {

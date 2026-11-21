@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Volume2, BookOpen, X, Sparkles, Copy, Check, Bookmark, BookmarkCheck, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { speakText, stopSpeech } from '../utils/tts';
-import { getApiUrl } from '../utils/apiUrl';
+import { getApiUrl, isBackendUrl, isBackendTemporarilyDown, markBackendDown } from '../utils/apiUrl';
 import { getPersistentItem, setPersistentItem } from '../utils/persistentStorage';
 import { lookupQuickWord, generateContextualExample } from '../utils/quickDictionary';
 import { translateEnglishToChinese } from '../utils/clientTranslation';
@@ -394,21 +394,29 @@ export const DictionaryModal: React.FC<Props> = ({ isOpen, onClose, initialWord 
           } catch (e) {}
         }
 
-        // Source 2: Backend Multi-source proxy endpoint
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 2500);
-          const serverRes = await fetch(getApiUrl(`/api/dictionary?word=${encodeURIComponent(clean)}`), {
-            signal: controller.signal,
-          });
-          clearTimeout(timer);
-          if (serverRes.ok) {
-            const data = await serverRes.json();
-            if (data && data.meanings && data.meanings.length > 0) {
-              return data;
+        // Source 2: Backend Multi-source proxy endpoint（後端最近連不上時直接跳過）
+        const dictUrl = getApiUrl(`/api/dictionary?word=${encodeURIComponent(clean)}`);
+        const dictToBackend = isBackendUrl(dictUrl);
+        if (!(dictToBackend && isBackendTemporarilyDown())) {
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 2500);
+            const serverRes = await fetch(dictUrl, {
+              signal: controller.signal,
+            });
+            clearTimeout(timer);
+            if (serverRes.ok) {
+              const data = await serverRes.json();
+              if (data && data.meanings && data.meanings.length > 0) {
+                return data;
+              }
+            } else if (dictToBackend) {
+              markBackendDown();
             }
+          } catch (e) {
+            if (dictToBackend) markBackendDown();
           }
-        } catch (e) {}
+        }
 
         // Source 3: Free Dictionary API fallback
         for (const cand of candidates.slice(0, 2)) {

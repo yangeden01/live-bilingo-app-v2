@@ -8,6 +8,7 @@ import { RewardedAdModal } from './components/RewardedAdModal';
 import { InterstitialAdModal } from './components/InterstitialAdModal';
 import { ReviewPromptModal } from './components/ReviewPromptModal';
 import { safeApiFetch } from './utils/safeFetch';
+import { isNativeAndroidApp } from './utils/apiUrl';
 import { vibrateGitPushSuccess, vibrateDetentTick } from './utils/haptics';
 import { getPersistentItem, setPersistentItem } from './utils/persistentStorage';
 import { ReviewManager } from './utils/reviewManager';
@@ -135,6 +136,10 @@ export default function App() {
   const [gitUpdateToast, setGitUpdateToast] = useState<{ commit?: string; time: number } | null>(null);
 
   useEffect(() => {
+    // 這是 AI Studio 開發時用的「伺服器更新提醒」。App 內的網頁打包在 APK 裡，伺服器更新不代表 App 有更新，
+    // 而且後端通常連不上，原本每 3 秒失敗一次、整天耗電耗流量，所以 App 內不執行。
+    if (isNativeAndroidApp()) return;
+
     let lastBuildTime = 0;
     let lastCommit = '';
     let isInitialCheck = true;

@@ -362,6 +362,8 @@ export const YouTubeBilingualView: React.FC<Props> = ({
   const subtitleContainerRef = useRef<HTMLDivElement | null>(null);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const lastSavedTimeRef = useRef<number>(0);
+  // 最新播放秒數（不觸發重新執行儲存進度的 effect）
+  const currentTimeRef = useRef<number>(0);
   const isLoopSeekingRef = useRef<boolean>(false);
   const handleLoopReplayRef = useRef<() => void>(() => {});
 
@@ -445,13 +447,24 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     }
   }, [activeVideoId, repeatSegmentId, subtitles]);
 
-  // Immediately persist progress when player pauses, buffers, or ends
+  currentTimeRef.current = currentTimeSeconds;
+
+  // Immediately persist progress when player pauses, buffers, or ends.
+  // 只在播放狀態或影片改變時儲存；原本依賴 currentTimeSeconds，播放時每 250ms 就寫一次磁碟。
+  // 播放中的定期儲存由上面 handleTimeUpdate 的 1.5 秒節流負責。
   useEffect(() => {
-    if (activeVideoId && currentTimeSeconds > 0) {
-      setPersistentItem('youtube_last_time', String(currentTimeSeconds));
-      setPersistentItem(`youtube_progress_${activeVideoId}`, String(currentTimeSeconds));
+    let t = currentTimeRef.current;
+    try {
+      const live = playerRef.current?.getCurrentTime?.();
+      if (typeof live === 'number' && live > 0) t = live;
+    } catch {
+      // ignore
     }
-  }, [playerState, activeVideoId, currentTimeSeconds]);
+    if (activeVideoId && t > 0) {
+      setPersistentItem('youtube_last_time', String(t));
+      setPersistentItem(`youtube_progress_${activeVideoId}`, String(t));
+    }
+  }, [playerState, activeVideoId]);
 
   // Save progress on page visibility change or unload
   useEffect(() => {
@@ -954,7 +967,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
     };
   };
 
-  const handleBookmarkToggle = (id: string) => {
+  const handleBookmarkToggle = useCallback((id: string) => {
     setBookmarkedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -964,7 +977,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
       }
       return next;
     });
-  };
+  }, []);
 
   const handleSeekToSentence = (startMs: number) => {
     const secs = Math.max(0, startMs / 1000);
@@ -1301,6 +1314,42 @@ export const YouTubeBilingualView: React.FC<Props> = ({
   handleLoopReplayRef.current = handleLoopReplay;
 
   const filteredSubtitles = subtitles;
+
+  // 字幕卡片用的「固定不變、但永遠讀最新狀態」的回呼（2026-11-21）。
+  // 播放時 currentTimeSeconds 每 250ms 更新、整個畫面重畫；卡片用 React.memo 後，只有內容改變的卡片才重畫。
+  // 回呼若每次重建就會讓 memo 失效，若直接固定又會讀到舊狀態，所以改成透過 ref 呼叫最新的處理函式。
+  const cardActionsRef = useRef({
+    playSegment: (_id: string, _startMs: number) => {},
+    toggleRepeat: (_id: string, _startMs: number) => {},
+  });
+  cardActionsRef.current = {
+    playSegment: (id: string, startMs: number) => {
+      const activeId = effectiveActiveId || activeSubtitleId;
+      if (id === activeId && playerState === 'playing') {
+        playerRef.current?.pause();
+      } else {
+        handleSeekToSentence(startMs);
+      }
+    },
+    toggleRepeat: (id: string, startMs: number) => handleToggleRepeatSegment(id, startMs),
+  };
+  const cardCallbacksRef = useRef(new Map<string, { onPlaySegment: () => void; onToggleRepeatSegment: () => void }>());
+  const getCardCallbacks = (id: string, startMs: number) => {
+    const key = `${id}@${startMs}`;
+    let cbs = cardCallbacksRef.current.get(key);
+    if (!cbs) {
+      cbs = {
+        onPlaySegment: () => cardActionsRef.current.playSegment(id, startMs),
+        onToggleRepeatSegment: () => cardActionsRef.current.toggleRepeat(id, startMs),
+      };
+      cardCallbacksRef.current.set(key, cbs);
+    }
+    return cbs;
+  };
+  useEffect(() => {
+    // 換影片時清掉舊影片的回呼，避免快取無限增長
+    cardCallbacksRef.current.clear();
+  }, [activeVideoId]);
 
   const inputParsedVideoId = urlInput.trim() ? extractYouTubeVideoId(urlInput.trim()) : null;
   const isNewInputUrl = Boolean(inputParsedVideoId && inputParsedVideoId !== activeVideoId);
@@ -2078,6 +2127,7 @@ export const YouTubeBilingualView: React.FC<Props> = ({
               >
                 {filteredSubtitles.map((ytItem, idx) => {
                   const subItem = toSubtitleItem(ytItem, idx);
+                  const cardCallbacks = getCardCallbacks(ytItem.id, ytItem.startMs);
                   const isActive = ytItem.id === (effectiveActiveId || activeSubtitleId);
                   const isPlayingThisSegment = isActive && playerState === 'playing';
 
@@ -2116,15 +2166,9 @@ export const YouTubeBilingualView: React.FC<Props> = ({
                         theme={effectiveTheme}
                         hideSpeedBookmark={true}
                         isPlayingSegment={isPlayingThisSegment}
-                        onPlaySegment={() => {
-                          if (isPlayingThisSegment) {
-                            playerRef.current?.pause();
-                          } else {
-                            handleSeekToSentence(ytItem.startMs);
-                          }
-                        }}
+                        onPlaySegment={cardCallbacks.onPlaySegment}
                         isRepeatActive={repeatSegmentId === ytItem.id}
-                        onToggleRepeatSegment={() => handleToggleRepeatSegment(ytItem.id, ytItem.startMs)}
+                        onToggleRepeatSegment={cardCallbacks.onToggleRepeatSegment}
                       />
                     </div>
                   );

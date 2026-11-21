@@ -44,3 +44,30 @@ export function getWsApiUrl(path: string): string {
   return `ws://localhost:3000${path.startsWith('/') ? path : '/' + path}`;
 }
 
+
+// ---- 後端暫時無法連線的記憶（2026-11-21）----
+// App 內的後端（AI Studio 預覽服務）常常連不上（被導向登入頁或逾時）。為了不要每次備援都白等數秒，
+// 失敗一次後 10 分鐘內直接跳過後端，之後再試。後端本身不移除，恢復正常時會自動再用。
+const BACKEND_DOWN_MS = 10 * 60 * 1000;
+let backendDownUntil = 0;
+
+export function isBackendUrl(url: string): boolean {
+  return url.startsWith(BACKEND_URL);
+}
+
+export function isBackendTemporarilyDown(): boolean {
+  return Date.now() < backendDownUntil;
+}
+
+export function markBackendDown(): void {
+  backendDownUntil = Date.now() + BACKEND_DOWN_MS;
+}
+
+export function markBackendUp(): void {
+  backendDownUntil = 0;
+}
+
+/** 是否在 Android App 內（原生層注入了 AndroidBridge） */
+export function isNativeAndroidApp(): boolean {
+  return typeof window !== 'undefined' && !!(window as any).AndroidBridge;
+}

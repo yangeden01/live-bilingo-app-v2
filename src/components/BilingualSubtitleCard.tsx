@@ -30,7 +30,7 @@ interface Props {
 
 const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-export const BilingualSubtitleCard: React.FC<Props> = ({
+const BilingualSubtitleCardInner: React.FC<Props> = ({
   subtitle,
   onBookmarkToggle,
   onOpenDictionary,
@@ -450,3 +450,29 @@ export const BilingualSubtitleCard: React.FC<Props> = ({
     </div>
   );
 };
+
+// 只在內容或狀態真的改變時才重畫（2026-11-21）：影片播放時父元件每 250ms 重畫一次，
+// 原本每張字幕卡都跟著重畫，字幕多時會卡頓、發燙。subtitle 每次都是新物件，所以比較它的欄位；
+// 其他 props 用一般的淺比較（回呼由父元件提供固定的參照）。
+const subtitleEqual = (a: SubtitleItem, b: SubtitleItem) =>
+  a === b ||
+  (a.id === b.id &&
+    a.english === b.english &&
+    a.traditionalChinese === b.traditionalChinese &&
+    a.timestamp === b.timestamp &&
+    a.start === b.start &&
+    a.end === b.end &&
+    a.bookmarked === b.bookmarked &&
+    a.createdAt === b.createdAt &&
+    a.isFinal === b.isFinal);
+
+export const BilingualSubtitleCard = React.memo(BilingualSubtitleCardInner, (prev, next) => {
+  for (const key of Object.keys({ ...prev, ...next }) as (keyof Props)[]) {
+    if (key === 'subtitle') {
+      if (!subtitleEqual(prev.subtitle, next.subtitle)) return false;
+    } else if (prev[key] !== next[key]) {
+      return false;
+    }
+  }
+  return true;
+});

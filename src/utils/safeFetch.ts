@@ -1,5 +1,5 @@
 // Safe API Client with Auto-Debug Trigger & Self-Healing Fallback
-import { getApiUrl } from './apiUrl';
+import { getApiUrl, isBackendUrl, isBackendTemporarilyDown, markBackendDown, markBackendUp } from './apiUrl';
 
 export interface SafeApiResponse<T> {
   ok: boolean;
@@ -67,6 +67,18 @@ export async function safeApiFetch<T = any>(
     ? endpointOrUrl
     : getApiUrl(endpointOrUrl);
 
+  // 後端最近連不上時直接回傳失敗，不再白等逾時
+  const toBackend = isBackendUrl(finalUrl);
+  if (toBackend && isBackendTemporarilyDown()) {
+    return {
+      ok: false,
+      status: 0,
+      data: fallbackData !== undefined ? fallbackData : null,
+      error: `Backend temporarily unavailable, skipped ${finalUrl}`,
+      source: fallbackData !== undefined ? 'fallback' : 'network',
+    };
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout limit
 
@@ -84,6 +96,7 @@ export async function safeApiFetch<T = any>(
 
     // Handle 404 or other non-2xx HTTP responses gracefully
     if (!response.ok) {
+      if (toBackend) markBackendDown();
       const errorMsg = `HTTP ${response.status} (${response.statusText || 'Error'}) from ${finalUrl}`;
       
       // Auto-trigger debug diagnosis
@@ -126,6 +139,7 @@ export async function safeApiFetch<T = any>(
 
     try {
       const parsedData = JSON.parse(text) as T;
+      if (toBackend) markBackendUp();
       return {
         ok: true,
         status: response.status,
@@ -133,6 +147,8 @@ export async function safeApiFetch<T = any>(
         source: 'network',
       };
     } catch (parseErr: any) {
+      // 後端被導向登入頁時會回 200 的 HTML，視為連不上
+      if (toBackend) markBackendDown();
       const parseErrorMsg = `JSON parsing failed for ${finalUrl}: ${parseErr.message}`;
       triggerAutoDebug({
         type: 'API_HTTP_ERROR',
@@ -152,6 +168,7 @@ export async function safeApiFetch<T = any>(
     }
   } catch (err: any) {
     clearTimeout(timeoutId);
+    if (toBackend) markBackendDown();
     const isAbort = err.name === 'AbortError';
     const errorMsg = isAbort ? `Request timeout for ${finalUrl}` : `Network/CORS failure for ${finalUrl}: ${err.message}`;
 

@@ -205,6 +205,10 @@ class RadioForegroundService : Service() {
         val action = intent?.action
         val isAppAlive = MainActivity.currentInstance?.activeWebView != null
 
+        // 用 startForegroundService() 啟動時，每條路徑都必須先呼叫 startForeground()，
+        // 否則系統會強制結束 App（原本「停止」與「睡眠計時」在 App 沒開時會當機）。
+        ensureForegroundStarted()
+
         when (action) {
             ACTION_STOP -> {
                 if (isAppAlive) {
@@ -311,6 +315,9 @@ class RadioForegroundService : Service() {
                     } else {
                         broadcastAction(ACTION_SLEEP_TIMER)
                     }
+                } else if (!currentIsPlaying && exoPlayer?.isPlaying != true) {
+                    // 只是調整計時、沒在播放：不要留下常駐通知
+                    stopForegroundService()
                 }
             }
             ACTION_UPDATE_STATE, ACTION_START -> {
@@ -356,6 +363,20 @@ class RadioForegroundService : Service() {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    private fun ensureForegroundStarted() {
+        try {
+            val statusText = if (currentIsPlaying) "🟢 正在播放雙語即時電台 • 點擊可返回" else "⏸ 廣播已暫停 • 點擊繼續播放"
+            val notification = buildNotification(currentStationName, statusText, currentIsPlaying)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("RadioForegroundService", "ensureForegroundStarted failed: ${e.message}")
         }
     }
 
@@ -603,10 +624,21 @@ class RadioForegroundService : Service() {
                     val serviceIntent = Intent(context, RadioForegroundService::class.java).apply {
                         action = ACTION_STOP
                     }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        context.startForegroundService(serviceIntent)
-                    } else {
-                        context.startService(serviceIntent)
+                    // Android 12 以上 App 在背景時不能啟動前景服務，會拋例外；
+                    // 改用一般 startService（服務已在執行時允許），兩者都失敗就略過，不讓 App 當掉
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            context.startForegroundService(serviceIntent)
+                        } else {
+                            context.startService(serviceIntent)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("RadioForegroundService", "Sleep timer stop via foreground start failed: ${e.message}")
+                        try {
+                            context.startService(serviceIntent)
+                        } catch (e2: Exception) {
+                            android.util.Log.w("RadioForegroundService", "Sleep timer stop failed: ${e2.message}")
+                        }
                     }
                 }
                 sleepTimerRunnable = runnable

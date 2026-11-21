@@ -5,9 +5,9 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+# contents: write 只給最後一步發布自用版 APK 到 GitHub Releases（latest）用；CI 不會推送程式碼
 permissions:
   contents: write
-  actions: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -27,19 +27,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
-
-      # 自動連動 Google AI Studio 撈取最新 Prompt 程式碼並覆蓋寫入專案 (選用)
-      - name: Fetch Latest Code from Google AI Studio
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          AI_STUDIO_PROMPT_ID: ${{ secrets.AI_STUDIO_PROMPT_ID }}
-        run: |
-          python fetch_ai_studio_code.py || true
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -61,6 +48,7 @@ jobs:
           fi
           cd android && gradle wrapper --gradle-version 8.7 || true
 
+      # 上傳金鑰只從 Secrets 解到 repo 外的暫存目錄；缺少或無效時直接失敗，不會產生新金鑰
       - name: Ensure Release Keystore
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -84,6 +72,12 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: Show Signing Certificate Fingerprint
+        run: |
+          AAB=$(find android/app/build/outputs/bundle/release -name "*.aab" | head -1)
+          echo "=== 簽署憑證 SHA-256（自用版與上架版用同一把，應為 95:EB:CD:8A…）==="
+          keytool -printcert -jarfile "$AAB" | grep -E "SHA256|Owner"
 
       - name: Upload Release AAB to Artifacts
         uses: actions/upload-artifact@v4
@@ -167,18 +161,10 @@ jobs:
           path: emulator_test/
           if-no-files-found: ignore
 
-      - name: Gemini AI Automatic Self-Healing & Re-Trigger CI
-        if: failure()
-        run: |
-          echo "=== 🤖 觸發 Gemini AI 自癒系統：自動解析 Logcat、生成修復 Patch 並 Push 重新觸發 CI ==="
-          python3 scripts/ai_self_heal.py
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+      # 只有 radio-selfuse 分支才發布；工作分支跑 CI 不會覆蓋 latest
       - name: Publish Direct APK to GitHub Releases (No Zip)
         uses: softprops/action-gh-release@v2
-        if: success()
+        if: success() && github.ref == 'refs/heads/radio-selfuse'
         with:
           tag_name: latest
           name: "BiLingo Radio (最新免解壓 APK)"

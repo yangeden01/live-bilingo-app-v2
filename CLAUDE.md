@@ -13,7 +13,7 @@
 5. 不得顯示、提交或分享 API Key、密碼、Secret 與簽署金鑰。
 6. 使用繁體中文。修改前先檢查現況，修改後執行必要測試。
 
-**本檔優先於 `AGENTS.md`。** AGENTS.md 的自動 push、回覆附花費報告、「main 是唯一維護目標」都不適用；其中的版本、地區與套件名已過時。
+**本檔是唯一規則來源。** `AGENTS.md` 已改為指向本檔（自用版 2026-11-22）。
 
 ## 新工作階段的分支設定
 
@@ -38,7 +38,7 @@
 |---|---|---|
 | 分支 | `main` | `radio-selfuse` |
 | applicationId | `com.bilingo.radio` | `com.bilingo.radio.internal` |
-| 版本 | 267 / 2.6.7 | 255 / 2.5.5 |
+| 版本 | 267 / 2.6.7 | 262 / 2.6.2 |
 | YouTube 模式 | 有 | 有，應與上架版相同 |
 | 廣播即時字幕與翻譯 | 無 | 有 |
 | 廣告 | AdMob 插頁等 | 無 |
@@ -52,7 +52,7 @@
 
 - **兩分支沒有共同祖先，不能 merge。** 修改要分別移植並各自驗證，並排除廣告與廣播相關程式。
 - **共用同一個後端**（`src/utils/apiUrl.ts` 相同）。後端變更會同時影響兩版，也要相容上架舊版。
-- **CI 與簽署腳本兩邊都有**，但目前內容已不同：`main` 的 `ensure_keystore.py` 已移除 Base64 輸出，`radio-selfuse` 尚未移除。
+- **CI 與簽署腳本兩邊都有**：`ensure_keystore.py` 與 `build.gradle.kts` 的簽署設定兩邊相同（自用版 2026-11-22 移植）。workflow 不同：自用版仍發布 APK 到 GitHub Releases（`latest`），沒有廣告測試 APK。
 - CI 在 `main` push 時自動觸發，`radio-selfuse` 要手動 dispatch。
 - 兩邊 workflow 都發布到 `latest` 與 `bilingo-radio.apk`，自用版建置可能蓋掉上架版的 Release 檔（不影響 Play）。
 
@@ -66,6 +66,7 @@ Android 原生外殼以 WebView 載入 React 前端，前端呼叫遠端 Node �
 - `android/app/src/main/assets/` 與 `assets/www/` 是建置產物，不要手改。
 - AGP 8.5.0、Kotlin 2.0.0、Gradle 8.7、JDK 17、compileSdk/targetSdk 36、minSdk 24。
 - WebView 黑屏問題見 `docs/WEBVIEW_BLACKSCREEN_AND_API_ROOTCAUSE.md`。
+- WebView 主畫面只允許 `https://appassets.android.com`（不可更改，否則已安裝使用者的 localStorage 會遺失），其他網址交給外部 App 開啟；`allowFileAccess`／`allowContentAccess` 關閉。自用版 `mixedContentMode` 維持 ALWAYS_ALLOW（有 http 電台串流），上架版為 COMPATIBILITY_MODE。
 
 ## 建置
 
@@ -92,10 +93,11 @@ cd android && ./gradlew assembleDebug
 - `package-lock.json` 與 `package.json` 不同步，`npm ci` 會失敗；CI 靠 `npm ci || npm install` 退回。
 - `npm run build` 含 `rm`、`cp`，Windows 要用 Git Bash。切換分支後要重跑。
 - 本機需要 JDK 17 與 SDK 36；Windows clone 需要 `git config core.longpaths true`。
-- repo 內的 keystore 已損毀，release 版只能由 CI 建置。
-- **不要使用 `scripts/deploy.sh`**：它會 `git add -A`、`push --force`、改全域 git 設定，甚至 `rm -rf .git`。
+- release 版只能由 CI 建置（上傳金鑰只在 GitHub Secrets）。
+- `scripts/deploy.sh` 已於 2026-11-22 從自用版刪除（`main` 於 2026-11-21 刪除）。
 
-CI：`.github/workflows/build-android.yml` 建置 AAB、APK，跑模擬器測試，再發布 APK 到 GitHub Releases。它**不會**上傳 Play。失敗時 `ai_self_heal.py` 會自動修改並推送。
+CI：`.github/workflows/build-android.yml` 建置 AAB、APK，跑模擬器測試，成功且分支是 `radio-selfuse` 時才發布 APK 到 GitHub Releases（`latest`／`bilingo-radio.apk`；工作分支跑 CI 不會發布）。它**不會**上傳 Play，也**不會**修改或推送程式（2026-11-22 刪除 `ai_self_heal.py` 與 AI Studio 拉取）。權限只有 `contents: write`（發布 Release 用）。
+- 「Show Signing Certificate Fingerprint」步驟印出簽署憑證 SHA-256，應為上傳金鑰 `95:EB:CD:8A…`（自用版與上架版同一把，已安裝的自用版才能直接更新）。
 
 ## 現況
 
@@ -128,20 +130,23 @@ CI：`.github/workflows/build-android.yml` 建置 AAB、APK，跑模擬器測試
 - Play App Signing 已啟用。應用程式簽署金鑰 SHA-256：`A8:96:2A:09…1B:24:BD`。
 - Play 上傳金鑰 SHA-256：`95:EB:CD:8A…83:F9:F1`。CI Secrets 應為這把，但未直接驗證。
 - **repo 的 `upload_certificate.pem`（`6C:E1:8C:05…`）不是現行上傳憑證，不可用來比對。**
-- repo 的 `release.keystore`、`temp.p12` 已損毀，無法使用。
+- 上傳金鑰只放在 GitHub Secrets（`RELEASE_KEYSTORE_BASE64`、`RELEASE_STORE_PASSWORD`、`RELEASE_KEY_PASSWORD`、`RELEASE_KEY_ALIAS`）。`android/app/ensure_keystore.py` 解碼到 `$RUNNER_TEMP` 並驗證，透過 `RELEASE_KEYSTORE_PATH` 交給 `build.gradle.kts`；缺少或無效時 CI 直接失敗，**不會產生新金鑰**、沒有寫死的預設密碼。debug 版改用 Android 預設 debug 金鑰。
+- 損毀的 `release.keystore`、`temp.p12` 已於 2026-11-22 從自用版刪除；`.gitignore` 排除 `*.keystore`、`*.jks`、`*.p12`。
+- 舊版 `ensure_keystore.py` 曾把金鑰庫 Base64 寫進 Actions 的執行摘要（Job summary）；舊的 workflow run 若還在，摘要裡可能仍有，要清除需刪除那些 run。
 - 不得升級或更換應用程式簽署金鑰。上傳金鑰遺失時，可在 Play Console 申請重設。
 
 ### 版本
 
 - versionCode 寫死在 `android/app/build.gradle.kts`，CI 不會自動遞增。
-- Play 已使用到 267，下一版至少 268。Play Console 正式版：267（2.6.7），178 個國家全面推出。
+- 上架版（`main`）：Play 已使用到 267 以上，正式版版號以 `main` 的 CLAUDE.md 為準。
+- 自用版：262（2.6.2，第一組安全修正移植）。
 
 ## 上架流程
 
 1. 通過 `npm run lint`、`npm run test:subtitles`。
 2. 遞增 `versionCode`、`versionName`。
 3. 推送 `main`，等 CI 成功。
-4. 確認 Keystore 步驟沒有產生新金鑰。
+4. 確認「Show Upload Key Fingerprint」的 SHA-256 為上傳金鑰 `95:EB:CD:8A…`。
 5. 從 Artifacts 下載 `app-release-aab`，上傳內部測試軌。
 6. 實機驗證字幕、翻譯、廣告、後端連線與舊版升級。
 7. 升級到正式版，分階段發布。
@@ -151,5 +156,5 @@ CI：`.github/workflows/build-android.yml` 建置 AAB、APK，跑模擬器測試
 
 1. 遞增版本並通過檢查。
 2. 手動 dispatch `build-android.yml`，分支選 `radio-selfuse`。
-3. 從 Artifacts 下載 `app-release-apk`，實機驗證。
+3. 確認「Show Signing Certificate Fingerprint」為 `95:EB:CD:8A…`，再從 Artifacts 下載 `app-release-apk`，實機驗證（要能直接覆蓋安裝舊版）。
 4. 檢查 `latest` Release 是否被覆蓋。

@@ -1,138 +1,88 @@
-import os
-import sys
+"""CI 用：把 GitHub Secrets 的上傳金鑰解碼到 repo 外的暫存目錄，並驗證可用。
+
+安全規則（2026-11-21 修正）：
+- 金鑰只寫到 $RUNNER_TEMP（repo 外），絕不寫進 repo，避免被 `git add` 帶進公開 repo。
+- Secrets 缺少或無效時直接失敗，絕不自行產生新金鑰（新金鑰簽的 AAB 會被 Play 拒收）。
+- 不使用任何寫死的預設密碼。
+成功時把 RELEASE_KEYSTORE_PATH / RELEASE_STORE_PASSWORD / RELEASE_KEY_PASSWORD / RELEASE_KEY_ALIAS
+寫入 $GITHUB_ENV，交給 app/build.gradle.kts 的 release signingConfig。
+"""
 import base64
-import subprocess
+import os
 import re
+import subprocess
+import sys
+import tempfile
 
-def main():
-    ks_path = "release.keystore"
-    env_b64 = os.environ.get("RELEASE_KEYSTORE_BASE64", "").strip()
-    env_store_pass = os.environ.get("RELEASE_STORE_PASSWORD", "").strip() or "bilingo123456"
-    env_key_pass = os.environ.get("RELEASE_KEY_PASSWORD", "").strip() or env_store_pass
-    env_alias = os.environ.get("RELEASE_KEY_ALIAS", "").strip() or "bilingokey"
 
-    def check_keystore(path, store_pass, key_pass, alias):
-        if not os.path.exists(path) or os.path.getsize(path) < 100:
-            return False
-        cmd = ["keytool", "-exportcert", "-alias", alias, "-keystore", path, "-storepass", store_pass, "-keypass", key_pass]
-        try:
-            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return res.returncode == 0
-        except FileNotFoundError:
-            return os.path.getsize(path) > 1000
-        except Exception:
-            return False
+def fail(msg: str) -> None:
+    print(f"::error::{msg}")
+    sys.exit(1)
 
-    def find_aliases(path, store_pass):
-        cmd = ["keytool", "-list", "-keystore", path, "-storepass", store_pass]
-        try:
-            res = subprocess.run(cmd, capture_output=True, text=True)
-            if res.returncode != 0:
-                return []
-            aliases = []
-            for line in res.stdout.splitlines():
-                if "," in line and any(k in line.lower() for k in ["privatekeyentry", "keyentry", "trustedcertentry"]):
-                    aliases.append(line.split(",")[0].strip())
-                elif ":" in line:
-                    parts = line.split(":", 1)
-                    if any(k in parts[0].lower() for k in ["alias", "別名"]):
-                        aliases.append(parts[1].strip())
-            return aliases
-        except Exception:
-            return []
 
-    valid = False
-    final_store_pass = env_store_pass
-    final_key_pass = env_key_pass
-    final_alias = env_alias
-    status_msg = ""
+def check_keystore(path: str, store_pass: str, key_pass: str, alias: str) -> bool:
+    cmd = ["keytool", "-exportcert", "-alias", alias, "-keystore", path,
+           "-storepass", store_pass, "-keypass", key_pass]
+    try:
+        return subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+    except Exception:
+        return False
 
-    if env_b64:
-        try:
-            clean_b64 = re.sub(r"[^A-Za-z0-9+/=]", "", env_b64)
-            data = base64.b64decode(clean_b64)
-            if len(data) > 100:
-                with open(ks_path, "wb") as f:
-                    f.write(data)
-                if check_keystore(ks_path, env_store_pass, env_key_pass, env_alias):
-                    valid = True
-                    status_msg = "Restored keystore from secret successfully."
-                elif check_keystore(ks_path, env_store_pass, env_store_pass, env_alias):
-                    final_key_pass = env_store_pass
-                    valid = True
-                    status_msg = "Restored keystore using storepass as keypass."
-                else:
-                    aliases = find_aliases(ks_path, env_store_pass)
-                    for a in aliases:
-                        if check_keystore(ks_path, env_store_pass, env_key_pass, a):
-                            final_alias = a
-                            valid = True
-                            status_msg = f"Restored keystore with alias {a}."
-                            break
-                        elif check_keystore(ks_path, env_store_pass, env_store_pass, a):
-                            final_alias = a
-                            final_key_pass = env_store_pass
-                            valid = True
-                            status_msg = f"Restored keystore with alias {a} using storepass as keypass."
-                            break
-        except Exception as e:
-            print(f"Error decoding base64 keystore: {e}")
 
-    # If no valid secret was provided, check if a committed release.keystore exists in git and is valid
-    if not valid and os.path.exists(ks_path) and os.path.getsize(ks_path) > 100:
-        test_pass = "bilingo123456"
-        test_alias = "bilingokey"
-        final_store_pass = test_pass
-        final_key_pass = test_pass
-        final_alias = test_alias
-        valid = True
-        status_msg = "Using verified committed repository release keystore (bilingokey)."
+def find_aliases(path: str, store_pass: str) -> list:
+    try:
+        res = subprocess.run(["keytool", "-list", "-keystore", path, "-storepass", store_pass],
+                             capture_output=True, text=True)
+    except Exception:
+        return []
+    if res.returncode != 0:
+        return []
+    aliases = []
+    for line in res.stdout.splitlines():
+        if "," in line and "entry" in line.lower():
+            aliases.append(line.split(",")[0].strip())
+    return aliases
 
-    if not valid:
-        final_store_pass = "bilingo123456"
-        final_key_pass = "bilingo123456"
-        final_alias = "bilingokey"
-        cmd = [
-            "keytool", "-genkeypair",
-            "-keystore", ks_path,
-            "-alias", final_alias,
-            "-keyalg", "RSA", "-keysize", "2048", "-validity", "10000",
-            "-storepass", final_store_pass,
-            "-keypass", final_key_pass,
-            "-dname", "CN=Bilingo, OU=Radio, O=Bilingo, L=Taipei, ST=Taiwan, C=TW"
-        ]
-        try:
-            subprocess.run(cmd, check=True)
-            status_msg = "Secret keystore missing/invalid. Generated fresh self-signed keystore."
-        except Exception as e:
-            print(f"Keytool generation warning: {e}")
-            status_msg = "Fallback keystore setup completed."
 
-    print(f"Keystore status: {status_msg}")
-    print(f"Alias: {final_alias}")
+def main() -> None:
+    b64 = os.environ.get("RELEASE_KEYSTORE_BASE64", "").strip()
+    store_pass = os.environ.get("RELEASE_STORE_PASSWORD", "").strip()
+    key_pass = os.environ.get("RELEASE_KEY_PASSWORD", "").strip() or store_pass
+    alias = os.environ.get("RELEASE_KEY_ALIAS", "").strip()
 
+    if not b64 or not store_pass:
+        fail("缺少 RELEASE_KEYSTORE_BASE64 或 RELEASE_STORE_PASSWORD（GitHub Secrets），停止建置。")
+
+    try:
+        data = base64.b64decode(re.sub(r"[^A-Za-z0-9+/=]", "", b64))
+    except Exception:
+        fail("RELEASE_KEYSTORE_BASE64 不是有效的 Base64。")
+
+    out_dir = os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()
+    ks_path = os.path.join(out_dir, "bilingo-upload.keystore")
+    with open(ks_path, "wb") as f:
+        f.write(data)
+
+    # 依序嘗試：指定的 alias；key 密碼與 store 密碼相同；金鑰庫裡實際的 alias
+    candidates = [(alias, key_pass), (alias, store_pass)] if alias else []
+    for a in find_aliases(ks_path, store_pass):
+        candidates += [(a, key_pass), (a, store_pass)]
+    for a, kp in candidates:
+        if a and check_keystore(ks_path, store_pass, kp, a):
+            alias, key_pass = a, kp
+            break
+    else:
+        fail("無法用 Secrets 的密碼與 alias 開啟上傳金鑰，停止建置（不會產生新金鑰）。")
+
+    print(f"上傳金鑰驗證成功（alias: {alias}），位置在 repo 外的暫存目錄。")
     github_env = os.environ.get("GITHUB_ENV")
     if github_env:
         with open(github_env, "a") as f:
-            f.write(f"RELEASE_STORE_PASSWORD={final_store_pass}\n")
-            f.write(f"RELEASE_KEY_PASSWORD={final_key_pass}\n")
-            f.write(f"RELEASE_KEY_ALIAS={final_alias}\n")
+            f.write(f"RELEASE_KEYSTORE_PATH={ks_path}\n")
+            f.write(f"RELEASE_STORE_PASSWORD={store_pass}\n")
+            f.write(f"RELEASE_KEY_PASSWORD={key_pass}\n")
+            f.write(f"RELEASE_KEY_ALIAS={alias}\n")
 
-    step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
-    if step_summary:
-        with open(step_summary, "a") as f:
-            f.write("### 🔑 Android Signing Keystore Status\n")
-            f.write(f"- **Status**: {status_msg}\n")
-            f.write(f"- **Alias**: `{final_alias}`\n")
-            if os.path.exists(ks_path):
-                f.write(f"- **Keystore Size**: {os.path.getsize(ks_path)} bytes\n")
-                try:
-                    with open(ks_path, "rb") as ksf:
-                        b64_str = base64.b64encode(ksf.read()).decode("utf-8")
-                    f.write("\n<details><summary>💡 點此展開並複製 Base64 設定至 GitHub Secrets (RELEASE_KEYSTORE_BASE64) 以固定簽名</summary>\n\n")
-                    f.write(f"```\n{b64_str}\n```\n\n</details>\n")
-                except Exception:
-                    pass
 
 if __name__ == "__main__":
     main()

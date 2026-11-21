@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# 金鑰與憑證檔一律不進 repo（上傳金鑰只放 GitHub Secrets）
+*.keystore
+*.jks
+*.p12
+__pycache__/

@@ -61,10 +61,8 @@ jobs:
       - name: Build Web App and Sync to Android Assets
         run: |
           npm ci || npm install
+          # npm run build 會用 scripts/sync-android-assets.mjs 把網頁複製到 APK assets（只一份，排除用不到的檔案）
           npm run build
-          mkdir -p android/app/src/main/assets/www
-          cp -r dist/* android/app/src/main/assets/
-          cp -r dist/* android/app/src/main/assets/www/
 
       - name: Build Android App Bundle (AAB)
         run: |
@@ -100,20 +98,6 @@ jobs:
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: ignore
 
-      - name: Build Android Debug APK
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
-
-      - name: Upload Debug APK to Artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: app-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: ignore
-
       # 模擬器專用 APK：-PuseTestAds=true 讓 release 也改用 Google 測試廣告，
       # 避免雲端模擬器載入正式廣告。放在正式 AAB／APK 上傳到 Artifacts 之後才建置，
       # 所以上架用的 AAB 維持正式廣告。
@@ -144,8 +128,8 @@ jobs:
           script: |
             echo "=== 1. 清理舊版 App 並強制覆蓋安裝最新 APK ==="
             adb uninstall com.bilingo.radio || true
-            # 只安裝測試廣告版本（-PuseTestAds=true 的 release，失敗時退回 debug，debug 本身也用測試廣告）
-            adb install -r -g emulator_apk/bilingo-radio-testads.apk || adb install -r -g android/app/build/outputs/apk/debug/*.apk
+            # 只安裝測試廣告版本（-PuseTestAds=true 的 release）。CI 不再另外建置 debug 版，省下約 2 分鐘
+            adb install -r -g emulator_apk/bilingo-radio-testads.apk
             echo "=== 2. 自動啟動 BiLingo Radio App 主畫面 ==="
             adb shell am start -n com.bilingo.radio/com.bilingo.radio.MainActivity
             echo "=== 3. 等待 App 啟動並完成 WebView 渲染 (12 秒) ==="

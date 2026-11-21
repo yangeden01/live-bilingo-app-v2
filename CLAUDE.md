@@ -63,7 +63,8 @@ Android 原生外殼以 WebView 載入 React 前端，前端呼叫遠端 Node �
 - 前端 `src/`：React 19、Vite 6、Tailwind 4。
 - 後端 `server.ts`、`server/`：Express + ws，整合 Gemini、Groq Whisper、Deepgram、YouTube 字幕與新聞探索。
 - Android `android/`：Kotlin、Compose。`MainScreen.kt` 以 `WebViewAssetLoader` 載入前端（`https://appassets.android.com`，不可更改，否則已安裝使用者的 localStorage 會遺失；主畫面只允許這個網域，其他網址交給外部 App 開啟），另有原生 `youtube/`、`stt/`、`translation/`、前景服務與桌面小工具；`main` 另有 `ads/`。
-- `android/app/src/main/assets/` 與 `assets/www/` 是建置產物，不要手改。
+- `android/app/src/main/assets/` 是建置產物，不要手改。`npm run build` 最後由 `scripts/sync-android-assets.mjs` 從 `dist/` 複製**一份**（2026-11-21 起不再複製 `assets/www/`），並排除 `server.cjs`、sourcemap、商店宣傳圖、憑證等 App 用不到的檔案；APK 內網頁約 2.6 MB（原本 13 MB）。CI 只跑 `npm run build`，不另外 cp。
+- Play 商店宣傳圖與截圖放在 repo 根目錄 `store-assets/`，不放 `public/`（`public/` 的檔案會被打包進 APK）。
 - AGP 8.5.0、Kotlin 2.0.0、Gradle 8.7、JDK 17、compileSdk/targetSdk 36、minSdk 24。
 - WebView 黑屏問題見 `docs/WEBVIEW_BLACKSCREEN_AND_API_ROOTCAUSE.md`。
 - **背景暫停（僅 `main`）**：`MainActivity.onPause` 在網頁的背景處理跑完後暫停 WebView 與計時器；但桌面小工具正在播放廣播（`isBackgroundAudioActive`）時不暫停。`radio-selfuse` 需要背景播放，**不要移植**這項。
@@ -100,6 +101,8 @@ cd android && ./gradlew assembleDebug
 - 本機需要 JDK 17 與 SDK 36；Windows clone 需要 `git config core.longpaths true`。
 - release 版只能由 CI 建置（上傳金鑰只在 GitHub Secrets）。
 - `scripts/deploy.sh`（會 `git add -A`、`push --force`、`rm -rf .git`）已於 2026-11-21 從 `main` 刪除；`radio-selfuse` 仍有，不要使用。
+- `main` 已刪除只屬於廣播功能、或完全沒被引用的前端檔案（21 個，約 9,100 行，例如 `Material3AndroidFrame.tsx`、`useRadioAudio.ts`、`SttLatencyDebugPanel.tsx`）與 Kotlin 類別（`RadioSubtitleViewModel` 等 5 個）。`radio-selfuse` 仍在使用其中部分檔案，**不要把這些刪除移植過去**。
+- `bun.lock` 已刪除，只用 npm。
 
 CI：`.github/workflows/build-android.yml` 建置 AAB、APK，跑模擬器測試，產物放在 Artifacts。它**不會**上傳 Play，也**不會**發布 GitHub Releases。
 - 權限 `contents: read`；不會自動修改或推送程式（`ai_self_heal.py`、`fetch_ai_studio_code.py` 已刪除，原本可能把真正的上傳金鑰 `git add` 進公開 repo）。
@@ -136,7 +139,7 @@ CI：`.github/workflows/build-android.yml` 建置 AAB、APK，跑模擬器測試
 
 - Play App Signing 已啟用。應用程式簽署金鑰 SHA-256：`A8:96:2A:09…1B:24:BD`。
 - Play 上傳金鑰 SHA-256：`95:EB:CD:8A…83:F9:F1`。CI Secrets 應為這把，但未直接驗證。
-- **repo 的 `upload_certificate.pem`（`6C:E1:8C:05…`）不是現行上傳憑證，不可用來比對。**
+- 舊的 `upload_certificate.pem`（`6C:E1:8C:05…`，不是現行上傳憑證）已於 2026-11-21 刪除。
 - 上傳金鑰只放在 GitHub Secrets（`RELEASE_KEYSTORE_BASE64`、`RELEASE_STORE_PASSWORD`、`RELEASE_KEY_PASSWORD`、`RELEASE_KEY_ALIAS`）。`android/app/ensure_keystore.py` 解碼到 `$RUNNER_TEMP` 並驗證，透過 `RELEASE_KEYSTORE_PATH` 交給 `build.gradle.kts`；缺少或無效時 CI 直接失敗，**不會產生新金鑰**、沒有寫死的預設密碼。
 - 損毀的 `release.keystore`、`temp.p12` 已於 2026-11-21 刪除；`.gitignore` 排除 `*.keystore`、`*.jks`、`*.p12`。debug 版改用 Android 預設 debug 金鑰。
 - 不得升級或更換應用程式簽署金鑰。上傳金鑰遺失時，可在 Play Console 申請重設。
@@ -144,7 +147,7 @@ CI：`.github/workflows/build-android.yml` 建置 AAB、APK，跑模擬器測試
 ### 版本
 
 - versionCode 寫死在 `android/app/build.gradle.kts`，CI 不會自動遞增。
-- 程式碼目前 277（2.7.7，第二組耗電／當機／假翻譯修正）。276（2.7.6）為第一組安全修正。2026-11-02 時 Play 正式版為 267（2.6.7），178 個國家全面推出；之後上架到哪一版待確認。
+- 程式碼目前 278（2.7.8，第三組瘦身與清理）。277（2.7.7）為第二組耗電／當機／假翻譯修正。276（2.7.6）為第一組安全修正。2026-11-02 時 Play 正式版為 267（2.6.7），178 個國家全面推出；之後上架到哪一版待確認。
 
 ## 上架流程
 

@@ -1,13 +1,12 @@
 {
-  "name": "react-example",
+  "name": "live-bilingo",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && node scripts/postbuild.js && rm -rf android/app/src/main/assets/* && mkdir -p android/app/src/main/assets/www && cp -r dist/* android/app/src/main/assets/ && cp -r dist/* android/app/src/main/assets/www/",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && node scripts/postbuild.js && node scripts/sync-android-assets.mjs",
     "start": "node dist/server.cjs",
-    "check-ci": "node scripts/check-github-actions.js",
     "test:subtitles": "node scripts/verify-subtitles-stream.js",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"

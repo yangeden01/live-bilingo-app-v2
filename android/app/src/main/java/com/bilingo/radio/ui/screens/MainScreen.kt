@@ -37,7 +37,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import com.bilingo.radio.MainActivity
 import com.bilingo.radio.service.RadioForegroundService
-import com.bilingo.radio.viewmodel.RadioSubtitleViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -1011,9 +1010,7 @@ class WebAppInterface(
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun MainScreen(
-    viewModel: RadioSubtitleViewModel? = null
-) {
+fun MainScreen() {
     val context = LocalContext.current
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     val localAppUrl = "https://appassets.android.com/assets/index.html"
@@ -1135,7 +1132,7 @@ fun MainScreen(
                             textZoom = 100
                             val defaultUa = try { userAgentString } catch (_: Exception) { "" } ?: ""
                             if (!defaultUa.contains("AndroidApp")) {
-                                userAgentString = "$defaultUa AndroidApp/2.4.9"
+                                userAgentString = "$defaultUa AndroidApp/${com.bilingo.radio.BuildConfig.VERSION_NAME}"
                             }
                             // 一般快取：App 自己的網頁由攔截器回傳 no-cache 標頭，不會讀到舊版；縮圖等外部資源可正常快取
                             cacheMode = WebSettings.LOAD_DEFAULT
@@ -1237,7 +1234,7 @@ fun MainScreen(
                                         200,
                                         "OK",
                                         noCacheHeaders,
-                                        java.io.ByteArrayInputStream("""{"version":"2.5.1","status":"ok"}""".toByteArray(Charsets.UTF_8))
+                                        java.io.ByteArrayInputStream("""{"version":"${com.bilingo.radio.BuildConfig.VERSION_NAME}","status":"ok"}""".toByteArray(Charsets.UTF_8))
                                     )
                                 }
 

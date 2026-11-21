@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- screenOrientation="portrait" 會讓 Play 自動把直向螢幕當成必要硬體，只能橫放的裝置（Chromebook、XR 等）
+         無法安裝，Play Console 會擋下送審。標為選用：畫面仍鎖直向，但這些裝置也能安裝。 -->
+    <uses-feature android:name="android.hardware.screen.portrait" android:required="false" />
+
     <application
         android:name=".LiveBilingoApp"
         android:allowBackup="true"

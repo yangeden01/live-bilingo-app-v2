@@ -53,6 +53,7 @@ import { VocabularyNotebookModal } from './VocabularyNotebookModal';
 import { AdManager } from '../utils/adManager';
 import { convertChinese } from '../utils/chineseConverter';
 import { splitSubtitleIntoCues, pickCueAt } from '../utils/subtitleCueSplitter';
+import { normalizeAllCapitalizedSpeech, formatSentenceCase } from '../utils/textSanitizer';
 
 interface Props {
   onOpenDictionary?: (word?: string) => void;
@@ -1066,7 +1067,11 @@ export const YouTubeBilingualView: React.FC<Props> = ({
 
   const fullscreenOverlaySubtitle = useMemo(() => {
     const cue = pickCueAt(fullscreenCues, currentTimeSeconds * 1000);
-    return cue ? { english: cue.english, chinese: cue.chinese } : null;
+    // Same case normalization as the reading-mode cards (BilingualSubtitleCard), so ALL-CAPS captions
+    // are shown in sentence case in fullscreen too.
+    return cue
+      ? { english: formatSentenceCase(normalizeAllCapitalizedSpeech(cue.english || '')), chinese: cue.chinese }
+      : null;
   }, [fullscreenCues, currentTimeSeconds]);
 
   // Ahead Subtitles (for pre-reading when voice is delayed by videoSyncOffset > 0)

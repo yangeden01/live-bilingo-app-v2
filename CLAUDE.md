@@ -38,7 +38,7 @@
 |---|---|---|
 | 分支 | `main` | `radio-selfuse` |
 | applicationId | `com.bilingo.radio` | `com.bilingo.radio.internal` |
-| 版本 | 267 / 2.6.7 | 262 / 2.6.2 |
+| 版本 | 267 / 2.6.7 | 263 / 2.6.3 |
 | YouTube 模式 | 有 | 有，應與上架版相同 |
 | 廣播即時字幕與翻譯 | 無 | 有 |
 | 廣告 | AdMob 插頁等 | 無 |
@@ -139,7 +139,7 @@ CI：`.github/workflows/build-android.yml` 建置 AAB、APK，跑模擬器測試
 
 - versionCode 寫死在 `android/app/build.gradle.kts`，CI 不會自動遞增。
 - 上架版（`main`）：Play 已使用到 267 以上，正式版版號以 `main` 的 CLAUDE.md 為準。
-- 自用版：262（2.6.2，第一組安全修正移植）。
+- 自用版：263（2.6.3，全螢幕字幕英文改用與閱讀模式相同的大小寫轉換；工作分支 `ccr-4011045b-ofi16b-selfuse`，尚未合併 `radio-selfuse`）。262（2.6.2）為第一組安全修正移植。
 
 ## 上架流程
 
